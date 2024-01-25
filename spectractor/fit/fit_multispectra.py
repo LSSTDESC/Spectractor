@@ -50,7 +50,7 @@ def _build_sim_sample(spectra, aerosols=0.05, ozone=300, pwv=5, angstrom_exponen
         # fast_sim must be True to avoid biases (the rebinning is done after in _prepare_data())
         s = SpectrumSimulation(spec, atmosphere=atm, fast_sim=True, with_adr=True)
         s.simulate(A1=1, A2=0, aerosols=aerosols, angstrom_exponent=angstrom_exponent, ozone=ozone, pwv=pwv,
-                   reso=-1, D=parameters.DISTANCE2CCD, shift_x=0, B=0)
+                   reso=-1, D=parameters.DISTANCE2CCD, shift_x=0)
         sim_spectra.append(s)
     return sim_spectra
 
@@ -94,7 +94,7 @@ def _build_test_sample(nspectra=3, aerosols=0.05, ozone=300, pwv=5, angstrom_exp
         s.temperature = temperature
         s.adr_params = [s.dec, s.hour_angle, temperature, pressure, s.humidity, airmass]
         s.simulate(A1=1, A2=0, aerosols=aerosols, angstrom_exponent=angstrom_exponent, ozone=ozone, pwv=pwv,
-                   reso=-1, D=parameters.DISTANCE2CCD, shift_x=0, B=0)
+                   reso=-1, D=parameters.DISTANCE2CCD, shift_x=0)
         spectra.append(s)
     return spectra
 

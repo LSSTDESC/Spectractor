@@ -62,7 +62,7 @@ def test_simulator():
         atmosphere = AtmosphereGrid(atmgrid_filename="./tests/data/reduc_20170530_134_atmsim.fits")
         spectrum_simulation = SpectrumSimulation(spectrum, atmosphere=atmosphere, fast_sim=True)
         spectrum_simulation.simulate(A1=1, A2=1, ozone=300, pwv=5, aerosols=0.05, angstrom_exponent=None,
-                                     reso=0., D=56, shift_x=0., B=0.)
+                                     reso=0., D=56, shift_x=0.)
 
         assert np.sum(spectrum_simulation.data) > 0
         assert np.sum(spectrum_simulation.data) < 1e-10

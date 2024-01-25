@@ -136,9 +136,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.params.bounds[self.params.get_index("PWV [mm]")] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
             self.params.fixed[self.params.get_index("angstrom_exp_log10")] = True  # angstrom exponent
 
-        self.simulation = SpectrogramModel(self.spectrum, atmosphere=self.atmosphere,
-                                           diffraction_orders=self.diffraction_orders,
-                                           with_background=True, fast_sim=False, with_adr=True)
+        self.spectrogram_simulation = SpectrogramModel(self.spectrum, atmosphere=self.atmosphere,
+                                                       diffraction_orders=self.diffraction_orders,
+                                                       fast_sim=False, with_adr=True)
         self.lambdas_truth = None
         self.amplitude_truth = None
         self.get_spectrogram_truth()

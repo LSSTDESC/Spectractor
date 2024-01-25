@@ -227,7 +227,9 @@ class SpectrumFitWorkspace(FitWorkspace):
             angstrom_exponent = 10 ** angstrom_exponent_log10
         else:
             angstrom_exponent = None
-        lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x, B)
+        lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x)
+        if B != 0:
+            model += B / (lambdas * np.gradient(lambdas))
         self.model = model
         self.model_err = model_err
         return lambdas, model, model_err
