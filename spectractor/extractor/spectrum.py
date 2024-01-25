@@ -671,7 +671,7 @@ class Spectrum:
             # print(f"Set header key {header_key} to {value} from attr {attribute}")
 
         extnames = ["SPECTRUM", "SPEC_COV", "ORDER2", "ORDER0"]  # spectrum data
-        extnames += ["S_DATA", "S_ERR", "S_BGD", "S_BGD_ER", "S_FIT", "S_RES"]  # spectrogram data
+        extnames += ["S_DATA", "S_ERR", "S_BGD", "S_BGD_ER", "S_FIT", "S_RES", "S_FLAT", "S_STAR"]  # spectrogram data
         extnames += ["PSF_TAB"]  # PSF parameter table
         extnames += ["LINES"]  # spectroscopic line table
         extnames += ["CONFIG"]  # config parameters
@@ -702,9 +702,9 @@ class Spectrum:
                 hdus[extname].data = self.spectrogram_fit
             elif extname == "S_RES":
                 hdus[extname].data = self.spectrogram_residuals
-            elif extname == "S_FLAT" and self.spectrogram_flat is not None:
+            elif extname == "S_FLAT":
                 hdus[extname].data = self.spectrogram_flat
-            elif extname == "S_STAR" and self.spectrogram_starfield is not None:
+            elif extname == "S_STAR":
                 hdus[extname].data = self.spectrogram_starfield
             elif extname == "PSF_TAB":
                 hdus[extname] = fits.table_to_hdu(self.chromatic_psf.table)
@@ -1086,9 +1086,9 @@ class Spectrum:
                 self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
                 self.spectrogram_fit = hdu_list["S_FIT"].data
                 self.spectrogram_residuals = hdu_list["S_RES"].data
-                if "S_FLAT" in hdu_list.__dict__.keys():
+                if "S_FLAT" in [hdu.name for hdu in hdu_list]:
                     self.spectrogram_flat = hdu_list["S_FLAT"].data
-                if "S_STAR" in hdu_list.__dict__.keys():
+                if "S_STAR" in [hdu.name for hdu in hdu_list]:
                     self.spectrogram_starfield = hdu_list["S_STAR"].data
                 self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
                                                    saturation=self.spectrogram_saturation)
