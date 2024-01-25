@@ -312,6 +312,101 @@ class BackgroundModel:
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
 
+class FlatModel:
+    """Class to model the pixel flat of the simulated image. Flat is dimensionless and its average must be one.
+
+    The flat model size is set with the parameters.CCD_IMSIZE global keyword.
+
+    Attributes
+    ----------
+    gains: array_like
+        The list of gains to apply. The average must be one.
+    with_noise: bool
+        If True, a random quantum efficiency is applied to pixels (default: False).
+    """
+
+    def __init__(self, gains, with_noise=False):
+        """Create a FlatModel instance. Flat is dimensionless and its average must be one.
+
+        The flat model size is set with the parameters.CCD_IMSIZE global keyword.
+
+        Parameters
+        ----------
+        gains: array_like
+            The list of gains to apply. The average must be one.
+        with_noise: bool
+            If True, a random quantum efficiency is applied to pixels (default: False).
+
+        Examples
+        --------
+        >>> from spectractor import parameters
+        >>> parameters.CCD_IMSIZE = 200
+        >>> flat = FlatModel(gains=[[1, 2, 3, 4], [4, 3, 2, 1]], with_noise=True)
+        >>> model = flat.model()
+        >>> print(f"{np.mean(model):.4f}")
+        1.0000
+        >>> model.shape
+        (200, 200)
+        >>> flat.plot_model()
+        """
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.gains = np.atleast_2d(gains).astype(float)
+        if len(self.gains) <= 0:
+            raise ValueError(f"Gains list is empty")
+        if np.any(self.gains <= 0):
+            raise ValueError(f"One the gain values is negative. Got {self.gains}.")
+        if np.mean(self.gains) != 1.:
+            self.my_logger.warning(f"\n\tGains list average is not one but {np.mean(self.gains)}. "
+                                   "I scaled them to have an average of one.")
+            self.gains /= np.mean(self.gains)
+        self.my_logger.warning(f'\n\tRelative gains are set to {self.gains}.')
+        self.with_noise = with_noise
+
+    def model(self):
+        """Compute the flat model for the image simulation (no units).
+
+        Returns
+        -------
+        flat: array_like
+            The array of the flat model.
+        """
+        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
+        flat = np.ones_like(xx, dtype=float)
+        hflats = np.array_split(flat, self.gains.shape[0])
+        for h in range(self.gains.shape[0]):
+            vflats = np.array_split(hflats[h].T, self.gains.shape[1])
+            for v in range(self.gains.shape[1]):
+                vflats[v] *= self.gains[h,v]
+            hflats[h] = np.concatenate(vflats).T
+        flat = np.concatenate(hflats).T
+        if self.with_noise:
+            flat += np.random.uniform(-1e-2, 1e-2, size=flat.shape)
+
+        return flat
+
+    def plot_model(self):
+        """Plot the flat model.
+
+        """
+        flat = self.model()
+        fig, ax = plt.subplots(1, 1)
+        im = plt.imshow(flat, origin='lower', cmap='jet')
+        ax.grid(color='white', ls='solid')
+        ax.grid(True)
+        ax.set_xlabel('X [pixels]')
+        ax.set_ylabel('Y [pixels]')
+        ax.set_title('Flat model')
+        cb = plt.colorbar(im, ax=ax)
+        cb.formatter.set_powerlimits((0, 0))
+        cb.locator = MaxNLocator(7, prune=None)
+        cb.update_ticks()
+        cb.set_label('Dimensionless')  # ,fontsize=16)
+        if parameters.DISPLAY:
+            plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
+
+
 
 class ImageModel(Image):
 
@@ -321,7 +416,7 @@ class ImageModel(Image):
         self.true_lambdas = None
         self.true_spectrum = None
 
-    def compute(self, star, background, spectrogram, starfield=None):
+    def compute(self, star, background, spectrogram, starfield=None, flat=None):
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         self.data = star.psf.evaluate(np.array([xx, yy])) + background.model()
         if spectrogram.full_image:
@@ -332,6 +427,8 @@ class ImageModel(Image):
         # - spectrogram.spectrogram_bgd)
         if starfield is not None:
             self.data += starfield.model(xx, yy)
+        if flat is not None:
+            self.data += flat.model()
 
     def add_poisson_and_read_out_noise(self):  # pragma: no cover
         if self.units != 'ADU':
@@ -367,7 +464,7 @@ class ImageModel(Image):
 
 
 def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1, A3=1, angstrom_exponent=None,
-             psf_poly_params=None, psf_type=None,  diffraction_orders=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True):
+             psf_poly_params=None, psf_type=None,  diffraction_orders=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True, with_flat=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
@@ -382,6 +479,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     - with_rotation: rotate the spectrum according to the disperser characteristics (True by default)
     - with_stars: include stars in the image field (True by default)
     - with_adr: include ADR effect (True by default)
+    - with_flat: include flat (True by default)
     """
     my_logger = set_logger(__name__)
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
@@ -412,6 +510,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # reso = star.fwhm
     if parameters.DEBUG:
         star.plot_model()
+
     # Star field model
     starfield = None
     if with_stars:
@@ -420,6 +519,14 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         if parameters.DEBUG:
             image.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
             starfield.plot_model()
+
+    # flat model
+    flat = None
+    if with_flat:
+        my_logger.info('\n\tStar field model...')
+        flat = FlatModel(image)
+        if parameters.DEBUG:
+            flat.plot_model()
 
     # Spectrum model
     my_logger.info('\n\tSpectrum model...')
@@ -462,7 +569,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # Image model
     my_logger.info('\n\tImage model...')
-    image.compute(star, background, spectrogram, starfield=starfield)
+    image.compute(star, background, spectrogram, starfield=starfield, flat=flat)
 
     # Recover true spectrum
     spectrogram.set_true_spectrum(spectrogram.lambdas, aerosols, ozone, pwv, shift_t=0)
