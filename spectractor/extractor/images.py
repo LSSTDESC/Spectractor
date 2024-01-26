@@ -46,6 +46,10 @@ class Image(object):
         Flat 2D array without units and median of 1.
     starfield: array
         Star field simulation, no units needed but better in ADU/s.
+    flat_rotated: array
+        Rotated flat 2D array without units and median of 1.
+    starfield_rotated: array
+        Rotated star field simulation, no units needed but better in ADU/s.
     target_pixcoords_rotated: array
         Target position [x,y] in the rotated image in pixels.
     date_obs: str
@@ -159,7 +163,9 @@ class Image(object):
         self.humidity = 0
 
         self.flat = None
+        self.flat_rotated = None
         self.starfield = None
+        self.starfield_rotated = None
 
         if parameters.CALLING_CODE != 'LSST_DM' and file_name != "":
             self.load_image(file_name)
@@ -939,6 +945,8 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
         image.target.image_x0 = sub_image_x0
         image.target.image_y0 = sub_image_y0
         image.target_pixcoords = [theX, theY]
+        if image.starfield is not None:
+            image.target.starfield = np.copy(image.starfield[int(theY) - Dy:int(theY) + Dy, int(theX) - Dx:int(theX) + Dx])
         image.header['TARGETX'] = theX
         image.header.comments['TARGETX'] = 'target position on X axis'
         image.header['TARGETY'] = theY
@@ -1421,6 +1429,13 @@ def turn_image(image):
                                   prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)))
         min_noz = np.min(image.err_rotated[image.err_rotated > 0])
         image.err_rotated[image.err_rotated <= 0] = min_noz
+        if image.flat is not None:
+            image.flat_rotated = ndimage.rotate(image.flat, image.rotation_angle,
+                                                prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
+        if image.starfield is not None:
+            image.starfield_rotated = ndimage.rotate(image.starfield, image.rotation_angle,
+                                                     prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
+
     if parameters.DEBUG:
         margin = 100 // parameters.CCD_REBIN
         y0 = int(image.target_pixcoords[1])
