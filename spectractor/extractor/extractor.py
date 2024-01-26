@@ -1247,9 +1247,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
         ws = [signal_width + 20, signal_width + 30]
 
     my_logger.info('\n\t  ======================= extract_spectrum_from_image =============================')
-    my_logger.info(
-        f'\n\tExtracting spectrum from image: spectrum with width 2*{signal_width:.0f} pixels '
-        f'and background from {ws[0]:.0f} to {ws[1]:.0f} pixels')
+    my_logger.info(f'\n\tExtracting spectrum from image: spectrum with width 2*{signal_width:.0f} pixels '
+                   f'and background from {ws[0]:.0f} to {ws[1]:.0f} pixels')
 
     # Make a data copy
     data = np.copy(image.data_rotated)
@@ -1281,8 +1280,12 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     # Create spectrogram
     data = data[ymin:ymax, xmin:xmax]
     err = err[ymin:ymax, xmin:xmax]
-    if image.flat is not None:
-        data /= image.flat[ymin:ymax, xmin:xmax]
+
+    # clean the data: this is truly a backward spectrum extraction to feed correctly the forward model
+    # if available, apply flats
+    if image.flat_rotated is not None:
+        data /= image.flat_rotated[ymin:ymax, xmin:xmax]
+
     Ny, Nx = data.shape
     my_logger.info(f'\n\tExtract spectrogram: crop rotated image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
@@ -1295,7 +1298,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
         return np.zeros((y.size, x.size))
     if parameters.SPECTRACTOR_BACKGROUND_SUBTRACTION:
         bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws, mask_signal_region=True)
-        # while np.nanmean(bgd_res)/np.nanstd(bgd_res) < -0.2 and parameters.PIXWIDTH_BOXSIZE >= 5:
         while (np.abs(np.nanmean(bgd_res)) > 0.5 or np.nanstd(bgd_res) > 1.3) and parameters.PIXWIDTH_BOXSIZE > 5:
             parameters.PIXWIDTH_BOXSIZE = max(5, parameters.PIXWIDTH_BOXSIZE // 2)
             my_logger.debug(f"\n\tPull distribution of background residuals differs too much from mean=0 and std=1. "
@@ -1546,6 +1548,9 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
                    f'mode={mode} and amplitude_priors_method={method}...')
     data = np.copy(spectrum.spectrogram_data)
     err = np.copy(spectrum.spectrogram_err)
+
+    # clean the data: this is truly a backward spectrum extraction to feed correctly the forward model
+    # if available, apply flats
     if spectrum.spectrogram_flat is not None:
         data /= spectrum.spectrogram_flat
 

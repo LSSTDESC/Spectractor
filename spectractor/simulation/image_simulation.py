@@ -69,11 +69,10 @@ class StarModel:
         self.x0 = centroid_coords[0]
         self.y0 = centroid_coords[1]
         self.amplitude = amplitude
-        # self.target = target
         self.psf = copy.deepcopy(psf)
         self.psf.params.values[1] = self.x0
         self.psf.params.values[2] = self.y0
-        self.psf.params.values[0] = amplitude
+        self.psf.params.values[0] = self.amplitude
         # to be realistic, usually fitted fwhm is too big, divide gamma by 2
         self.fwhm = self.psf.params.values[3]
         # self.sigma = self.model.stddev / 2
@@ -157,11 +156,6 @@ class StarFieldModel:
         else:
             # mask background, faint stars, and saturated pixels
             data = np.copy(self.image.data)
-            # self.saturation = 0.99 * parameters.CCD_MAXADU / base_image.expo
-            # self.saturated_pixels = np.where(image_thresholded > self.saturation)
-            # image_thresholded[self.saturated_pixels] = 0.
-            # image_thresholded -= threshold
-            # image_thresholded[np.where(image_thresholded < 0)] = 0.
             # mask order0 and spectrum
             margin = 30
             mask = np.zeros(data.shape, dtype=bool)
@@ -312,6 +306,7 @@ class BackgroundModel:
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
 
+
 class FlatModel:
     """Class to model the pixel flat of the simulated image. Flat is dimensionless and its average must be one.
 
@@ -321,11 +316,11 @@ class FlatModel:
     ----------
     gains: array_like
         The list of gains to apply. The average must be one.
-    with_noise: bool
-        If True, a random quantum efficiency is applied to pixels (default: False).
+    randomness_level: float
+        Level of random quantum efficiency to apply to pixels (default: 0.).
     """
 
-    def __init__(self, gains, with_randomness=False):
+    def __init__(self, gains, randomness_level=0.):
         """Create a FlatModel instance. Flat is dimensionless and its average must be one.
 
         The flat model size is set with the parameters.CCD_IMSIZE global keyword.
@@ -334,8 +329,8 @@ class FlatModel:
         ----------
         gains: array_like
             The list of gains to apply. The average must be one.
-        with_randomness: bool
-            If True, a random quantum efficiency is applied to pixels (default: False).
+        randomness_level: float
+            Level of random quantum efficiency to apply to pixels (default: 0.).
 
         Examples
         --------
@@ -360,7 +355,7 @@ class FlatModel:
                                    "I scaled them to have an average of one.")
             self.gains /= np.mean(self.gains)
         self.my_logger.warning(f'\n\tRelative gains are set to {self.gains}.')
-        self.with_noise = with_randomness
+        self.randomness_level = randomness_level
 
     def model(self):
         """Compute the flat model for the image simulation (no units).
@@ -379,8 +374,8 @@ class FlatModel:
                 vflats[v] *= self.gains[h,v]
             hflats[h] = np.concatenate(vflats).T
         flat = np.concatenate(hflats).T
-        if self.with_noise:
-            flat += np.random.uniform(-1e-2, 1e-2, size=flat.shape)
+        if self.randomness_level != 0:
+            flat += np.random.uniform(-self.randomness_level, self.randomness_level, size=flat.shape)
 
         return flat
 
@@ -509,7 +504,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # Target model
     my_logger.info('\n\tStar model...')
-    # Spectrogram is simulated with spectrum.x0 target position: must be this position to simualte the target.
+    # Spectrogram is simulated with spectrum.x0 target position: must be this position to simulate the target.
     star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.params.values[0])
     # reso = star.fwhm
     if parameters.DEBUG:
@@ -519,16 +514,16 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     starfield = None
     if with_stars:
         my_logger.info('\n\tStar field model...')
-        starfield = StarFieldModel(image)
+        starfield = StarFieldModel(image, flux_factor=1)
         if parameters.DEBUG:
             image.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
             starfield.plot_model()
 
-    # flat model
+    # Flat model
     flat = None
     if with_flat:
         my_logger.info('\n\tStar field model...')
-        flat = FlatModel(gains=[[1, 2, 3, 4], [4, 3, 2, 1]], with_randomness=True)
+        flat = FlatModel(gains=[[1, 2, 3, 4], [4, 3, 2, 1]], randomness_level=1e-2)
         if parameters.DEBUG:
             flat.plot_model()
 
