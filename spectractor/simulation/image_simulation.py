@@ -139,14 +139,40 @@ class StarFieldModel:
                 wcs = load_wcs_from_file(wcs_file_name)
                 # catalog matching to set star positions using Gaia
                 sources_coord = wcs.all_pix2world(sources['xcentroid'], sources['ycentroid'], 0)
+                target_coord = wcs.all_pix2world([x0], [y0], 0)
                 sources_coord = SkyCoord(ra=sources_coord[0] * units.deg, dec=sources_coord[1] * units.deg,
                                          frame="icrs", obstime=self.image.date_obs, equinox="J2000")
+                target_coord = SkyCoord(ra=target_coord[0] * units.deg, dec=target_coord[1] * units.deg,
+                                         frame="icrs", obstime=self.image.date_obs, equinox="J2000")
                 gaia_index, dist_2d, dist_3d = sources_coord.match_to_catalog_sky(gaia_coord_after_motion)
-                for k, gaia_i in enumerate(gaia_index):
-                    x, y = wcs.all_world2pix(gaia_coord_after_motion[gaia_i].ra, gaia_coord_after_motion[gaia_i].dec, 0)
-                    A = sources['flux'][k] * self.flux_factor
+                gaia_target_index, dist_2d, dist_3d = target_coord.match_to_catalog_sky(gaia_coord_after_motion)
+                #for k, gaia_i in enumerate(gaia_index):
+                #    x, y = wcs.all_world2pix(gaia_coord_after_motion[gaia_i].ra, gaia_coord_after_motion[gaia_i].dec, 0)
+                #    A = sources['flux'][k] * self.flux_factor
+                #    self.stars.append(StarModel([x, y], self.image.target_star2D, A))
+                #    self.pixcoords.append([x, y])
+                dx, dy = 0, 0
+                for gaia_i in range(len(gaia_catalog)):
+                    x, y = wcs.all_world2pix(gaia_coord_after_motion[gaia_i].ra,
+                                             gaia_coord_after_motion[gaia_i].dec, 0)
+                    if gaia_i == gaia_target_index[0]:
+                        dx = x0 - x
+                        dy = y0 - y
+                    A = 10**(-gaia_catalog['phot_g_mean_mag'][gaia_i]/2.5)
                     self.stars.append(StarModel([x, y], self.image.target_star2D, A))
                     self.pixcoords.append([x, y])
+                # rescale using target fitted amplitude
+                amplitudes = np.array([star.amplitude for star in self.stars])
+                target_flux = self.image.target_star2D.params.values[0]
+                amplitudes *= target_flux / self.stars[gaia_target_index[0]].amplitude * self.flux_factor
+                for k, star in enumerate(self.stars):
+                    star.amplitude = amplitudes[k]
+                    star.x0 += dx
+                    star.y0 += dy
+                    star.psf.params.values[1] += dx
+                    star.psf.params.values[2] += dy
+                    star.psf.params.values[0] = amplitudes[k]
+
             else:
                 for k, source in enumerate(sources):
                     x, y = sources['xcentroid'][k], sources['ycentroid'][k]
@@ -413,17 +439,18 @@ class ImageModel(Image):
 
     def compute(self, star, background, spectrogram, starfield=None, flat=None):
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
-        self.data = star.psf.evaluate(np.array([xx, yy])) + background.model()
+        if starfield is not None:
+            starfield_mod = starfield.model(xx, yy)
+            self.data = starfield_mod
+            self.starfield = np.copy(starfield_mod)
+        else:
+            self.data = star.psf.evaluate(np.array([xx, yy]))
+        self.data += background.model()
         if spectrogram.full_image:
             self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax, :] += spectrogram.spectrogram_data
         else:
             self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
                       spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.spectrogram_data
-        # - spectrogram.spectrogram_bgd)
-        if starfield is not None:
-            starfield_mod = starfield.model(xx, yy)
-            self.data += starfield_mod
-            self.starfield = starfield_mod
         if flat is not None:
             flat_mod = flat.model()
             self.data *= flat_mod
