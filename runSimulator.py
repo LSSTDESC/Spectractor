@@ -43,6 +43,6 @@ if __name__ == "__main__":
         atmgrid = AtmosphereGrid(file_name)
         image = ImageSim(file_name, spectrum_file_name, args.output_directory, A1=1, A2=1,
                          pwv=5, ozone=300, aerosols=0.03,
-                         psf_poly_params=None, with_stars=True)
+                         psf_poly_params=None, with_starfield=True)
         sim_file_name = args.output_directory + tag.replace('reduc_', 'sim_')
         Spectractor(sim_file_name, args.output_directory, target, [xpos, ypos], disperser_label, args.config)

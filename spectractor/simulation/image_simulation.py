@@ -490,7 +490,7 @@ class ImageModel(Image):
 
 
 def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1, A3=1, angstrom_exponent=None,
-             psf_poly_params=None, psf_type=None,  diffraction_orders=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True, with_flat=True):
+             psf_poly_params=None, psf_type=None, diffraction_orders=None, with_rotation=True, with_starfield=True, with_adr=True, with_noise=True, with_flat=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
@@ -539,7 +539,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # Star field model
     starfield = None
-    if with_stars:
+    if with_starfield:
         my_logger.info('\n\tStar field model...')
         starfield = StarFieldModel(image, flux_factor=1)
         if parameters.DEBUG:
@@ -644,7 +644,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['VAOD_T'] = aerosols
     image.header['ROT_T'] = rotation_angle
     image.header['ROTATION'] = int(with_rotation)
-    image.header['STARS'] = int(with_stars)
+    image.header['STARS'] = int(with_starfield)
     image.header['BKGD_LEV'] = background.level
     image.header['PSF_DEG'] = spectrogram.chromatic_psf.deg
     image.header['PSF_TYPE'] = parameters.PSF_TYPE

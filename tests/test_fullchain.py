@@ -7,7 +7,7 @@ from scipy.interpolate import interp1d  # noqa: E402
 from spectractor import parameters  # noqa: E402
 from spectractor.extractor.images import Image  # noqa: E402
 from spectractor.extractor.spectrum import Spectrum  # noqa: E402
-from spectractor.extractor.extractor import Spectractor, SpectractorRun, SpectractorInit  # noqa: E402
+from spectractor.extractor.extractor import SpectractorRun, SpectractorInit  # noqa: E402
 from spectractor.logbook import LogBook  # noqa: E402
 from spectractor.config import load_config, apply_rebinning_to_parameters  # noqa: E402
 from spectractor.simulation.image_simulation import ImageSim  # noqa: E402
@@ -96,7 +96,7 @@ def make_image():
     spectrum_filename = "./tests/data/reduc_20170530_134_spectrum.fits"
     image_filename = "./tests/data/reduc_20170530_134.fits"
     sim = ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=A2_T, A3=A3_T,
-                   psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=False, with_rotation=True, with_noise=False,
+                   psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_starfield=True, with_rotation=True, with_noise=False,
                    with_flat=True)
     return sim
 
@@ -106,22 +106,22 @@ def make_image():
 def test_ctio_fullchain():
     parameters.VERBOSE = True
     parameters.DEBUG = False
-    sim_image = "./tests/data/sim_20170530_134.fits"
+    sim_image_filename = "./tests/data/sim_20170530_134.fits"
 
     # load test and make image simulation
-    if not os.path.isfile(sim_image):
-        make_image()
-    image = Image(sim_image, config="./config/ctio.ini")
+    # if not os.path.isfile(sim_image_filename):
+    sim = make_image()
+    image = Image(sim_image_filename, config="./config/ctio.ini")
     lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
     amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
     parameters.AMPLITUDE_TRUTH = np.copy(amplitude_truth)
     parameters.LAMBDA_TRUTH = np.copy(lambdas_truth)
 
     # extractor
-    tag = os.path.basename(sim_image)
+    tag = os.path.basename(sim_image_filename)
     tag = tag.replace('sim_', 'reduc_')
     logbook = LogBook(logbook="./tests/data/ctiofulllogbook_jun2017_v5.csv")
-    disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
+    disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
     load_config("./config/ctio.ini")
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
     parameters.CCD_REBIN = 1
@@ -131,8 +131,13 @@ def test_ctio_fullchain():
     if parameters.CCD_REBIN > 1:
         for k in range(2 * (PSF_POLY_ORDER + 1), 3 * (PSF_POLY_ORDER +1)):
             PSF_POLY_PARAMS_TRUTH[k] /= parameters.CCD_REBIN
-    spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
-                           disperser_label=disperser_label, config="")  # config already loaded, do not overwrite PSF_POLY_ORDER
+
+    image = SpectractorInit(sim_image_filename, target_label=target_label,
+                            disperser_label=disperser_label, config="")  # config already loaded, do not overwrite PSF_POLY_ORDER
+    image.flat = sim.flat
+    image.starfield = sim.starfield
+    spectrum = SpectractorRun(image, guess=[xpos, ypos], output_directory="./tests/data")
+
     # tests
     residuals = plot_residuals(spectrum, lambdas_truth, amplitude_truth)
 
@@ -169,7 +174,7 @@ def test_ctio_fullchain():
 
     spectrum_file_name = "./tests/data/sim_20170530_134_spectrum.fits"
     assert os.path.isfile(spectrum_file_name)
-    atmgrid_filename = sim_image.replace('sim', 'reduc').replace('.fits', '_atmsim.fits')
+    atmgrid_filename = sim_image_filename.replace('sim', 'reduc').replace('.fits', '_atmsim.fits')
     assert os.path.isfile(atmgrid_filename)
     spectrum = Spectrum(spectrum_file_name)
     w = SpectrumFitWorkspace(spectrum, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
@@ -200,7 +205,7 @@ def test_ctio_fullchain():
     nsigma = 2
     labels = ["A1_T", "A2_T", "VAOD_T", "OZONE_T", "PWV_T"]
     indices = [0, 1, 3, 5, 6]
-    A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, shift_t, B, *psf_poly_params = w.params.values
+    A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, shift_t, B, Astar, *psf_poly_params = w.params.values
     ipar = w.params.get_free_parameters()  # non fixed param indices
     cov_indices = [list(ipar).index(k) for k in indices]  # non fixed param indices in cov matrix
     assert w.costs[-1] / w.data.size < 1e-3
@@ -215,6 +220,7 @@ def test_ctio_fullchain():
     assert np.isclose(shift_y, 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
     assert np.isclose(D, spectrum.header["D2CCD_T"], atol=0.1)  # D2CCD
     assert np.isclose(B, 1, atol=1e-3)  # B
+    assert np.isclose(Astar, 1, atol=1e-3)  # Astar
     assert np.all(np.isclose(psf_poly_params[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              np.array(PSF_POLY_PARAMS_TRUTH)[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              rtol=0.01, atol=0.01))
