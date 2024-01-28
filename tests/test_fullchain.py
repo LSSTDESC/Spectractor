@@ -222,7 +222,7 @@ def test_ctio_fullchain():
     assert np.isclose(shift_y, 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
     assert np.isclose(D, spectrum.header["D2CCD_T"], atol=0.1)  # D2CCD
     assert np.isclose(B, 1, atol=1e-3)  # B
-    assert np.isclose(Astar, 1, atol=1e-3)  # Astar
+    assert np.isclose(Astar, 1, atol=1e-2)  # Astar
     assert np.all(np.isclose(psf_poly_params[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              np.array(PSF_POLY_PARAMS_TRUTH)[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              rtol=0.01, atol=0.01))

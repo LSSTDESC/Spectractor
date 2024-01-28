@@ -539,7 +539,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Flat model
     flat = None
     if with_flat:
-        my_logger.info('\n\tStar field model...')
+        my_logger.info('\n\tFlat model...')
         flat = FlatModel(gains=[[1, 2, 3, 4], [4, 3, 2, 1]], randomness_level=1e-2)
         if parameters.DEBUG:
             flat.plot_model()
