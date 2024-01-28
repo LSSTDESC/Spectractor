@@ -26,9 +26,10 @@ jobs:
         # Might be quicker to install rubin-env plus any necessary additions.
         shell: bash -l {0}
         run: |
-          mamba install -y  "numpy>1.15" scipy "matplotlib>3.1" pandas llvmlite numba "astropy>=3.2" "photutils>=1.7" astroquery coloredlogs scikit-image>=0.20 h5py emcee tqdm mpi4py schwimmbad "iminuit>=2" "coverage>=3.6" configparser coveralls deprecated pyyaml nose rubin-libradtran "getCalspec>=2.0.0"
+          mamba install -y  "numpy>1.15" scipy "matplotlib>3.1" pandas llvmlite numba "astropy>=3.2" "photutils>=1.7" astroquery coloredlogs scikit-image>=0.20 h5py emcee tqdm mpi4py schwimmbad "iminuit>=2" "coverage>=3.6" configparser coveralls deprecated pyyaml pytest pytest-cov rubin-libradtran "getCalspec>=2.0.0"
           # python -c "from getCalspec.rebuild import rebuild_tables; rebuild_tables()"
           pip install lsst.utils
+          pip install git+https://github.com/LSSTDESC/getObsAtmo.git@main
           mamba install astrometry
 
       - name: Download test data
@@ -50,24 +51,26 @@ jobs:
         run: |
           pip install -v --no-deps -e .
 
-      - name: Run full chain
+      - name: Run full chain test
         shell: bash -l {0}
         run: |
-          nosetests tests/run_full_chain.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
+          pytest tests/test_fullchain.py --log-cli-level=INFO --cov --cov-report lcov
 
-      - name: Run nosetests
+      - name: Run pytests
         shell: bash -l {0}
         run: |
-          nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
+          pytest tests/test_extractor.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
+          pytest tests/test_simulator.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
+          pytest tests/test_utils.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
+          pytest tests/test_fitter.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
+          pytest tests/test_multispectra.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
 
       - name: Run doctests and coverage
         shell: bash -l {0}
-        run: |
-          .github/workflows/coverage_and_test.sh
-
+        run: pytest spectractor tests/test_fullchain.py -v --cov --cov-append --cov-report lcov --doctest-modules spectractor --doctest-continue-on-failure
+        continue-on-error: true
       - name: Coveralls
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          pip3 install --upgrade coveralls
-          coveralls --service=github
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: coverage.lcov

@@ -519,21 +519,21 @@ class ChromaticPSF:
         >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
         >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
         >>> profile_params[:, 1] = np.arange(s.Nx)
-        >>> psf_cube = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
-        >>> psf_cube.shape
+        >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
+        >>> psf_cube_masked.shape
         (100, 20, 100)
-        >>> plt.imshow(psf_cube[20], origin="lower"); plt.show()  # doctest: +ELLIPSIS
+        >>> plt.imshow(psf_cube_masked[20], origin="lower"); plt.show()  # doctest: +ELLIPSIS
         <matplotlib.image.AxesImage object at ...>
-        >>> plt.imshow(psf_cube[80], origin="lower"); plt.show()  # doctest: +ELLIPSIS
+        >>> plt.imshow(psf_cube_masked[80], origin="lower"); plt.show()  # doctest: +ELLIPSIS
         <matplotlib.image.AxesImage object at ...>
 
         .. doctest::
             :hide:
 
-            >>> assert psf_cube.shape == (s.Nx, s.Ny, s.Nx)
-            >>> np.argmax(np.sum(psf_cube[20], axis=0))
+            >>> assert psf_cube_masked.shape == (s.Nx, s.Ny, s.Nx)
+            >>> np.argmax(np.sum(psf_cube_masked[20], axis=0))
             10
-            >>> np.argmax(np.sum(psf_cube[80], axis=0))
+            >>> np.argmax(np.sum(psf_cube_masked[80], axis=0))
             70
 
         """
@@ -2406,32 +2406,36 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
 
     def jacobian(self, params, epsilon, model_input=None):
         r"""Generic function to compute the Jacobian matrix of a model, linear parameters being fixed (see Notes),
-        with analytical or numerical derivatives. Analytical derivatives are performed if self.analytical is True.
-        Let's write :math:`\theta`  the non-linear model parameters. If the model is written as:
+        with analytical or numerical derivatives. Analytical derivatives are performed if `self.analytical` is True.
+        Let's write :math:`\theta` the non-linear model parameters. If the model is written as:
+
         .. math::
 
             \mathbf{I} =  \mathbf{M}(\theta) \cdot \hat{\mathbf{A}}(\theta),
 
         this jacobian function returns:
+
         .. math::
 
             \frac{\partial \mathbf{I}}{\partial \theta} =   \frac{\partial \mathbf{M}}{\partial \theta} \cdot \hat{\mathbf{A}}.
 
         Notes
         -----
-            The gradient descent is performed on the non-linear parameters :math:`\theta` (PSF shape and position). Linear parameters :math:`\mathbf{A}`(amplitudes) are computed on the fly.
+            The gradient descent is performed on the non-linear parameters :math:`\theta` (PSF shape and position). Linear parameters :math:`\mathbf{A}` (amplitudes) are computed on the fly.
             Therefore, :math:`\chi^2` is a function of :math:`\theta` only
+
             .. math ::
 
                 \chi^2(\theta) = \chi'^2(\theta, \hat{\mathbf{A}}
 
-            whose partial derivatives on :math:`\theta` for gradient descent are
+            whose partial derivatives on :math:`\theta` for gradient descent are:
+
             .. math ::
 
-                \frac{\partial \chi^2}{\partial \theta} = \left.\left(\frac{\partial \chi'^2}{\partial \theta}  + \frac{\partial \chi'^2}{\partial \mathbf{A}} \frac{\partial \mathbf{A}}{\partial \theta}\right)\right\vert_{\mathbf{A} = \hat \mathbf{A}}
+                \frac{\partial \chi^2}{\partial \theta} = \left.\left(\frac{\partial \chi'^2}{\partial \theta}  + \frac{\partial \chi'^2}{\partial \mathbf{A}} \frac{\partial \mathbf{A}}{\partial \theta}\right)\right\vert_{\mathbf{A} = \hat{\mathbf{A}}}
 
-            By definition, :math:`\left.\partial \chi'^2/\partial \mathbf{A}\right\vert_{\mathbf{A} = \hat \mathbf{A}}=0` then :math:`\chi^2`  partial derivatives must be performed with fixed :math:`\mathbf{A} = \hat \mathbf{A}`
-            for gradient descent. `self.amplitude_priors_method` is temporarily switched to "keep" in `self.jacobian()` to use previously computed :math:`\hat \mathbf{A}` solution.
+            By definition, :math:`\left.\partial \chi'^2/\partial \mathbf{A}\right\vert_{\mathbf{A} = \hat{\mathbf{A}}}=0` then :math:`\chi^2`  partial derivatives must be performed with fixed :math:`\mathbf{A} = \hat{\mathbf{A}}`
+            for gradient descent. `self.amplitude_priors_method` is temporarily switched to "keep" in `self.jacobian()` to use previously computed :math:`\hat{\mathbf{A}}` solution.
 
 
         Parameters

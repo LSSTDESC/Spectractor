@@ -14,7 +14,8 @@ from matplotlib.ticker import MaxNLocator
 
 import json
 import warnings
-from scipy.signal import fftconvolve, gaussian
+from scipy.signal.windows import gaussian
+from scipy.signal import fftconvolve
 from scipy.ndimage import maximum_filter, generate_binary_structure, binary_erosion
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
@@ -1970,7 +1971,7 @@ def plot_table_in_axis(ax, table):
         'FWHM': 'FWHM\n(nm)',
         'Amplitude': 'Amplitude',
         'SNR': 'SNR',
-        'Chisq': '${\chi}^2$',
+        'Chisq': r'${\chi}^2$',
         'Eqwidth_mod': 'Eq. Width\n(model)',
         'Eqwidth_data': 'Eq. Width\n(data)',
     }
@@ -2364,14 +2365,14 @@ def set_sources_file_name(file_name, output_directory=""):
     Examples
     --------
     >>> set_sources_file_name("image.fits", output_directory="")
-    'image_wcs/image.xyls'
+    'image_wcs/image.axy'
     >>> set_sources_file_name("image.png", output_directory="outputs")
-    'outputs/image_wcs/image.xyls'
+    'outputs/image_wcs/image.axy'
 
     """
     output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
     tag = set_wcs_tag(file_name)
-    return os.path.join(output_directory, f"{tag}.xyls")
+    return os.path.join(output_directory, f"{tag}.axy")
 
 
 def set_gaia_catalog_file_name(file_name, output_directory=""):
@@ -2479,9 +2480,11 @@ def compute_correlation_matrix(cov):
 
     """
     rho = np.zeros_like(cov, dtype="float")
+    # rescale cov matrix in case it contains very low value in diagonal (for float precision)
+    cov_scaled = cov * np.mean([cov[i, i] for i in range(cov.shape[0])])
     for i in range(cov.shape[0]):
         for j in range(cov.shape[1]):
-            rho[i, j] = cov[i, j] / np.sqrt(cov[i, i] * cov[j, j])
+            rho[i, j] = cov_scaled[i, j] / np.sqrt(cov_scaled[i, i] * cov_scaled[j, j])
     return rho
 
 
@@ -2685,7 +2688,12 @@ class NumpyArrayEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
+        elif isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        else:
+            return super().default(obj)
 
 
 if __name__ == "__main__":

@@ -820,7 +820,8 @@ class Spectrum:
         Examples
         --------
 
-        # Latest Spectractor output format: do not provide a config file (parameters are loaded from file header)
+        Latest Spectractor output format: do not provide a config file (parameters are loaded from file header)
+
         >>> from spectractor import parameters
         >>> s = Spectrum(config="")
         >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
@@ -832,7 +833,8 @@ class Spectrum:
             >>> assert parameters.CCD_REBIN == s.header["REBIN"]
             >>> assert s.parallactic_angle == s.header["PARANGLE"]
 
-        # Spectractor output format older than version <=2.3: must give the config file
+        Spectractor output format older than version <=2.3: must give the config file
+
         >>> parameters.VERBOSE = False
         >>> s = Spectrum(config="./config/ctio.ini")
         >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
@@ -855,12 +857,16 @@ class Spectrum:
         # check the version of the file
         if "VERSION" in self.header:
             from spectractor._version import __version__
+            from packaging import version
             if self.config != "":
                 raise AttributeError(f"With Spectractor above 2.4 do not provide a config file in Spectrum(config=...)."
                                      f"Now config parameters are loaded from the file header. Got {self.config=}.")
             if self.header["VERSION"] != str(__version__):
+                self.my_logger.debug(f"\n\tSpectrum file spectractor version {self.header['VERSION']} is "
+                                     f"different from current Spectractor software {__version__}.")
+            if version.parse(self.header["VERSION"]) < version.parse("3.0"):
                 self.my_logger.warning(f"\n\tSpectrum file spectractor version {self.header['VERSION']} is "
-                                       f"different from current Spectractor software {__version__}.")
+                                       f"below Spectractor software 3.0. It may be deprecated.")
             self.load_spectrum_latest(input_file_name)
         else:
             self.my_logger.warning("\n\tNo information about Spectractor software version is given in the header. "
@@ -1312,102 +1318,6 @@ class Spectrum:
         # with respect to order 0 initial centroid position.
         dispersion_law = (Dx + shift_x + with_adr * adr_x) + 1j * (Dy_disp_axis + with_adr * adr_y + shift_y)
         return dispersion_law
-
-    def old_compute_dispersion_in_spectrogram(self, D, shift_x, shift_y, angle, niter=3, with_adr=True):
-        """Compute the dispersion relation in a spectrogram, using grating dispersion model and ADR.
-        Origin is the order 0 centroid.
-
-        Parameters
-        ----------
-        D: float
-            The distance between the CCD and the disperser in mm.
-        shift_x: float
-            Shift in the x axis direction for order 0 position in pixel.
-        shift_y: float
-            Shift in the y axis direction for order 0 position in pixel.
-        angle: float
-            Main dispersion axis angle in degrees.
-        niter: int, optional
-            Number of iterations to compute ADR (default: 3).
-        with_adr: bool, optional
-            If True, add ADR effect to grating dispersion model (default: True).
-
-        Returns
-        -------
-        lambdas: array_like
-            Wavelength array for parameters.SPECTRUM_ORDER diffraction.
-        lambdas_order2: array_like
-            Wavelength array for parameters.SPECTRUM_ORDER+1 diffraction.
-        dispersion_law: array_like
-            Complex array coding the 2D dispersion relation in the spectrogram for parameters.SPECTRUM_ORDER diffraction.
-        dispersion_law_order2: array_like
-            Complex array coding the 2D dispersion relation in the spectrogram for parameters.SPECTRUM_ORDER+1 diffraction.
-
-        Examples
-        --------
-        >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
-        >>> s.x0 = [743, 683]
-        >>> s.spectrogram_x0 = -280
-        >>> lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = s.old_compute_dispersion_in_spectrogram(58, 0, 0, 0)
-        >>> lambdas[:4]
-        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
-        >>> lambdas_order2[:4]
-        array([175.24821864, 175.6613138 , 176.08856096, 176.52723832])
-        >>> dispersion_law[:4]
-        array([278.11756086+1.07838932j, 279.13819666+1.06656773j,
-               280.15859766+1.05488065j, 281.17876742+1.04332603j])
-        >>> dispersion_law[90:95]
-        array([369.3298545 +0.38390497j, 370.338383  +0.37901927j,
-               371.34683964+0.37417473j, 372.35522523+0.36937089j,
-               373.36354058+0.36460729j])
-        >>> dispersion_law_order2[:4]
-        array([573.69581057+1.07838932j, 575.80156994+1.06656773j,
-               577.90852175+1.05488065j, 580.01666653+1.04332603j])
-
-        """
-        # Distance in x and y with respect to the true order 0 position at lambda_ref
-        Dx = np.arange(self.spectrogram_Nx) - self.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
-        Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
-        distance = np.sign(Dx) * np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
-
-        # Wavelengths using the order 0 shifts (ADR has no impact as it shifts order 0 and order p equally)
-        new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
-        # First guess of wavelengths
-        self.disperser.D = np.copy(D)
-        lambdas = self.disperser.grating_pixel_to_lambda(distance, new_x0, order=self.order)
-        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, new_x0, order=self.order+np.sign(self.order))
-
-        # Evaluate ADR
-        adr_x = np.zeros_like(Dx)
-        adr_y = np.zeros_like(Dy_disp_axis)
-        for k in range(niter):
-            adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE,
-                                        lambda_ref=self.lambda_ref)
-            adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-            adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
-
-            # Evaluate ADR for order 2
-            adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE,
-                                        lambda_ref=self.lambda_ref)
-            # adr_x_2, adr_y_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-            adr_u_2, adr_v_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
-
-            # Compute lambdas at pixel column x
-            lambdas = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, order=self.order)
-            lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - adr_u_2, new_x0, order=self.order+np.sign(self.order))
-
-        # Position (not distance) in pixel of wavelength lambda order 1 centroid in the (x,y) spectrogram frame
-        #distance = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=self.order)
-        #Dx = distance * np.cos(angle * np.pi / 180)
-        #Dy_disp_axis = distance * np.sin(angle * np.pi / 180)
-        dispersion_law = (Dx + shift_x + with_adr * adr_x) + 1j * (Dy_disp_axis + with_adr * adr_y + shift_y)
-        # Position (not distance) in pixel of wavelength lambda order 2 centroid in the (x,y) spectrogram frame
-        distance_order2 = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=self.order+np.sign(self.order))
-        Dx_order2 = distance_order2 * np.cos(angle * np.pi / 180)
-        Dy_disp_axis_order2 = distance_order2 * np.sin(angle * np.pi / 180)
-        dispersion_law_order2 = (Dx_order2 + shift_x + with_adr * adr_x) + \
-                                1j * (Dy_disp_axis_order2 + with_adr * adr_y + shift_y)
-        return lambdas, lambdas_order2, dispersion_law, dispersion_law_order2
 
 
 class MultigaussAndBgdFitWorkspace(FitWorkspace):

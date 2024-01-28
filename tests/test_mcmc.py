@@ -1,7 +1,6 @@
 import matplotlib as mpl
 mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
-from numpy.testing import run_module_suite  # noqa: E402
 import numpy as np  # noqa: E402
 from spectractor.fit.fitter import FitParameters  # noqa: E402
 from spectractor.fit.mcmc import (MCMCFitWorkspace, run_emcee)  # noqa: E402
@@ -63,6 +62,3 @@ def test_fitworkspace(seed=42):
     assert os.path.exists(file_name.replace(".txt", "_emcee_triangle.pdf"))
     assert np.all([np.abs(w.params.values[i] - truth[i]) / np.sqrt(w.params.cov[i, i]) < 3 for i in range(w.params.ndim)])
 
-
-if __name__ == "__main__":
-    run_module_suite()
