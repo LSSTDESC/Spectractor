@@ -1094,7 +1094,7 @@ def SpectractorRun(image, output_directory, guess=None):
 
     # Use fast mode
     if parameters.CCD_REBIN > 1:
-        my_logger.info('\n\t  ======================= REBIN =============================')
+        my_logger.info('\n\t ======================= REBIN =============================')
         image.rebin()
         if parameters.DEBUG:
             image.plot_image(scale='symlog', title="after rebinning ", target_pixcoords=image.target_guess)
@@ -1105,6 +1105,7 @@ def SpectractorRun(image, output_directory, guess=None):
     output_filename = output_filename.replace('.fits', '_spectrum.fits')
     output_filename = output_filename.replace('.fz', '_spectrum.fits')
     output_filename = os.path.join(output_directory, output_filename)
+
     # Find the exact target position in the raw cut image: several methods
     my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...')
     find_target(image, image.target_guess, widths=(parameters.XWINDOW, parameters.YWINDOW))
@@ -1113,9 +1114,9 @@ def SpectractorRun(image, output_directory, guess=None):
         image.starfield = image.simulate_starfield_with_gaia()
     # Rotate the image
     turn_image(image)
+
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
-
     find_target(image, image.target_guess, rotated=True, widths=(parameters.XWINDOW_ROT,
                                                                  parameters.YWINDOW_ROT))
     # Create Spectrum object
@@ -1144,13 +1145,13 @@ def SpectractorRun(image, output_directory, guess=None):
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
     if parameters.SPECTRACTOR_DECONVOLUTION_FFM:
-        my_logger.info('\n\t  ======================= FFM DECONVOLUTION =============================')
+        my_logger.info('\n\t ======================= FFM DECONVOLUTION =============================')
         w = FullForwardModelFitWorkspace(spectrum, verbose=parameters.VERBOSE, plot=True, live_fit=False,
                                          amplitude_priors_method="spectrum")
         spectrum = run_ffm_minimisation(w, method="newton", niter=2)
 
     # Save the spectrum
-    my_logger.info('\n\t  ======================= SAVE SPECTRUM =============================')
+    my_logger.info('\n\t ======================= SAVE SPECTRUM =============================')
     spectrum.save_spectrum(output_filename, overwrite=True)
     spectrum.lines.table = spectrum.lines.build_detected_line_table(amplitude_units=spectrum.units)
 
@@ -1326,10 +1327,9 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
 
     # clean the data: this is truly a backward spectrum extraction to feed correctly the forward model
     # if available, subtract starfield before 1D spectrum estimate
-    # (important as it is used as a prior for regularisation)
+    # it is important to have a clean 1D spectrum as it is used as a prior for regularisation
     if image.starfield_rotated is not None:
-        scaling = np.max(image.target.image) / np.max(image.target.starfield)
-        data -= scaling * image.starfield_rotated[ymin:ymax, xmin:xmax]
+        data -= image.starfield_rotated[ymin:ymax, xmin:xmax]
 
     s.fit_transverse_PSF1D_profile(data, err, signal_width, ws, pixel_step=parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT,
                                    sigma_clip=5, bgd_model_func=bgd_model_func, saturation=image.saturation,
@@ -1567,8 +1567,7 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
     # if available, subtract starfield before 1D spectrum estimate
     # (important as it is used as a prior for regularisation)
     if spectrum.spectrogram_starfield is not None:
-        scaling = np.max(spectrum.target.image) / np.max(spectrum.target.starfield)
-        data -= scaling * spectrum.spectrogram_starfield
+        data -= spectrum.spectrogram_starfield
 
     my_logger.info('\n\t  ======================= ChromaticPSF2D polynomial fit  =============================')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, live_fit=False,

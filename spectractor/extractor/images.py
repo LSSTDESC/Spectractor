@@ -592,6 +592,7 @@ def load_CTIO_image(image):
     build_CTIO_gain_map(image)
     build_CTIO_read_out_noise_map(image)
     image.flat = image.gain / np.mean(image.gain)
+    # parallactic angle
     image.compute_parallactic_angle()
     # WCS
     wcs_file_name = set_wcs_file_name(image.file_name)
