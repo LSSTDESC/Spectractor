@@ -137,6 +137,7 @@ def test_ctio_fullchain():
                             disperser_label=disperser_label, config="")  # config already loaded, do not overwrite PSF_POLY_ORDER
     image.flat = sim.flat
     image.starfield = sim.starfield
+    parameters.SPECTRACTOR_SIMULATE_STARFIELD = False  # here we want to test fit with an exact starfield simulation
     spectrum = SpectractorRun(image, guess=[xpos, ypos], output_directory="./tests/data")
 
     # tests

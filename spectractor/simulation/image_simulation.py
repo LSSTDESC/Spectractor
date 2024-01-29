@@ -420,6 +420,9 @@ class ImageModel(Image):
             starfield_mod = starfield.model(xx, yy)
             self.data = starfield_mod
             self.starfield = np.copy(starfield_mod)
+            if parameters.DEBUG:
+                self.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
+                starfield.plot_model()
         else:
             self.data = star.psf.evaluate(np.array([xx, yy]))
         self.data += background.model()
@@ -519,9 +522,6 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     if with_starfield:
         my_logger.info('\n\tStar field model...')
         starfield = StarFieldModel(image, flux_factor=1)
-        if parameters.DEBUG:
-            image.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
-            starfield.plot_model()
 
     # Flat model
     flat = None
