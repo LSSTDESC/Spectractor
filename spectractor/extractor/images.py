@@ -220,6 +220,10 @@ class Image(object):
         new_shape = np.asarray(self.data.shape) // parameters.CCD_REBIN
         self.data = rebin(self.data, new_shape)
         self.err = np.sqrt(rebin(self.err ** 2, new_shape))
+        if self.flat is not None:
+            self.flat = rebin(self.flat, new_shape)
+        if self.starfield is not None:
+            self.starfield = rebin(self.starfield, new_shape)
         if self.target_guess is not None:
             self.target_guess = np.asarray(self.target_guess) / parameters.CCD_REBIN
 
@@ -538,6 +542,16 @@ class Image(object):
             plt.show()
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
+
+    def simulate_starfield_with_gaia(self):
+        from spectractor.simulation.image_simulation import StarFieldModel
+        starfield = StarFieldModel(self, flux_factor=1)
+        yy, xx = np.mgrid[0:self.data.shape[1]:1, 0:self.data.shape[0]:1]
+        starfield.model(xx, yy)
+        if parameters.DEBUG:
+            self.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
+            starfield.plot_model()
+        return starfield.field
 
 
 def load_CTIO_image(image):

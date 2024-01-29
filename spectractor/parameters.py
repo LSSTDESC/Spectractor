@@ -40,6 +40,7 @@ SPECTRACTOR_BACKGROUND_SUBTRACTION = True #if True the background is estimated a
 SPECTRACTOR_FIT_TIMEOUT_PER_ITER = 600  # maximum time per gradient descent iteration before TimeoutError in seconds
 SPECTRACTOR_FIT_TIMEOUT = 3600  # maximum time per gradient descent before TimeoutError in seconds
 SPECTRACTOR_ATMOSPHERE_SIM = "none"  # library to compute atmospheric transmission: none, libradtran, getobsatmo
+SPECTRACTOR_SIMULATE_STARFIELD = False  # simulate star field with Gaia catalog: False, True
 
 # Paths
 DISPERSER_DIR = "./extractor/dispersers/"

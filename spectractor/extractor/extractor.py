@@ -1108,6 +1108,9 @@ def SpectractorRun(image, output_directory, guess=None):
     # Find the exact target position in the raw cut image: several methods
     my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...')
     find_target(image, image.target_guess, widths=(parameters.XWINDOW, parameters.YWINDOW))
+    # Simulate star field
+    if parameters.SPECTRACTOR_SIMULATE_STARFIELD:
+        image.starfield = image.simulate_starfield_with_gaia()
     # Rotate the image
     turn_image(image)
     # Find the exact target position in the rotated image: several methods

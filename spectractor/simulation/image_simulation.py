@@ -131,14 +131,14 @@ class StarFieldModel:
             # load WCS
             wcs = load_wcs_from_file(wcs_file_name)
             # catalog matching to set star positions using Gaia
-            target_coord = wcs.all_pix2world([x0], [y0], 0)
+            target_coord = wcs.all_pix2world([x0 * parameters.CCD_REBIN], [y0 * parameters.CCD_REBIN], 0)
             target_coord = SkyCoord(ra=target_coord[0] * units.deg, dec=target_coord[1] * units.deg,
                                     frame="icrs", obstime=self.image.date_obs, equinox="J2000")
             gaia_target_index, dist_2d, dist_3d = target_coord.match_to_catalog_sky(gaia_coord_after_motion)
             dx, dy = 0, 0
             for gaia_i in range(len(gaia_catalog)):
-                x, y = wcs.all_world2pix(gaia_coord_after_motion[gaia_i].ra,
-                                         gaia_coord_after_motion[gaia_i].dec, 0)
+                x, y = np.array(wcs.all_world2pix(gaia_coord_after_motion[gaia_i].ra,
+                                                  gaia_coord_after_motion[gaia_i].dec, 0)) / parameters.CCD_REBIN
                 if gaia_i == gaia_target_index[0]:
                     dx = x0 - x
                     dy = y0 - y
@@ -164,7 +164,7 @@ class StarFieldModel:
             sources['Y'].name = "ycentroid"
             sources['FLUX'].name = "flux"
             for k, source in enumerate(sources):
-                x, y = sources['xcentroid'][k], sources['ycentroid'][k]
+                x, y = np.array([sources['xcentroid'][k], sources['ycentroid'][k]]) / parameters.CCD_REBIN
                 A = sources['flux'][k] * self.flux_factor
                 self.stars.append(StarModel([x, y], self.image.target_star2D, A))
                 self.pixcoords.append([x, y])
@@ -196,9 +196,9 @@ class StarFieldModel:
             self.field = self.stars[0].psf.evaluate(np.array([x, y]))
             for k in range(1, len(self.stars)):
                 left = max(0, int(self.pixcoords[0][k]) - window)
-                right = min(parameters.CCD_IMSIZE, int(self.pixcoords[0][k]) + window)
+                right = min(np.max(x), int(self.pixcoords[0][k]) + window)
                 low = max(0, int(self.pixcoords[1][k]) - window)
-                up = min(parameters.CCD_IMSIZE, int(self.pixcoords[1][k]) + window)
+                up = min(np.max(y), int(self.pixcoords[1][k]) + window)
                 if up < low or left > right:
                     continue
                 yy, xx = np.mgrid[low:up, left:right]
@@ -206,21 +206,8 @@ class StarFieldModel:
         return self.field
 
     def plot_model(self):
-        xx, yy = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
-        starfield = self.model(xx, yy)
         fig, ax = plt.subplots(1, 1)
-        plot_image_simple(ax, starfield, scale="log10", target_pixcoords=self.pixcoords)
-        # im = plt.imshow(starfield, origin='lower', cmap='jet')
-        # ax.grid(color='white', ls='solid')
-        # ax.grid(True)
-        # ax.set_xlabel('X [pixels]')
-        # ax.set_ylabel('Y [pixels]')
-        # ax.set_title(f'Star field model: fwhm={self.fwhm.value:.2f}')
-        # cb = plt.colorbar(im, ax=ax)
-        # cb.formatter.set_powerlimits((0, 0))
-        # cb.locator = MaxNLocator(7, prune=None)
-        # cb.update_ticks()
-        # cb.set_label('Arbitrary units')  # ,fontsize=16)
+        plot_image_simple(ax, self.field, scale="log10", target_pixcoords=self.pixcoords)
         if parameters.DISPLAY:
             plt.show()
         if parameters.PdfPages:
