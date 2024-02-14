@@ -1287,7 +1287,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
                     ipar = np.delete(ipar, list(ipar).index(jp))
                     fit_workspace.params.fixed[jp] = True
                     my_logger.warning(
-                        f"\n\tStep {i}: {fit_workspace.params.labels[ip]} is degenerated with {fit_workspace.params.labels[jp]}; "
+                        f"\n\tStep {i}: {fit_workspace.params.labels[jp]} is degenerated with {fit_workspace.params.labels[ip]}; "
                         f"parameter {fit_workspace.params.labels[jp]} is fixed at its last known current value ({tmp_params[jp]}).")
                     continue
         # remove fixed and degenerated parameters; then transpose
