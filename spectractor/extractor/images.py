@@ -486,7 +486,7 @@ class Image(object):
 
     def plot_image(self, ax=None, scale="lin", title="", units="", plot_stats=False,
                    target_pixcoords=None, figsize=(7.3, 6), aspect=None, vmin=None, vmax=None,
-                   cmap=None, cax=None):
+                   cmap=None, cax=None, use_flat=True):
         """Plot image.
 
         Parameters
@@ -515,6 +515,8 @@ class Image(object):
             Figure size (default: [9.3, 8]).
         plot_stats: bool
             If True, plot the uncertainty map instead of the image (default: False).
+        use_flat: bool
+            If True and self.flat exists, divide the image by the flat (default: True).
 
         Examples
         --------
@@ -530,6 +532,8 @@ class Image(object):
             data = np.copy(self.err)
         if units == "":
             units = self.units
+        if self.flat is not None and use_flat:
+            data /= self.flat
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         if parameters.OBS_OBJECT_TYPE == "STAR":
