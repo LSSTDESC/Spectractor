@@ -219,6 +219,24 @@ class FitParameters:
                 out *= getattr(self, key) == getattr(other, key)
         return out
 
+    def __repr__(self):
+        """Print the best fitting parameters on screen.
+        Labels are from self.labels.
+
+        Examples
+        --------
+        >>> parameters.VERBOSE = True
+        >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params.cov = np.array([[1, -0.5], [-0.5, 4]])
+        >>> params
+        x: 1.0 (fixed)
+        y: 2 +1 -1 bounds=[-inf, inf]
+        z: 3.0 (fixed)
+        t: 4 +2 -2 bounds=[-inf, inf]
+
+        """
+        return self.print_parameters_summary()
+
     def get_index(self, label):
         """Get parameter index given its label.
 
@@ -401,7 +419,7 @@ class FitParameters:
         return np.array(np.where(np.array(self.fixed).astype(int) == 1)[0])
 
     def print_parameters_summary(self):
-        """Print the best fitting parameters on screen.
+        """Build a string with the best fitting parameters to display on screen.
         Labels are from self.labels.
 
         Returns
@@ -424,11 +442,14 @@ class FitParameters:
                 txt += "%s: %s +%s -%s" % formatting_numbers(self.values[ip], np.sqrt(np.abs(self.cov[icov, icov])),
                                                              np.sqrt(np.abs(self.cov[icov, icov])),
                                                              label=self.labels[ip])
-                txt += f" bounds={self.bounds[ip]}\n\t"
+                txt += f" bounds={self.bounds[ip]}"
                 icov += 1
             else:
-                txt += f"{self.labels[ip]}: {self.values[ip]} (fixed)\n\t"
+                txt += f"{self.labels[ip]}: {self.values[ip]} (fixed)"
+            if ip != self.ndim-1:
+                txt += "\n"
         return txt
+
 
     def get_parameter(self, key):
         """Return a FitParameter instance. key argument can be the parameter label or its index value.
