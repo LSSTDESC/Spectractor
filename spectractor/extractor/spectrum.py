@@ -713,8 +713,11 @@ class Spectrum:
                 hdus[extname].data = self.spectrogram_flat
             elif extname == "S_STAR":
                 hdus[extname].data = self.spectrogram_starfield
-            elif extname == "S_MASK" and self.spectrogram_mask is not None:
-                hdus[extname].data = self.spectrogram_mask.astype(int)
+            elif extname == "S_MASK":
+                if self.spectrogram_mask is not None:
+                    hdus[extname].data = self.spectrogram_mask.astype(int)
+                else:
+                    hdus[extname].data = self.spectrogram_mask
             elif extname == "PSF_TAB":
                 hdus[extname] = fits.table_to_hdu(self.chromatic_psf.table)
             elif extname == "LINES":
