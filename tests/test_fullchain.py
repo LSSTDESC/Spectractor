@@ -137,6 +137,8 @@ def test_ctio_fullchain():
                             disperser_label=disperser_label, config="")  # config already loaded, do not overwrite PSF_POLY_ORDER
     image.flat = sim.flat
     image.starfield = sim.starfield
+    image.mask = np.zeros_like(image.data).astype(bool)
+    image.mask[680:685, 1255:1260] = True  # test masking of some pixels like cosmic rays
     parameters.SPECTRACTOR_SIMULATE_STARFIELD = False  # here we want to test fit with an exact starfield simulation
     spectrum = SpectractorRun(image, guess=[xpos, ypos], output_directory="./tests/data")
 

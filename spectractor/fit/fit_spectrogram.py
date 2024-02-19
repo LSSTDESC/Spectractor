@@ -144,6 +144,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.starfield = self.spectrum.spectrogram_starfield.flatten()
         else:
             self.starfield = None
+        if self.spectrum.spectrogram_mask is not None:
+            self.mask = list(np.where(spectrum.spectrogram_mask.astype(bool).ravel())[0])
+        else:
+            self.mask = []
         self.fit_angstrom_exponent = fit_angstrom_exponent
         if not fit_angstrom_exponent:
             self.params.fixed[self.params.get_index("angstrom_exp")] = True  # angstrom exponent
@@ -236,7 +240,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         mask = np.sum(self.spectrogram_simulation.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube_masked.shape[0], self.spectrogram_simulation.pixels[0].size), axis=0) == 0
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
-        self.mask = list(np.where(mask)[0])
+        self.mask += list(np.where(mask)[0])
+        self.mask = list(set(self.mask))
 
     def get_spectrogram_truth(self):
         """Load the truth parameters (if provided) from the file header.

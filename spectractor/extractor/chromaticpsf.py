@@ -1651,15 +1651,17 @@ class ChromaticPSF:
         self.cov_matrix = np.diag(1 / np.array(self.table['flux_err']) ** 2)
         psf.params.bounds = initial_bounds
 
-    def fit_chromatic_psf(self, data, bgd_model_func=None, data_errors=None, mode="1D", analytical=True,
+    def fit_chromatic_psf(self, data, mask=None, bgd_model_func=None, data_errors=None, mode="1D", analytical=True,
                           amplitude_priors_method="noprior", verbose=False, live_fit=False):
         """
         Fit a chromatic PSF model on 2D data.
 
         Parameters
         ----------
-        data: array_like
+        data: np.array
             2D array containing the image data.
+        mask: np.array, optional
+            2D array containing the masked pixels.
         bgd_model_func: callable, optional
             A 2D function to model the extracted background (default: None -> null background)
         data_errors: np.array
@@ -1699,6 +1701,8 @@ class ChromaticPSF:
         >>> data += bgd
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(np.abs(data+1))
+        >>> mask = np.zeros_like(data).astype(bool)
+        >>> mask[10:30,20:22] = True
 
         Extract the background:
 
@@ -1720,7 +1724,7 @@ class ChromaticPSF:
         Fit the data using the transverse 1D PSF model only:
 
         >>> w = s.fit_chromatic_psf(data, mode="1D", data_errors=data_errors, bgd_model_func=bgd_model_func,
-        ... amplitude_priors_method="noprior", verbose=True)
+        ... amplitude_priors_method="noprior", verbose=True, mask=mask)
         >>> s.plot_summary(truth=s0)
         >>> amplitude_residuals.append([s0.params.values[:s0.Nx], w.amplitude_params-s0.params.values[:s0.Nx],
         ... w.amplitude_params_err])
@@ -1737,7 +1741,7 @@ class ChromaticPSF:
 
         >>> parameters.PSF_FIT_REG_PARAM = 0.002
         >>> w = s.fit_chromatic_psf(data, mode="2D", data_errors=data_errors, bgd_model_func=bgd_model_func,
-        ... amplitude_priors_method="psf1d", verbose=True, analytical=True)
+        ... amplitude_priors_method="psf1d", verbose=True, analytical=True, mask=mask)
         >>> s.plot_summary(truth=s0)
         >>> amplitude_residuals.append([s0.params.values[:s0.Nx], w.amplitude_params-s0.params.values[:s0.Nx],
         ... w.amplitude_params_err])
@@ -1762,13 +1766,13 @@ class ChromaticPSF:
 
         """
         if mode == "1D":
-            w = ChromaticPSFFitWorkspace(self, data, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
+            w = ChromaticPSFFitWorkspace(self, data, mask=mask, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
                                         amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                         live_fit=live_fit, analytical=analytical)
             run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, with_line_search=True)
         elif mode == "2D":
             # first shot to set the mask
-            w = ChromaticPSFFitWorkspace(self, data, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
+            w = ChromaticPSFFitWorkspace(self, data, mask=mask, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
                                          amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                          live_fit=live_fit, analytical=analytical)
             # first, fit the transverse position
@@ -1834,7 +1838,7 @@ class ChromaticPSF:
 
 class ChromaticPSFFitWorkspace(FitWorkspace):
 
-    def __init__(self, chromatic_psf, data, data_errors, mode, bgd_model_func=None, file_name="", analytical=True,
+    def __init__(self, chromatic_psf, data, data_errors, mode, bgd_model_func=None, mask=None, file_name="", analytical=True,
                  amplitude_priors_method="noprior", verbose=False, plot=False, live_fit=False, truth=None):
         if mode not in ["1D", "2D"]:
             raise ValueError(f"mode argument must be '1D' or '2D'. Got {mode=}.")
@@ -1884,6 +1888,10 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.data = self.data.astype("float32").ravel()
         self.err = self.err.astype("float32").ravel()
         self.pixels = np.arange(self.data.shape[0])
+        if mask is not None:
+            self.mask = list(np.where(mask[self.bgd_width:-self.bgd_width, :].astype(bool).ravel())[0])
+        else:
+            self.mask = []
 
         if mode == "1D":
             self.pixels = np.arange(self.Ny)
@@ -1910,7 +1918,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.data_cov = sparse.diags(self.err * self.err, dtype="float32", format="dia")
         self.W = sparse.diags(1 / (self.err * self.err), dtype="float32", format="dia")
         self.sqrtW = self.W.sqrt()
-        # create a mask
         self.W_before_mask = self.W.copy()
 
         # design matrix
@@ -2036,7 +2043,8 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         W[mask] = 0
         self.W = sparse.diags(W, dtype="float32", format="dia")
         self.sqrtW = self.W.sqrt()
-        self.mask = list(np.where(mask)[0])
+        self.mask += list(np.where(mask)[0])
+        self.mask = list(set(self.mask))
 
     def simulate(self, *shape_params):
         r"""

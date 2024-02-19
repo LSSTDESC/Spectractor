@@ -46,10 +46,14 @@ class Image(object):
         Flat 2D array without units and median of 1.
     starfield: array
         Star field simulation, no units needed but better in ADU/s.
+    mask: array
+        Boolean array to mask defects.
     flat_rotated: array
         Rotated flat 2D array without units and median of 1.
     starfield_rotated: array
         Rotated star field simulation, no units needed but better in ADU/s.
+    mask_rotated: array
+        Rotated boolean array to mask defects.
     target_pixcoords_rotated: array
         Target position [x,y] in the rotated image in pixels.
     date_obs: str
@@ -166,6 +170,8 @@ class Image(object):
         self.flat_rotated = None
         self.starfield = None
         self.starfield_rotated = None
+        self.mask = None
+        self.mask_rotated = None
 
         if parameters.CALLING_CODE != 'LSST_DM' and file_name != "":
             self.load_image(file_name)
@@ -521,6 +527,8 @@ class Image(object):
         Examples
         --------
         >>> im = Image('tests/data/reduc_20170605_028.fits', config="./config/ctio.ini")
+        >>> im.mask = np.zeros_like(im.data).astype(bool)
+        >>> im.mask[700:705, 1250:1260] = True  # test masking of some pixels like cosmic rays
         >>> im.plot_image(target_pixcoords=[820, 580], scale="symlog")
         >>> if parameters.DISPLAY: plt.show()
         """
@@ -534,7 +542,7 @@ class Image(object):
             units = self.units
         if self.flat is not None and use_flat:
             data /= self.flat
-        plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
+        plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax, mask=self.mask,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         if parameters.OBS_OBJECT_TYPE == "STAR":
             plot_compass_simple(ax, self.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
@@ -1454,6 +1462,9 @@ def turn_image(image):
         if image.starfield is not None:
             image.starfield_rotated = ndimage.rotate(image.starfield, image.rotation_angle,
                                                      prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
+        if image.mask is not None:
+            image.mask_rotated = ndimage.rotate(image.mask, image.rotation_angle,
+                                                prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
 
     if parameters.DEBUG:
         margin = 100 // parameters.CCD_REBIN

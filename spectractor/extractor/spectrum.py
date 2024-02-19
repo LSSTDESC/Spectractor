@@ -145,6 +145,12 @@ class Spectrum:
         Best fitting model of the spectrogram in image units.
     spectrogram_residuals: array
         Residuals between the spectrogram data and the best fitting model of the spectrogram in image units.
+    spectrogram_flat: array
+        Flat array for the spectrogram with average=1.
+    spectrogram_starfield: array
+        Star field simulation array for the spectrogram in ADU/s.
+    spectrogram_mask: array
+        Boolean mask array to flag the defects.
     spectrogram_x0: float
         Relative position of the target in the spectrogram array along the x axis.
     spectrogram_y0: float
@@ -245,6 +251,7 @@ class Spectrum:
         self.spectrogram_fit = None
         self.spectrogram_flat = None
         self.spectrogram_starfield = None
+        self.spectrogram_mask = None
         self.spectrogram_x0 = None
         self.spectrogram_y0 = None
         self.spectrogram_xmin = None
@@ -671,7 +678,7 @@ class Spectrum:
             # print(f"Set header key {header_key} to {value} from attr {attribute}")
 
         extnames = ["SPECTRUM", "SPEC_COV", "ORDER2", "ORDER0"]  # spectrum data
-        extnames += ["S_DATA", "S_ERR", "S_BGD", "S_BGD_ER", "S_FIT", "S_RES", "S_FLAT", "S_STAR"]  # spectrogram data
+        extnames += ["S_DATA", "S_ERR", "S_BGD", "S_BGD_ER", "S_FIT", "S_RES", "S_FLAT", "S_STAR", "S_MASK"]
         extnames += ["PSF_TAB"]  # PSF parameter table
         extnames += ["LINES"]  # spectroscopic line table
         extnames += ["CONFIG"]  # config parameters
@@ -706,6 +713,8 @@ class Spectrum:
                 hdus[extname].data = self.spectrogram_flat
             elif extname == "S_STAR":
                 hdus[extname].data = self.spectrogram_starfield
+            elif extname == "S_MASK":
+                hdus[extname].data = self.spectrogram_mask.astype(int)
             elif extname == "PSF_TAB":
                 hdus[extname] = fits.table_to_hdu(self.chromatic_psf.table)
             elif extname == "LINES":
@@ -1096,6 +1105,8 @@ class Spectrum:
                     self.spectrogram_flat = hdu_list["S_FLAT"].data
                 if "S_STAR" in [hdu.name for hdu in hdu_list]:
                     self.spectrogram_starfield = hdu_list["S_STAR"].data
+                if "S_MASK" in [hdu.name for hdu in hdu_list]:
+                    self.spectrogram_mask = hdu_list["S_MASK"].data.astype(bool)
                 self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
                                                    saturation=self.spectrogram_saturation)
                 self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")

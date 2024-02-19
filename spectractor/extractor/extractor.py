@@ -139,6 +139,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 self.starfield *= self.flat
         else:
             self.starfield = None
+        if spectrum.spectrogram_mask is not None:
+            self.mask = list(np.where(spectrum.spectrogram_mask[self.bgd_width:-self.bgd_width, :].astype(bool).ravel())[0])
+        else:
+            self.mask = []
 
         # adapt the ChromaticPSF table shape
         if self.Nx != self.spectrum.chromatic_psf.Nx:
@@ -176,8 +180,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.W = 1. / (self.err * self.err)
         self.data_before_mask = np.copy(self.data)
         self.W_before_mask = np.copy(self.W)
-
-        # create mask
         self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
 
         # design matrix
@@ -296,7 +298,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
         self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
-        self.mask = list(np.where(mask)[0])
+        self.mask += list(np.where(mask)[0])
+        self.mask = list(set(self.mask))
 
     def simulate(self, *params):
         r"""
@@ -1090,7 +1093,7 @@ def SpectractorRun(image, output_directory, guess=None):
         my_logger.info(f"\n\tNo guess position of order 0 has been given. Assuming the spectrum to extract comes "
                        f"from the brightest object, guess position is set as {image.target_guess}.")
     if parameters.DEBUG:
-        image.plot_image(scale='symlog', title="before rebinning", target_pixcoords=image.target_guess, cmap='gray', vmax=1e3)
+        image.plot_image(scale='symlog', title="before rebinning", target_pixcoords=image.target_guess, vmax=1e3)
 
     # Use fast mode
     if parameters.CCD_REBIN > 1:
@@ -1289,6 +1292,10 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     # if available, apply flats
     if image.flat_rotated is not None:
         data /= image.flat_rotated[ymin:ymax, xmin:xmax]
+    if image.mask_rotated is not None:
+        mask = image.mask_rotated[ymin:ymax, xmin:xmax]
+    else:
+        mask = None
 
     Ny, Nx = data.shape
     my_logger.info(f'\n\tExtract spectrogram: crop rotated image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
@@ -1352,7 +1359,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     my_logger.info('\n\t  ======================= ChromaticPSF1D polynomial fit  =============================')
     my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
                    f'mode={mode} and amplitude_priors_method={method}...')
-    w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
+    w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, mask=mask,
                             amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE, analytical=True)
 
     Dx_rot = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
@@ -1411,6 +1418,10 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
         spectrum.spectrogram_flat = np.copy(image.flat[ymin:ymax, xmin:xmax])
     else:
         spectrum.spectrogram_flat = None  # np.ones_like(spectrum.spectrogram_data)
+    if image.mask is not None:
+        spectrum.spectrogram_mask = np.copy(image.mask[ymin:ymax, xmin:xmax])
+    else:
+        spectrum.spectrogram_mask = None  # np.ones_like(spectrum.spectrogram_data)
 
     Ny, Nx = spectrum.spectrogram_data.shape
     my_logger.info(f'\n\tExtract spectrogram: crop raw image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
@@ -1570,7 +1581,7 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
         data -= spectrum.spectrogram_starfield
 
     my_logger.info('\n\t  ======================= ChromaticPSF2D polynomial fit  =============================')
-    w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, live_fit=False,
+    w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, live_fit=False, mask=spectrum.spectrogram_mask,
                             amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE, analytical=True)
 
     # save results
