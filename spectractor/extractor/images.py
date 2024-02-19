@@ -212,6 +212,8 @@ class Image(object):
         --------
         >>> parameters.CCD_REBIN = 2
         >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im.mask = np.zeros_like(im.data).astype(bool)
+        >>> im.mask[700:750, 800:850] = True
         >>> im.target_guess = [810, 590]
         >>> im.data.shape
         (2048, 2048)
@@ -227,7 +229,7 @@ class Image(object):
         self.data = rebin(self.data, new_shape)
         self.err = np.sqrt(rebin(self.err ** 2, new_shape))
         if self.mask is not None:
-            self.mask = rebin(self.mask, new_shape, FLAG_MAKESUM=True)
+            self.mask = rebin(self.mask, new_shape, FLAG_MAKESUM=True).astype(bool)
         if self.flat is not None:
             self.flat = rebin(self.flat, new_shape, FLAG_MAKESUM=False)
         if self.starfield is not None:
