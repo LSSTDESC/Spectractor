@@ -186,6 +186,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.spectrum.spectrogram_flat = self.spectrum.spectrogram_flat[bgd_width:-bgd_width, :]
         if self.spectrum.spectrogram_starfield is not None:
             self.spectrum.spectrogram_starfield = self.spectrum.spectrogram_starfield[bgd_width:-bgd_width, :]
+        if self.spectrum.spectrogram_mask is not None:
+            self.spectrum.spectrogram_mask = self.spectrum.spectrogram_mask[bgd_width:-bgd_width, :]
         self.spectrum.spectrogram_y0 -= bgd_width
         self.spectrum.chromatic_psf.y0 -= bgd_width
         self.spectrum.spectrogram_Ny, self.spectrum.spectrogram_Nx = self.spectrum.spectrogram_data.shape
