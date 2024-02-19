@@ -1489,7 +1489,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
         gs_kw = dict(width_ratios=[3, 0.08], height_ratios=[1, 1])
         fig, ax = plt.subplots(2, 2, sharex='none', figsize=(16, 6), gridspec_kw=gs_kw)
         xx = np.arange(s.table['Dx'].size)
-        plot_image_simple(ax[1, 0], data=spectrum.spectrogram_data, scale="symlog", title='',
+        plot_image_simple(ax[1, 0], data=spectrum.spectrogram_data, scale="symlog", title='', mask=spectrum.spectrogram_mask,
                           units=image.units, aspect='auto', cax=ax[1, 1])
         ax[1, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_disp_axis'], label='Dispersion axis', color="r")
         ax[1, 0].scatter(xx, target_pixcoords_spectrogram[1] + s.table['Dy'],
@@ -1500,7 +1500,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
         # ax[1, 0].set_ylim(0.5 * Ny - signal_width, 0.5 * Ny + signal_width)
         ax[1, 0].set_xlim(0, xx.size)
         ax[1, 0].legend(loc='best')
-        plot_spectrum_simple(ax[0, 0], spectrum.lambdas, spectrum.data, data_err=spectrum.err,
+        plot_spectrum_simple(ax[0, 0], spectrum.lambdas, spectrum.data, data_err=spectrum.err, mask=spectrum.spectrogram_mask,
                              units=image.units, label='Fitted spectrum')
         ax[0, 0].plot(spectrum.lambdas, s.table['flux_sum'], 'k-', label='Cross spectrum')
         ax[1, 0].set_xlabel(r"$\lambda$ [nm]")

@@ -1,5 +1,5 @@
 import matplotlib as mpl
-mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
+#mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
 from scipy.interpolate import interp1d  # noqa: E402
 
@@ -104,7 +104,7 @@ def make_image():
 @astropy.config.set_temp_cache(os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache"))
 def test_ctio_fullchain():
     parameters.VERBOSE = True
-    parameters.DEBUG = False
+    parameters.DEBUG = True
     parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     sim_image_filename = "./tests/data/sim_20170530_134.fits"
 
