@@ -1109,7 +1109,7 @@ class Spectrum:
                 if "S_STAR" in [hdu.name for hdu in hdu_list]:
                     self.spectrogram_starfield = hdu_list["S_STAR"].data
                 if "S_MASK" in [hdu.name for hdu in hdu_list]:
-                    self.spectrogram_mask = hdu_list["S_MASK"].dat
+                    self.spectrogram_mask = hdu_list["S_MASK"].data
                     if self.spectrogram_mask is not None:
                         self.spectrogram_mask = self.spectrogram_mask.astype(bool)
                 self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
