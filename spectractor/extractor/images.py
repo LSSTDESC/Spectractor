@@ -226,6 +226,8 @@ class Image(object):
         new_shape = np.asarray(self.data.shape) // parameters.CCD_REBIN
         self.data = rebin(self.data, new_shape)
         self.err = np.sqrt(rebin(self.err ** 2, new_shape))
+        if self.mask is not None:
+            self.mask = rebin(self.mask, new_shape, FLAG_MAKESUM=True)
         if self.flat is not None:
             self.flat = rebin(self.flat, new_shape, FLAG_MAKESUM=False)
         if self.starfield is not None:
