@@ -221,7 +221,7 @@ class Image(object):
         self.data = rebin(self.data, new_shape)
         self.err = np.sqrt(rebin(self.err ** 2, new_shape))
         if self.flat is not None:
-            self.flat = rebin(self.flat, new_shape)
+            self.flat = rebin(self.flat, new_shape, FLAG_MAKESUM=False)
         if self.starfield is not None:
             self.starfield = rebin(self.starfield, new_shape)
         if self.target_guess is not None:
