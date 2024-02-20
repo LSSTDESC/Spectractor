@@ -236,7 +236,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     >>> from spectractor import parameters
     >>> parameters.DEBUG = True
     >>> psf = MoffatGauss()
-    >>> s0 = ChromaticPSF(psf, Nx=100, Ny=200, saturation=1000)
+    >>> s0 = ChromaticPSF(psf, Nx=100, Ny=300, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
     >>> data = s0.evaluate(s0.set_pixels(mode="1D"), poly_params=params)
@@ -272,7 +272,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         for dx in range(Nx):
             bgd_bands[int(Dy_disp_axis[dx] - ws[0]):int(Dy_disp_axis[dx] + ws[0]), dx] = np.nan
             mask += (np.isnan(bgd_bands))
-    bkg = Background2D(data, (parameters.PIXWIDTH_BOXSIZE, parameters.PIXWIDTH_BOXSIZE),
+    bkg = Background2D(data, (2*parameters.PIXWIDTH_BOXSIZE, parameters.PIXWIDTH_BOXSIZE),
                        filter_size=(filter_size, filter_size),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
                        mask=mask)

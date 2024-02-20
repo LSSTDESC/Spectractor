@@ -1540,7 +1540,7 @@ def run_gradient_descent(fit_workspace, epsilon, xtol, ftol, niter, verbose=Fals
     fit_workspace.params_table = np.concatenate([fit_workspace.params_table, tmp_params_table])
     fit_workspace.costs = np.concatenate([fit_workspace.costs, tmp_costs])
     if verbose or fit_workspace.verbose:
-        fit_workspace.my_logger.info(f"\n\t{fit_workspace.params.print_parameters_summary()}")
+        fit_workspace.my_logger.info(f"\n{fit_workspace.params.print_parameters_summary()}")
     if parameters.DEBUG and (verbose or fit_workspace.verbose):
         fit_workspace.plot_gradient_descent()
         if len(fit_workspace.params.get_free_parameters()) > 1:
@@ -1552,7 +1552,7 @@ def run_simple_newton_minimisation(fit_workspace, epsilon, xtol=1e-8, ftol=1e-8,
                                                                                               epsilon, niter=niter,
                                                                                               xtol=xtol, ftol=ftol)
     if verbose or fit_workspace.verbose:
-        fit_workspace.my_logger.info(f"\n\t{fit_workspace.params.print_parameters_summary()}")
+        fit_workspace.my_logger.info(f"\n{fit_workspace.params.print_parameters_summary()}")
     if parameters.DEBUG and (verbose or fit_workspace.verbose):
         fit_workspace.plot_gradient_descent()
         if len(fit_workspace.params.get_free_parameters()) > 1:
