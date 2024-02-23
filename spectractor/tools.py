@@ -1800,7 +1800,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         norm = matplotlib.colors.SymLogNorm(vmin=vmin, vmax=vmax, linthresh=10, base=10)
     else:
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
-    im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect)
+    im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect, interpolation="none")
     ax.grid(color='silver', ls='solid')
     ax.grid(True)
     ax.set_xlabel(parameters.PLOT_XLABEL)
