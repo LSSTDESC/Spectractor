@@ -70,6 +70,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.psf_params_start_index = np.array([p.size + len(self.psf_poly_params) * k for k in range(len(self.diffraction_orders))])
         self.saturation = spectrum.spectrogram_saturation
         p = np.concatenate([p] + [self.psf_poly_params] * len(self.diffraction_orders))
+        # for order in self.diffraction_orders:
+        #     p = np.concatenate([p] + [self.psf_poly_params * order])
         input_labels = [f"A{order}" for order in self.diffraction_orders]
         input_labels += [r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B", "A_star", "R", "P [hPa]", "T [Celsius]", "z"]
         for order in self.diffraction_orders:
@@ -818,9 +820,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     --------
 
     >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
-    >>> spec = Spectrum("./tests/data/test_auxtel_spectrum.fits")
     >>> parameters.VERBOSE = True
-    >>> w = FullForwardModelFitWorkspace(spec, verbose=True, plot=True, live_fit=True, amplitude_priors_method="spectrum")
+    >>> w = FullForwardModelFitWorkspace(spec, verbose=True, plot=True, live_fit=False, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
     >>> if 'LBDAS_T' in spec.header: plot_comparison_truth(spec, w)
 
