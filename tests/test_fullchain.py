@@ -29,6 +29,13 @@ PSF_POLY_PARAMS_TRUTH = [1, 0, 0,
                          3, 1, 1,
                          3, 0, 0,
                          1e6] * N_DIFF_ORDERS
+
+PSF_POLY_PARAMS_AUXTEL_TRUTH = [1, 0, 0,
+                         0, 0, 0,
+                         6, 0, 0,
+                         3, 0, 0,
+                         1e6] * N_DIFF_ORDERS
+
 A1_T = 1
 A2_T = 1
 A3_T = 0
