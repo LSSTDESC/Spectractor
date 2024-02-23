@@ -491,12 +491,12 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
     # Load reduced image
     spectrum = Spectrum(spectrum_filename)
+    parameters.CALLING_CODE = ""
     if diffraction_orders is None:
         diffraction_orders = np.arange(spectrum.order, spectrum.order + 3 * np.sign(spectrum.order), np.sign(spectrum.order))
     image = ImageModel(image_filename, target_label=spectrum.target.label)
     guess = np.array([spectrum.header['TARGETX'], spectrum.header['TARGETY']])
-    if "CCDREBIN" in spectrum.header:
-        guess *= spectrum.header["CCDREBIN"]
+    guess *= parameters.CCD_REBIN
     if parameters.DEBUG:
         image.plot_image(scale='symlog', target_pixcoords=guess)
     # Fit the star 2D profile
@@ -512,7 +512,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Target model
     my_logger.info('\n\tStar model...')
     # Spectrogram is simulated with spectrum.x0 target position: must be this position to simulate the target.
-    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.params.values[0])
+    star = StarModel(np.array(image.target_pixcoords) / parameters.CCD_REBIN, image.target_star2D, image.target_star2D.params.values[0])
     # reso = star.fwhm
     if parameters.DEBUG:
         star.plot_model()
@@ -596,6 +596,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # Round float ADU into closest integers
     # image.data = np.around(image.data)
+    if parameters.OBS_NAME == "AUXTEL":
+        image.data = image.data.T[::-1, ::-1]
 
     # Plot
     if parameters.VERBOSE and parameters.DISPLAY:  # pragma: no cover
@@ -606,7 +608,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Set output path
     ensure_dir(outputdir)
     output_filename = image_filename.split('/')[-1]
-    output_filename = (output_filename.replace('reduc', 'sim')).replace('trim', 'sim')
+    output_filename = (output_filename.replace('reduc', 'sim')).replace('trim', 'sim').replace('exposure', 'sim')
     output_filename = os.path.join(outputdir, output_filename)
 
     # Save images and parameters
