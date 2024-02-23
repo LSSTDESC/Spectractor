@@ -2039,6 +2039,12 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.boundaries, self.psf_cube_masked = self.chromatic_psf.get_boundaries(self.psf_cube_masked)
         self.psf_cube_sparse_indices, self.M_sparse_indices = self.chromatic_psf.get_sparse_indices(self.psf_cube_masked)
         mask = np.sum(self.psf_cube_masked.reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
+        # cumulate the boolean values as int
+        weight_mask = np.sum(self.psf_cube_masked, axis=0)
+        # look for indices with maximum weight per column (all sheets of the psf cube have contributed)
+        res = np.max(weight_mask, axis=0)[np.newaxis,:] * np.ones((weight_mask.shape[0],1))
+        # keep only the pixels where all psf_cube sheets have contributed per column
+        mask = (weight_mask != res).ravel()
         W = np.copy(self.W_before_mask.data.ravel())
         W[mask] = 0
         self.W = sparse.diags(W, dtype="float32", format="dia")

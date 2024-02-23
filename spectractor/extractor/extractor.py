@@ -86,7 +86,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                   [D2CCD - 3 * parameters.DISTANCE2CCD_ERR, D2CCD + 3 * parameters.DISTANCE2CCD_ERR],
                   [-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR],
                   [-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR],
-                  [-90, 90], [0.2, 5], [0, np.inf], [-360, 360], [300, 1100], [-100, 100], [1.001, 3]]
+                  [-90, 90], [0.2, 5], [0.5, 2], [-360, 360], [300, 1100], [-100, 100], [1.001, 3]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
         fixed = [False] * p.size
         for k, par in enumerate(input_labels):
@@ -95,6 +95,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         for k, par in enumerate(input_labels):
             if "y_c" in par:
                 fixed[k] = False
+                p[k] = 0
+        for k, par in enumerate(input_labels):
+            if "y_c" in par and par[-2:]=="_3" and "c_0" not in par:
+                fixed[k] = True
+                p[k] = 0
+            if "y_c" in par and par[-2:]=="_2" and "c_0" not in par:
+                fixed[k] = True
                 p[k] = 0
 
         params = FitParameters(p, labels=input_labels, axis_names=axis_names, fixed=fixed, bounds=bounds,
@@ -299,8 +306,14 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.convolve_psf_cube_masked(psf_cube_masked)
             # make rectangular mask per wavelength
             self.boundaries[order], self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.get_boundaries(self.psf_cubes_masked[order])
-            self.psf_cube_sparse_indices[order], self.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(self.psf_cubes_masked[order])
+            self.psf_cube_sparse_indices[order], self.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(self.psf_cubes_masked[order])       
         mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
+        # cumulate the boolean values as int
+        weight_mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]], axis=0)
+        # look for indices with maximum weight per column (all sheets of the psf cube have contributed)
+        res = np.max(weight_mask, axis=0)[np.newaxis,:] * np.ones((weight_mask.shape[0],1))
+        # keep only the pixels where all psf_cube sheets have contributed per column
+        mask = (weight_mask != res).ravel()
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
         self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
