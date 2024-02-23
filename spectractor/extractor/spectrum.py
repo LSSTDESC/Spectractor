@@ -713,8 +713,11 @@ class Spectrum:
                 hdus[extname].data = self.spectrogram_flat
             elif extname == "S_STAR":
                 hdus[extname].data = self.spectrogram_starfield
-            elif extname == "S_MASK" and self.spectrogram_mask is not None:
-                hdus[extname].data = self.spectrogram_mask.astype(int)
+            elif extname == "S_MASK":
+                if self.spectrogram_mask is not None:
+                    hdus[extname].data = self.spectrogram_mask.astype(int)
+                else:
+                    hdus[extname].data = self.spectrogram_mask
             elif extname == "PSF_TAB":
                 hdus[extname] = fits.table_to_hdu(self.chromatic_psf.table)
             elif extname == "LINES":
@@ -1087,7 +1090,7 @@ class Spectrum:
             self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
 
         if not self.fast_load:
-            with fits.open(input_file_name) as hdu_list:
+            with (fits.open(input_file_name) as hdu_list):
                 # load other spectrum info
                 self.cov_matrix = hdu_list["SPEC_COV"].data
                 _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
@@ -1106,7 +1109,9 @@ class Spectrum:
                 if "S_STAR" in [hdu.name for hdu in hdu_list]:
                     self.spectrogram_starfield = hdu_list["S_STAR"].data
                 if "S_MASK" in [hdu.name for hdu in hdu_list]:
-                    self.spectrogram_mask = hdu_list["S_MASK"].data.astype(bool)
+                    self.spectrogram_mask = hdu_list["S_MASK"].data
+                    if self.spectrogram_mask is not None:
+                        self.spectrogram_mask = self.spectrogram_mask.astype(bool)
                 self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
                                                    saturation=self.spectrogram_saturation)
                 self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")

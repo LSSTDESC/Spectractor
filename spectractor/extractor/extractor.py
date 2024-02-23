@@ -131,25 +131,29 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # crop data to fit faster
         self.lambdas = self.spectrum.lambdas
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
-        self.Ny, self.Nx = spectrum.spectrogram_data[self.bgd_width:-self.bgd_width, :].shape
+        if spectrum.spectrogram_data.shape[0] < 2 * self.bgd_width:
+            # Data has been already cropped
+            self.bgd_width = 0
+        rows = np.arange(self.bgd_width, spectrum.spectrogram_data.shape[0]-self.bgd_width)
+        self.Ny, self.Nx = spectrum.spectrogram_data[rows, :].shape
         yy, xx = np.mgrid[:self.Ny, :self.Nx]
         self.pixels = np.asarray([xx, yy], dtype=int)
-        self.data = spectrum.spectrogram_data[self.bgd_width:-self.bgd_width, :].flatten()
-        self.err = spectrum.spectrogram_err[self.bgd_width:-self.bgd_width, :].flatten()
-        self.bgd = spectrum.spectrogram_bgd[self.bgd_width:-self.bgd_width, :].flatten()
+        self.data = spectrum.spectrogram_data[rows, :].flatten()
+        self.err = spectrum.spectrogram_err[rows, :].flatten()
+        self.bgd = spectrum.spectrogram_bgd[rows, :].flatten()
         if spectrum.spectrogram_flat is not None:
-            self.flat = spectrum.spectrogram_flat[self.bgd_width:-self.bgd_width, :].flatten()
+            self.flat = spectrum.spectrogram_flat[rows, :].flatten()
             self.bgd *= self.flat
         else:
             self.flat = None
         if spectrum.spectrogram_starfield is not None:
-            self.starfield = spectrum.spectrogram_starfield[self.bgd_width:-self.bgd_width, :].flatten()
+            self.starfield = spectrum.spectrogram_starfield[rows, :].flatten()
             if self.flat is not None:
                 self.starfield *= self.flat
         else:
             self.starfield = None
         if spectrum.spectrogram_mask is not None:
-            self.mask = list(np.where(spectrum.spectrogram_mask[self.bgd_width:-self.bgd_width, :].astype(bool).ravel())[0])
+            self.mask = list(np.where(spectrum.spectrogram_mask[rows, :].astype(bool).ravel())[0])
         else:
             self.mask = []
 
@@ -399,6 +403,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         Load data:
 
         >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
+        >>> spec.plot_spectrogram()
 
         Simulate the data with fixed amplitude priors:
 
@@ -828,6 +833,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     --------
 
     >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
+    >>> spec = Spectrum("./tests/data/test_auxtel_spectrum.fits")
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=True, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
