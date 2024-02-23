@@ -656,8 +656,8 @@ class Spectrum:
         """
         from spectractor._version import __version__
         self.header["VERSION"] = str(__version__)
-        self.header["REBIN"] = parameters.CCD_REBIN
-        self.header.comments['REBIN'] = 'original image rebinning factor to get spectrum.'
+        self.header["CCD_REBIN"] = parameters.CCD_REBIN
+        self.header.comments['CCD_REBIN'] = 'original image rebinning factor to get spectrum.'
         self.header['UNIT1'] = "nanometer"
         self.header['UNIT2'] = self.units
         self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, ' \
