@@ -1,6 +1,6 @@
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.tools import (pixel_rotation, set_wcs_file_name, set_sources_file_name,
+from spectractor.tools import (rebin, pixel_rotation, set_wcs_file_name, set_sources_file_name,
                                set_gaia_catalog_file_name, load_wcs_from_file, ensure_dir,
                                plot_image_simple, iraf_source_detection)
 from spectractor.extractor.images import Image, find_target
@@ -176,7 +176,7 @@ class StarFieldModel:
             margin = 30
             mask = np.zeros(data.shape, dtype=bool)
             for y in range(int(y0) - 100, int(y0) + 100):
-                for x in range(parameters.CCD_IMSIZE):
+                for x in range(self.image.data.shape[1]):
                     u, v = pixel_rotation(x, y, self.image.disperser.theta([x0, y0]) * np.pi / 180., x0, y0)
                     if margin > v > -margin:
                         mask[y, x] = True
@@ -217,10 +217,12 @@ class StarFieldModel:
 class BackgroundModel:
     """Class to model the background of the simulated image.
 
-    The background model size is set with the parameters.CCD_IMSIZE global keyword.
-
     Attributes
     ----------
+    Nx: int
+        Size of the background along X axis in pixels.
+    Ny: int
+        Size of the background along Y axis in pixels.
     level: float
         The mean level of the background in image units.
     frame: array_like
@@ -228,13 +230,15 @@ class BackgroundModel:
         and the smoothing gaussian width (default: None).
     """
 
-    def __init__(self, level, frame=None):
+    def __init__(self, Nx, Ny, level, frame=None):
         """Create a BackgroundModel instance.
-
-        The background model size is set with the parameters.CCD_IMSIZE global keyword.
 
         Parameters
         ----------
+        Nx: int
+            Size of the background along X axis in pixels.
+        Ny: int
+            Size of the background along Y axis in pixels.
         level: float
             The mean level of the background in image units.
         frame: array_like, None
@@ -244,17 +248,19 @@ class BackgroundModel:
         Examples
         --------
         >>> from spectractor import parameters
-        >>> parameters.CCD_IMSIZE = 200
-        >>> bgd = BackgroundModel(10)
+        >>> Nx, Ny = 200, 300
+        >>> bgd = BackgroundModel(Nx, Ny, 10)
         >>> model = bgd.model()
         >>> np.all(model==10)
         True
         >>> model.shape
         (200, 200)
-        >>> bgd = BackgroundModel(10, frame=(160, 180, 3))
+        >>> bgd = BackgroundModel(Nx, Ny, 10, frame=(160, 180, 3))
         >>> bgd.plot_model()
         """
         self.my_logger = set_logger(self.__class__.__name__)
+        self.Nx = Nx
+        self.Ny = Ny
         self.level = level
         if self.level <= 0:
             self.my_logger.warning('\n\tBackground level must be strictly positive.')
@@ -266,7 +272,6 @@ class BackgroundModel:
         """Compute the background model for the image simulation in image units.
 
         A shadowing vignetting frame is roughly simulated if self.frame is set.
-        The background model size is set with the parameters.CCD_IMSIZE global keyword.
 
         Returns
         -------
@@ -274,7 +279,7 @@ class BackgroundModel:
             The array of the background model.
 
         """
-        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
+        xx, yy = np.mgrid[0:self.Ny:1, 0:self.Nx:1]
         bkgd = self.level * np.ones_like(xx)
         if self.frame is None:
             return bkgd
@@ -282,9 +287,9 @@ class BackgroundModel:
             xlim, ylim, width = self.frame
             bkgd[ylim:, :] = self.level / 100
             bkgd[:, xlim:] = self.level / 100
-            kernel = np.outer(gaussian(parameters.CCD_IMSIZE, width), gaussian(parameters.CCD_IMSIZE, width))
+            kernel = np.outer(gaussian(self.Nx, width), gaussian(self.Ny, width))
             bkgd = fftconvolve(bkgd, kernel, mode='same')
-            bkgd *= self.level / bkgd[parameters.CCD_IMSIZE // 2, parameters.CCD_IMSIZE // 2]
+            bkgd *= self.level / bkgd[self.Ny // 2, self.Nx // 2]
             return bkgd
 
     def plot_model(self):
@@ -313,23 +318,27 @@ class BackgroundModel:
 class FlatModel:
     """Class to model the pixel flat of the simulated image. Flat is dimensionless and its average must be one.
 
-    The flat model size is set with the parameters.CCD_IMSIZE global keyword.
-
     Attributes
     ----------
+    Nx: int
+        Size of the background along X axis in pixels.
+    Ny: int
+        Size of the background along Y axis in pixels.
     gains: array_like
         The list of gains to apply. The average must be one.
     randomness_level: float
         Level of random quantum efficiency to apply to pixels (default: 0.).
     """
 
-    def __init__(self, gains, randomness_level=0.):
+    def __init__(self, Nx, Ny, gains, randomness_level=0.):
         """Create a FlatModel instance. Flat is dimensionless and its average must be one.
-
-        The flat model size is set with the parameters.CCD_IMSIZE global keyword.
 
         Parameters
         ----------
+        Nx: int
+            Size of the background along X axis in pixels.
+        Ny: int
+            Size of the background along Y axis in pixels.
         gains: array_like
             The list of gains to apply. The average must be one.
         randomness_level: float
@@ -338,8 +347,8 @@ class FlatModel:
         Examples
         --------
         >>> from spectractor import parameters
-        >>> parameters.CCD_IMSIZE = 200
-        >>> flat = FlatModel(gains=[[1, 2, 3, 4], [4, 3, 2, 1]], with_randomness=True)
+        >>> Nx, Ny = 200, 300
+        >>> flat = FlatModel(Nx, Ny, gains=[[1, 2, 3, 4], [4, 3, 2, 1]])
         >>> model = flat.model()
         >>> print(f"{np.mean(model):.4f}")
         1.0000
@@ -348,6 +357,8 @@ class FlatModel:
         >>> flat.plot_model()
         """
         self.my_logger = set_logger(self.__class__.__name__)
+        self.Nx = Nx
+        self.Ny = Ny
         self.gains = np.atleast_2d(gains).astype(float)
         if len(self.gains) <= 0:
             raise ValueError(f"Gains list is empty")
@@ -368,7 +379,7 @@ class FlatModel:
         flat: array_like
             The array of the flat model.
         """
-        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
+        yy, xx = np.mgrid[0:self.Nx:1, 0:self.Ny:1]
         flat = np.ones_like(xx, dtype=float)
         hflats = np.array_split(flat, self.gains.shape[0])
         for h in range(self.gains.shape[0]):
@@ -496,7 +507,14 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         diffraction_orders = np.arange(spectrum.order, spectrum.order + 3 * np.sign(spectrum.order), np.sign(spectrum.order))
     image = ImageModel(image_filename, target_label=spectrum.target.label)
     guess = np.array([spectrum.header['TARGETX'], spectrum.header['TARGETY']])
-    guess *= parameters.CCD_REBIN
+    if parameters.CCD_REBIN != 1:
+        # these lines allow to simulate images using rebinned spectrum files
+        guess *= parameters.CCD_REBIN
+        new_shape = np.asarray((parameters.CCD_IMSIZE, parameters.CCD_IMSIZE))
+        old_edge = parameters.CCD_IMSIZE * parameters.CCD_REBIN
+        image.gain = rebin(image.gain[:old_edge, :old_edge], new_shape, FLAG_MAKESUM=False)
+        image.read_out_noise = rebin(image.read_out_noise[:old_edge, :old_edge], new_shape, FLAG_MAKESUM=False)
+
     if parameters.DEBUG:
         image.plot_image(scale='symlog', target_pixcoords=guess)
     # Fit the star 2D profile
@@ -505,7 +523,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Background model
     my_logger.info('\n\tBackground model...')
     bgd_level = float(np.mean(spectrum.spectrogram_bgd))
-    background = BackgroundModel(level=bgd_level, frame=None)  # (1600, 1650, 100))
+    background = BackgroundModel(parameters.CCD_IMSIZE, parameters.CCD_IMSIZE, level=bgd_level, frame=None)
     if parameters.DEBUG:
         background.plot_model()
 
@@ -527,7 +545,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     flat = None
     if with_flat:
         my_logger.info('\n\tFlat model...')
-        flat = FlatModel(gains=[[1, 2, 3, 4], [4, 3, 2, 1]], randomness_level=1e-2)
+        flat = FlatModel(parameters.CCD_IMSIZE, parameters.CCD_IMSIZE, gains=[[1, 2, 3, 4], [4, 3, 2, 1]], randomness_level=1e-2)
         if parameters.DEBUG:
             flat.plot_model()
 
