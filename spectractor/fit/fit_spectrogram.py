@@ -238,7 +238,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             psf_cube_masked = self.spectrum.chromatic_psf.convolve_psf_cube_masked(psf_cube_masked)
             # make rectangular mask per wavelength
             self.spectrogram_simulation.boundaries[order], self.spectrogram_simulation.psf_cubes_masked[order] = self.spectrum.chromatic_psf.set_rectangular_boundaries(psf_cube_masked)
-            self.spectrogram_simulation.psf_cube_sparse_indices[order], self.spectrogram_simulation.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(self.spectrogram_simulation.psf_cubes_masked[order])
+            self.spectrogram_simulation.psf_cube_sparse_indices[order], self.spectrogram_simulation.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(self.spectrogram_simulation.boundaries[order])
         mask = np.sum(self.spectrogram_simulation.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube_masked.shape[0], self.spectrogram_simulation.pixels[0].size), axis=0) == 0
         # cumulate the boolean values as int
         weight_mask = np.sum(self.spectrogram_simulation.psf_cubes_masked[self.diffraction_orders[0]], axis=0)

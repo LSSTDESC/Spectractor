@@ -678,14 +678,13 @@ class ChromaticPSF:
             psf_cube_masked[k, ymin:ymax, xmin:xmax] = True
         return boundaries, psf_cube_masked
 
-    @staticmethod
-    def get_sparse_indices(psf_cube_masked):
-        """Methods that returns the indices to build sparse matrices from `psf_cube_masked`.
+    def get_sparse_indices(self, boundaries):
+        """Methods that returns the indices to build sparse matrices from rectangular `boundaries`.
 
         Parameters
         ----------
-        psf_cube_masked: np.ndarray
-            Cube of boolean values where `psf_cube` cube is positive, eventually convolved.
+        boundaries: dict
+            The dictionnary of PSF edges per wavelength.
 
         Returns
         -------
@@ -702,14 +701,20 @@ class ChromaticPSF:
         >>> profile_params[:, 1] = np.arange(s.Nx)
         >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
-        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
-        >>> M_sparse_indices.shape
-        (72000,)
-        >>> len(psf_cube_sparse_indices)
-        100
+        >>> boundaries, psf_cube_masked = s.set_rectangular_boundaries(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(boundaries)
+        >>> assert M_sparse_indices.shape == np.sum(psf_cube_masked)
+        >>> assert len(psf_cube_sparse_indices) == s.Nx
         """
-        wl_size = psf_cube_masked.shape[0]
-        psf_cube_sparse_indices = [np.where(psf_cube_masked[k].ravel() > 0)[0] for k in range(wl_size)]
+        wl_size = self.Nx  # assuming that the number of cube layers is the number of pixel columns
+        psf_cube_sparse_indices = []
+        for k in range(wl_size):
+            xmin, xmax = boundaries["xmin"][k], boundaries["xmax"][k]
+            if xmin == -1:
+                psf_cube_sparse_indices.append([])
+            else:
+                ymin, ymax = boundaries["ymin"][k], boundaries["ymax"][k]
+                psf_cube_sparse_indices.append(np.concatenate([np.arange(xmin,xmax) + k * wl_size for k in range(ymin, ymax)]))
         M_sparse_indices = np.concatenate(psf_cube_sparse_indices)
         return psf_cube_sparse_indices, M_sparse_indices
 
@@ -752,7 +757,7 @@ class ChromaticPSF:
         >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
         >>> boundaries, psf_cube_masked = s.set_rectangular_boundaries(psf_cube_masked)
-        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(boundaries)
         >>> M = s.build_sparse_M(s.set_pixels(mode="2D"), profile_params, M_sparse_indices, boundaries, dtype="float32")
         >>> M.shape
         (2000, 100)
@@ -771,7 +776,7 @@ class ChromaticPSF:
         >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="1D"), profile_params)
         >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
         >>> boundaries, psf_cube_masked = s.set_rectangular_boundaries(psf_cube_masked)
-        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(boundaries)
         >>> M = s.build_sparse_M(s.set_pixels(mode="1D"), profile_params, M_sparse_indices, boundaries, dtype="float32")
         >>> M.shape
         (2000, 100)
@@ -850,7 +855,7 @@ class ChromaticPSF:
         >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
         >>> boundaries, psf_cube_masked = s.set_rectangular_boundaries(psf_cube_masked)
-        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(boundaries)
         >>> s.params.fixed[s.Nx:s.Nx+s.deg+1] = [True] * (s.deg+1)  # fix all x_c parameters
         >>> J = s.build_psf_jacobian(s.set_pixels(mode="2D"), profile_params, psf_cube_sparse_indices, boundaries, dtype="float32")
         >>> J.shape
@@ -941,7 +946,7 @@ class ChromaticPSF:
         >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
         >>> boundaries, psf_cube_masked = s.set_rectangular_boundaries(psf_cube_masked)
-        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(boundaries)
         >>> s.params.fixed[s.Nx:s.Nx+s.deg+1] = [True] * (s.deg+1)  # fix all x_c parameters
         >>> dM = s.build_sparse_dM(s.set_pixels(mode="2D"), profile_params, M_sparse_indices, boundaries, dtype="float32")
         >>> len(dM), dM[0].shape
@@ -2037,7 +2042,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                                                                        fwhmy_clip=parameters.PSF_FWHM_CLIP)
         self.psf_cube_masked = self.chromatic_psf.convolve_psf_cube_masked(psf_cube_masked)
         self.boundaries, self.psf_cube_masked = self.chromatic_psf.set_rectangular_boundaries(self.psf_cube_masked)
-        self.psf_cube_sparse_indices, self.M_sparse_indices = self.chromatic_psf.get_sparse_indices(self.psf_cube_masked)
+        self.psf_cube_sparse_indices, self.M_sparse_indices = self.chromatic_psf.get_sparse_indices(self.boundaries)
         mask = np.sum(self.psf_cube_masked.reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
         # cumulate the boolean values as int
         weight_mask = np.sum(self.psf_cube_masked, axis=0)
