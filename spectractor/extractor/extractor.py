@@ -97,7 +97,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 fixed[k] = True
                 p[k] = 0
         for k, par in enumerate(input_labels):
-            if "y_c_0" not in par and "y_c_1" not in par:
+            if "y_c" in par and "y_c_0" not in par and "y_c_1" not in par:
                 fixed[k] = False
                 p[k] = 0
 
@@ -304,10 +304,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             # make rectangular mask per wavelength
             self.boundaries[order], self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.set_rectangular_boundaries(self.psf_cubes_masked[order])
             if k > 0:
-                # spectrogram modelisation must be accurate inside the k=0 order footprint
-                for i in range(len(psf_cube_masked)):
-                    self.boundaries[order]["ymin"] = np.zeros_like(self.boundaries[order]["ymin"])
-                    self.boundaries[order]["ymax"] = self.Ny * np.ones_like(self.boundaries[order]["ymax"])
+                # spectrogram model must be accurate inside the k=0 order footprint: enlarge the next order footprints
+                self.boundaries[order]["ymin"] = np.zeros_like(self.boundaries[order]["ymin"])
+                self.boundaries[order]["ymax"] = self.Ny * np.ones_like(self.boundaries[order]["ymax"])
             self.psf_cube_sparse_indices[order], self.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(self.boundaries[order])
         mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
         # cumulate the boolean values as int
