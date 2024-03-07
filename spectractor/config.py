@@ -116,6 +116,10 @@ def load_config(config_filename, rebin=True):
     if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:
         raise ValueError(f'parameters.PIXWIDTH_BOXSIZE must be smaller than parameters.PIXWIDTH_BACKGROUND (or equal).')
 
+    # check consistency
+    if parameters.PSF_POLY_TYPE not in ["polynomial", "legendre"]:
+        raise ValueError(f'parameters.PSF_POLY_TYPE must be either "polynomial" or "legendre". Got {parameters.PSF_POLY_TYPE=}')
+
     # check presence of atmospheric simulation packages
     if parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() not in ["none", "libradtran", "getobsatmo"]:
         raise ValueError(f'parameters.SPECTRACTOR_ATMOSPHERE_SIM must be either ["none", "libradtran", "getobsatmo"]. '

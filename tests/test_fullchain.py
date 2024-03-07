@@ -26,7 +26,7 @@ N_DIFF_ORDERS = 3
 PSF_POLY_ORDER = 2
 PSF_POLY_PARAMS_TRUTH = [1, 0, 0,
                          0, 0, 0,
-                         3, 1, 1,
+                         3, 0, 0,
                          3, 0, 0,
                          1e6] * N_DIFF_ORDERS
 

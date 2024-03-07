@@ -94,14 +94,18 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 fixed[k] = True
         for k, par in enumerate(input_labels):
             if "y_c" in par:
-                fixed[k] = False
+                fixed[k] = True
                 p[k] = 0
+        # for k, par in enumerate(input_labels):
+        #     if "y_c" in par and par[-2:]=="_3" and "c_0" not in par:
+        #         fixed[k] = True
+        #         p[k] = 0
+        #     if "y_c" in par and par[-2:]=="_2" and "c_0" not in par:
+        #         fixed[k] = True
+        #         p[k] = 0
         for k, par in enumerate(input_labels):
-            if "y_c" in par and par[-2:]=="_3" and "c_0" not in par:
-                fixed[k] = True
-                p[k] = 0
-            if "y_c" in par and par[-2:]=="_2" and "c_0" not in par:
-                fixed[k] = True
+            if "y_c_2" in par:
+                fixed[k] = False
                 p[k] = 0
 
         params = FitParameters(p, labels=input_labels, axis_names=axis_names, fixed=fixed, bounds=bounds,
@@ -117,8 +121,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             params.fixed[params.get_index("A_star")] = True  # Astar
         params.fixed[params.get_index("D_CCD [mm]")] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_spectrum
         params.fixed[params.get_index("shift_x [pix]")] = True  # delta x: if False, extracted spectrum is biased compared with truth
-        params.fixed[params.get_index("shift_y [pix]")] = True  # delta y
-        params.fixed[params.get_index("angle [deg]")] = True  # angle
+        params.fixed[params.get_index("shift_y [pix]")] = False  # delta y
+        params.fixed[params.get_index("angle [deg]")] = False  # angle
         params.fixed[params.get_index("B")] = True  # B: not needed in simulations, to check with data
         params.fixed[params.get_index("R")] = True  # camera rot
         params.fixed[params.get_index("P [hPa]")] = True  # pressure
