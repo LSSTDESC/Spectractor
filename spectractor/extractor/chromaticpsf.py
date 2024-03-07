@@ -224,7 +224,7 @@ class ChromaticPSF:
 
         ..  doctest::
             :hide:
-            >>> assert(np.all(np.isclose(params,[10, 50, 100, 150, 200, 0, 0, 0, 0, 5, 0, 2, 0, -0.4, -0.4,1,0,20000])))
+            >>> assert(np.all(np.isclose(params,[10, 50, 100, 150, 200, 0, 0, 0, 0, 5, 0, 2, 0, -0.4, 0, 1, 0, 20000])))
 
         """
         if not isinstance(self.psf, MoffatGauss) and not isinstance(self.psf, Moffat):
@@ -241,7 +241,7 @@ class ChromaticPSF:
         params += [0.] * (self.degrees['gamma'] - 1) + [0, 5]  # gamma
         params += [0.] * (self.degrees['alpha'] - 1) + [0, 2]  # alpha
         if isinstance(self.psf, MoffatGauss):
-            params += [0.] * (self.degrees['eta_gauss'] - 1) + [-0.4, -0.4]  # eta_gauss
+            params += [0.] * (self.degrees['eta_gauss'] - 1) + [0, -0.4]  # eta_gauss
             params += [0.] * (self.degrees['stddev'] - 1) + [0, 1]  # stddev
         params += [self.saturation]  # saturation
         poly_params = np.zeros_like(params)
@@ -1126,8 +1126,7 @@ class ChromaticPSF:
 
         ..  doctest::
             :hide:
-
-            >>> assert(np.all(np.isclose(profile_params[0], [10, 0, 50, 5, 2, 0, 1, 8e3])))
+            >>> assert(np.all(np.isclose(profile_params[0], [10, 0, 50, 5, 2, -0.4, 1, 8e3])))
 
         From the profile parameters to the polynomial parameters:
 
@@ -1271,8 +1270,7 @@ class ChromaticPSF:
 
         ..  doctest::
             :hide:
-
-            >>> assert np.allclose(profile_params[0], [10, 0, 50, 5, 2, -5e-3, 1, 8e3], rtol=1e-3, atol=1e-3)
+            >>> assert np.allclose(profile_params[0], [10, 0, 50, 5, 2, -0.4, 1, 8e3], rtol=1e-3, atol=1e-3)
 
         From the profile parameters to the polynomial parameters:
 
@@ -1289,8 +1287,7 @@ class ChromaticPSF:
 
         ..  doctest::
             :hide:
-
-            >>> assert np.allclose(profile_params[0], [1, 0, 50, 5, 2, 0, 1, 8e3])
+            >>> assert np.allclose(profile_params[0], [1, 0, 50, 5, 2, -0.4, 1, 8e3])
 
         """
         length = len(self.table)

@@ -921,23 +921,6 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             if parameters.DEBUG and parameters.DISPLAY:
                 w.plot_fit()
 
-            # recompute angle and dy0 if fixed while y_c parameters are free
-            # if w.fixed[3] and w.fixed[4] and not np.any([w.fixed[k] for k, par in enumerate(w.input_labels) if "y_c" in par]):
-            #     pval_leg = [w.p[k] for k, par in enumerate(w.input_labels) if "y_c" in par][
-            #                :w.spectrum.chromatic_psf.degrees["y_c"] + 1]
-            #     pval_poly = np.polynomial.legendre.leg2poly(pval_leg)
-            #     new_dy0, new_angle = w.p[2], w.p[4]
-            #     from numpy.polynomial import Polynomial as P
-            #     p = P(pval_poly)
-            #     pX = P([0, 0.5 * (w.spectrum.spectrogram_Nx)])
-            #     pfinal = p(pX)
-            #     pval_poly = pfinal.coef
-            #     for k in range(pval_poly.size):
-            #         if k == 0:
-            #             new_dy0 += pval_poly[k]
-            #         if k == 1:
-            #             new_angle += np.arctan(pval_poly[k]) * 180 / np.pi
-
             w.spectrum.lambdas = np.copy(w.lambdas)
             w.spectrum.chromatic_psf.table['lambdas'] = np.copy(w.lambdas)
             w.spectrum.data = np.copy(w.amplitude_params)
