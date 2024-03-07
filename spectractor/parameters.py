@@ -114,6 +114,7 @@ PSF_POLY_ORDER = 2  # the order of the polynomials to model wavelength dependenc
 PSF_FIT_REG_PARAM = 0.01  # regularisation parameter for the chisq minimisation to extract the spectrum
 PSF_PIXEL_STEP_TRANSVERSE_FIT = 10  # step size in pixels for the first transverse PSF1D fit
 PSF_FWHM_CLIP = 2  # PSF is not evaluated outside a region larger than max(PIXWIDTH_SIGNAL, PSF_FWHM_CLIP*fwhm) pixels
+PSF_POLY_TYPE = "polynomial"  # polynomial type: must be polynomial or legendre
 
 # Detection line algorithm
 CALIB_BGD_ORDER = 3  # order of the background polynome to fit

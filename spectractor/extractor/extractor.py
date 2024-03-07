@@ -70,8 +70,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.psf_params_start_index = np.array([p.size + len(self.psf_poly_params) * k for k in range(len(self.diffraction_orders))])
         self.saturation = spectrum.spectrogram_saturation
         p = np.concatenate([p] + [self.psf_poly_params] * len(self.diffraction_orders))
-        #for order in self.diffraction_orders:
-        #    p = np.concatenate([p] + [order*self.psf_poly_params])
+        # for order in self.diffraction_orders:
+        #     p = np.concatenate([p] + [self.psf_poly_params * order])
         input_labels = [f"A{order}" for order in self.diffraction_orders]
         input_labels += [r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B", "A_star", "R", "P [hPa]", "T [Celsius]", "z"]
         for order in self.diffraction_orders:
@@ -94,14 +94,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 fixed[k] = True
         for k, par in enumerate(input_labels):
             if "y_c" in par:
-                fixed[k] = False
+                fixed[k] = True
                 p[k] = 0
         for k, par in enumerate(input_labels):
-            if "y_c" in par and par[-2:]=="_3" and "c_0" not in par:
-                fixed[k] = True
-                p[k] = 0
-            if "y_c" in par and par[-2:]=="_2" and "c_0" not in par:
-                fixed[k] = True
+            if "y_c" in par and "y_c_0" not in par and "y_c_1" not in par:
+                fixed[k] = False
                 p[k] = 0
 
         params = FitParameters(p, labels=input_labels, axis_names=axis_names, fixed=fixed, bounds=bounds,
@@ -117,8 +114,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             params.fixed[params.get_index("A_star")] = True  # Astar
         params.fixed[params.get_index("D_CCD [mm]")] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_spectrum
         params.fixed[params.get_index("shift_x [pix]")] = True  # delta x: if False, extracted spectrum is biased compared with truth
-        params.fixed[params.get_index("shift_y [pix]")] = True  # delta y
-        params.fixed[params.get_index("angle [deg]")] = True  # angle
+        params.fixed[params.get_index("shift_y [pix]")] = False  # delta y
+        params.fixed[params.get_index("angle [deg]")] = False  # angle
         params.fixed[params.get_index("B")] = True  # B: not needed in simulations, to check with data
         params.fixed[params.get_index("R")] = True  # camera rot
         params.fixed[params.get_index("P [hPa]")] = True  # pressure
@@ -305,8 +302,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
             self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.convolve_psf_cube_masked(psf_cube_masked)
             # make rectangular mask per wavelength
-            self.boundaries[order], self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.get_boundaries(self.psf_cubes_masked[order])
-            self.psf_cube_sparse_indices[order], self.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(self.psf_cubes_masked[order])       
+            self.boundaries[order], self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.set_rectangular_boundaries(self.psf_cubes_masked[order])
+            if k > 0:
+                # spectrogram model must be accurate inside the k=0 order footprint: enlarge the next order footprints
+                self.boundaries[order]["ymin"] = np.zeros_like(self.boundaries[order]["ymin"])
+                self.boundaries[order]["ymax"] = self.Ny * np.ones_like(self.boundaries[order]["ymax"])
+            self.psf_cube_sparse_indices[order], self.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(self.boundaries[order])
         mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
         # cumulate the boolean values as int
         weight_mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]], axis=0)
@@ -833,9 +834,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     --------
 
     >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
-    >>> spec = Spectrum("./tests/data/test_auxtel_spectrum.fits")
     >>> parameters.VERBOSE = True
-    >>> w = FullForwardModelFitWorkspace(spec, verbose=True, plot=True, live_fit=True, amplitude_priors_method="spectrum")
+    >>> w = FullForwardModelFitWorkspace(spec, verbose=True, plot=True, live_fit=False, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
     >>> if 'LBDAS_T' in spec.header: plot_comparison_truth(spec, w)
 
@@ -919,23 +919,6 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             my_logger.info(f"\n\t  niter = {i} : Newton: total computation time: {time.time() - start}s")
             if parameters.DEBUG and parameters.DISPLAY:
                 w.plot_fit()
-
-            # recompute angle and dy0 if fixed while y_c parameters are free
-            # if w.fixed[3] and w.fixed[4] and not np.any([w.fixed[k] for k, par in enumerate(w.input_labels) if "y_c" in par]):
-            #     pval_leg = [w.p[k] for k, par in enumerate(w.input_labels) if "y_c" in par][
-            #                :w.spectrum.chromatic_psf.degrees["y_c"] + 1]
-            #     pval_poly = np.polynomial.legendre.leg2poly(pval_leg)
-            #     new_dy0, new_angle = w.p[2], w.p[4]
-            #     from numpy.polynomial import Polynomial as P
-            #     p = P(pval_poly)
-            #     pX = P([0, 0.5 * (w.spectrum.spectrogram_Nx)])
-            #     pfinal = p(pX)
-            #     pval_poly = pfinal.coef
-            #     for k in range(pval_poly.size):
-            #         if k == 0:
-            #             new_dy0 += pval_poly[k]
-            #         if k == 1:
-            #             new_angle += np.arctan(pval_poly[k]) * 180 / np.pi
 
             w.spectrum.lambdas = np.copy(w.lambdas)
             w.spectrum.chromatic_psf.table['lambdas'] = np.copy(w.lambdas)

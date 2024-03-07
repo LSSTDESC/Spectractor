@@ -722,7 +722,10 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.my_logger.info(f'\n\tLoading AUXTEL image {image.file_name}...')
     with fits.open(image.file_name) as hdu_list:
         image.header = hdu_list[0].header
-        image.data = hdu_list[1].data.astype(np.float64)
+        if hdu_list[0].data is not None:
+            image.data = hdu_list[0].data.astype(np.float64)
+        else:
+            image.data = hdu_list[1].data.astype(np.float64)
     image.date_obs = image.header['DATE']
     image.expo = float(image.header['EXPTIME'])
     if "empty" not in image.header['FILTER'].lower():
@@ -765,7 +768,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     if parameters.OBS_CAMERA_ROTATION < -360:
         parameters.OBS_CAMERA_ROTATION += 360
     image.header["CAM_ROT"] = parameters.OBS_CAMERA_ROTATION
-    if "CD2_1" in hdu_list[1].header:
+    if len(hdu_list) > 1 and "CD2_1" in hdu_list[1].header:
         rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[1].header["CD2_1"], hdu_list[1].header["CD1_1"]) + 90
         if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=2):
             image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degree while "
