@@ -255,7 +255,7 @@ class ChromaticPSF:
                 if parameters.PSF_POLY_TYPE == "legendre":
                     c = np.polynomial.legendre.poly2leg(params[index + shift:index:-1])
                 elif parameters.PSF_POLY_TYPE == "polynomial":
-                    c = params[index + shift:index:-1]
+                    c = np.asarray(params[index + shift:index:-1])
                 else:
                     raise ValueError(f"Unknown polynomial type {parameters.PSF_POLY_TYPE=}.")
                 coeffs = np.zeros(shift)

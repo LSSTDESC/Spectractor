@@ -96,15 +96,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             if "y_c" in par:
                 fixed[k] = True
                 p[k] = 0
-        # for k, par in enumerate(input_labels):
-        #     if "y_c" in par and par[-2:]=="_3" and "c_0" not in par:
-        #         fixed[k] = True
-        #         p[k] = 0
-        #     if "y_c" in par and par[-2:]=="_2" and "c_0" not in par:
-        #         fixed[k] = True
-        #         p[k] = 0
         for k, par in enumerate(input_labels):
-            if "y_c_2" in par:
+            if "y_c_0" not in par and "y_c_1" not in par:
                 fixed[k] = False
                 p[k] = 0
 
