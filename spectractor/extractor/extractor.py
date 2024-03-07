@@ -306,6 +306,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.convolve_psf_cube_masked(psf_cube_masked)
             # make rectangular mask per wavelength
             self.boundaries[order], self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.set_rectangular_boundaries(self.psf_cubes_masked[order])
+            if k > 0:
+                # spectrogram modelisation must be accurate inside the k=0 order footprint
+                for i in range(len(psf_cube_masked)):
+                    self.boundaries[order]["ymin"] = np.zeros_like(self.boundaries[order]["ymin"])
+                    self.boundaries[order]["ymax"] = self.Ny * np.ones_like(self.boundaries[order]["ymax"])
             self.psf_cube_sparse_indices[order], self.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(self.boundaries[order])
         mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
         # cumulate the boolean values as int
