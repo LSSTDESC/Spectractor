@@ -65,8 +65,8 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
     >>> from spectractor.extractor.spectrum import Spectrum
     >>> image = Image("./tests/data/sim_20170530_134.fits")
     >>> spectrum = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
-    >>> lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
-    >>> amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)[:lambdas_truth.size]
+    >>> lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=',')
+    >>> amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=',', dtype=float)[:lambdas_truth.size]
     >>> plot_residuals(spectrum, lambdas_truth, amplitude_truth)  #doctest: +ELLIPSIS
     array([...
     """
@@ -128,8 +128,8 @@ def test_ctio_fullchain():
     # if not os.path.isfile(sim_image_filename):
     sim = make_image()
     image = Image(sim_image_filename, config="./config/ctio.ini")
-    lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
-    amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+    lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=',')
+    amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=',', dtype=float)
     parameters.AMPLITUDE_TRUTH = np.copy(amplitude_truth)
     parameters.LAMBDA_TRUTH = np.copy(lambdas_truth)
 
@@ -258,8 +258,8 @@ def auxtel_fullchain():
     # if not os.path.isfile(sim_image_filename):
     sim = make_auxtel_image()
     image = Image(sim_image_filename, config="./config/auxtel.ini")
-    lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
-    amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+    lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=',')
+    amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=',', dtype=float)
     parameters.AMPLITUDE_TRUTH = np.copy(amplitude_truth)
     parameters.LAMBDA_TRUTH = np.copy(lambdas_truth)
 

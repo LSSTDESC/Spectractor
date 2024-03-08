@@ -1630,11 +1630,11 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
 
 def plot_comparison_truth(spectrum, w):  # pragma: no cover
     s = spectrum.chromatic_psf
-    lambdas_truth = np.fromstring(spectrum.header['LBDAS_T'][1:-1], sep=' ')
-    psf_poly_truth = np.fromstring(spectrum.header['PSF_P_T'][1:-1], sep=' ', dtype=float)
+    lambdas_truth = np.fromstring(spectrum.header['LBDAS_T'][1:-1], sep=',')
+    psf_poly_truth = np.fromstring(spectrum.header['PSF_P_T'][1:-1], sep=',', dtype=float)
     deg_truth = int(spectrum.header["PSF_DEG"])
     psf_poly_truth[-1] = spectrum.spectrogram_saturation
-    amplitude_truth = np.fromstring(spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+    amplitude_truth = np.fromstring(spectrum.header['AMPLIS_T'][1:-1], sep=',', dtype=float)
     amplitude_truth *= parameters.FLAM_TO_ADURATE * lambdas_truth * np.gradient(lambdas_truth) * parameters.CCD_REBIN
     s0 = ChromaticPSF(s.psf, lambdas_truth.size, s.Ny, deg=deg_truth,
                       saturation=spectrum.spectrogram_saturation)

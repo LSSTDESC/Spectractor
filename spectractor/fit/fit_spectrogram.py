@@ -279,11 +279,11 @@ class SpectrogramFitWorkspace(FitWorkspace):
             rotation_angle = self.spectrum.header['ROT_T']
             B = 1
             Astar = 1
-            poly_truth = np.fromstring(self.spectrum.header['PSF_P_T'][1:-1], sep=' ', dtype=float)
+            poly_truth = np.fromstring(self.spectrum.header['PSF_P_T'][1:-1], sep=',', dtype=float)
             self.truth = (A1_truth, A2_truth, A3_truth, aerosols_truth, ozone_truth, pwv_truth,
                           D_truth, shiftx_truth, shifty_truth, rotation_angle, B, Astar, *poly_truth)
-            self.lambdas_truth = np.fromstring(self.spectrum.header['LBDAS_T'][1:-1], sep=' ', dtype=float)
-            self.amplitude_truth = np.fromstring(self.spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+            self.lambdas_truth = np.fromstring(self.spectrum.header['LBDAS_T'][1:-1], sep=',', dtype=float)
+            self.amplitude_truth = np.fromstring(self.spectrum.header['AMPLIS_T'][1:-1], sep=',', dtype=float)
         else:
             self.truth = None
 
