@@ -98,10 +98,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 fixed[k] = True
         for k, par in enumerate(input_labels):
             if "y_c" in par:
-                fixed[k] = True
-                p[k] = 0
-        for k, par in enumerate(input_labels):
-            if "y_c" in par and (("y_c_0" not in par and "y_c_1" not in par) or (par[-2:] == "_2" or par[-2:]=="_3")):
                 fixed[k] = False
                 p[k] = 0
 
@@ -114,8 +110,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         if "A3" in params.labels:
             params.fixed[params.get_index(f"A{self.diffraction_orders[2]}")] = "A3_T" not in self.spectrum.header
         params.fixed[params.get_index(r"shift_x [pix]")] = True  # Delta x
-        params.fixed[params.get_index(r"shift_y [pix]")] = False  # Delta y
-        params.fixed[params.get_index(r"angle [deg]")] = False  # angle
+        params.fixed[params.get_index(r"shift_y [pix]")] = True  # Delta y
+        params.fixed[params.get_index(r"angle [deg]")] = True  # angle
         params.fixed[params.get_index("B")] = True  # B
 
         FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=self.filename)
