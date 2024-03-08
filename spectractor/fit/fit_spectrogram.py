@@ -68,7 +68,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         self.saturation = self.spectrum.spectrogram_saturation
         D2CCD = np.copy(spectrum.header['D2CCD'])
-        p = np.array([1, 1, 1, 0.05, 1.2, 400, 5, D2CCD, self.spectrum.header['PIXSHIFT'],
+        p = np.array([1, 1, 0, 0.05, 1.2, 400, 5, D2CCD, self.spectrum.header['PIXSHIFT'],
                       0, self.spectrum.rotation_angle, 1, 1])
         # parameter indices for which we don't need to recompute the PSF cube for model evaluation
         self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 5, 6, 9, 10])
