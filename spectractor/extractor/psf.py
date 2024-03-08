@@ -1194,7 +1194,7 @@ class Moffat(PSF):
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.params.bounds[2] = (0, 2 * self.max_half_width)
+        self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
         self.params.bounds[3] = (0.5, self.max_half_width)
 
     def evaluate(self, pixels, values=None):
@@ -1390,7 +1390,7 @@ class Gauss(PSF):
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.params.bounds[2] = (0, 2 * self.max_half_width)
+        self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
         self.params.bounds[3] = (1, self.max_half_width)
 
     def evaluate(self, pixels, values=None):
@@ -1563,7 +1563,7 @@ class MoffatGauss(PSF):
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.params.bounds[2] = (0, 2 * self.max_half_width)
+        self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
         self.params.bounds[3] = (0.5, self.max_half_width)
         self.params.bounds[6] = (0.5, self.max_half_width)
 
@@ -1769,7 +1769,7 @@ class Order0(PSF):
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.params.bounds[2] = (0, 2 * self.max_half_width)
+        self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
 
     def evaluate(self, pixels, values=None):
         r"""Evaluate the Order 0 interpolated function.
