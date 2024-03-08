@@ -1374,17 +1374,29 @@ class ChromaticPSF:
     def set_bounds(self):
         """
         This function returns an array of bounds for PSF polynomial parameters (no amplitude ones).
-        It is very touchy, change the values with caution !
 
         Returns
         -------
         bounds: list
             2D array containing the pair of bounds for each polynomial parameters.
 
+        Examples
+        ________
+        >>> psf = MoffatGauss()
+        >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=4, saturation=8000)
+        >>> s.set_bounds()   # doctest: +ELLIPSIS
+        [array([-inf,  inf]), array([-inf,  inf]), ...
+
         """
         bounds = [[], []]
         for k, name in enumerate(self.psf.params.labels):
-            tmp_bounds = [[-np.inf] * (1 + self.degrees[name]), [np.inf] * (1 + self.degrees[name])]
+            if parameters.PSF_POLY_TYPE == "legendre":
+                tmp_bounds = [[-np.inf] * (1 + self.degrees[name]), [np.inf] * (1 + self.degrees[name])]
+            elif parameters.PSF_POLY_TYPE == "polynomial":
+                tmp_bounds = [[self.psf.params.bounds[k][0]] + [-np.inf] * (self.degrees[name]),
+                              [self.psf.params.bounds[k][1]] + [np.inf] * (self.degrees[name])]
+            else:
+                raise ValueError(f"Unknown polynomial type {parameters.PSF_POLY_TYPE=}.")
             if name == "saturation":
                 tmp_bounds = [[0], [2 * self.saturation]]
             elif name == "amplitude":
