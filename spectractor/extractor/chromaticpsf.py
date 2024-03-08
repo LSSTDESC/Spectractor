@@ -1962,10 +1962,9 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.psf_cube_masked = None
         self.M_sparse_indices = None
 
-        # update the bounds only for 2D mode
-        if mode == "2D":
-            self.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
-            self.params.bounds = self.chromatic_psf.set_bounds()
+        # update the bounds
+        self.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
+        self.params.bounds = self.chromatic_psf.set_bounds()
 
         # error matrix
         # here image uncertainties are assumed to be uncorrelated
