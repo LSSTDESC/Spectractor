@@ -809,11 +809,18 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         epsilon[epsilon == 0] = 1e-4
         fixed_default = np.copy(self.params.fixed)
         self.params.fixed = [True] * len(self.params.values)
+        strategy = copy.copy(self.amplitude_priors_method)
+        self.amplitude_priors_method = "fixed"
+        # let A1 free to help finding the spectrogram trace, with amplitude fixed to prior
+        self.params.fixed[self.params.get_index(r"A1")] = False  # A1
         self.params.fixed[self.params.get_index(r"shift_y [pix]")] = False  # shift y
         self.params.fixed[self.params.get_index(r"angle [deg]")] = False  # angle
         run_minimisation(self, "newton", epsilon, xtol=1e-2, ftol=0.01, with_line_search=False)  # 1000 / self.data.size)
         self.params.fixed = fixed_default
         self.set_mask(params=self.params.values, fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
+        # refix A1=1 and let amplitude parameters free
+        self.amplitude_priors_method = strategy
+        self.params.values[self.params.get_index(r"A1")] = 1
 
 
 def run_ffm_minimisation(w, method="newton", niter=2):
