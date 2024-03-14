@@ -942,11 +942,15 @@ class FitWorkspace:
                         f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
             else:
                 format = self.W.getformat()
-                W = self.W.tocsr()
-                W[:, bad_indices] = 0
-                W[bad_indices, :] = 0
-                W.eliminate_zeros()
-                self.W = W.asformat(format=format)
+                if format == 'dia':
+                    self.W.data[0, bad_indices] = 0
+                else:
+                    W = self.W.tolil()
+                    W[:, bad_indices] = 0
+                    W[bad_indices, :] = 0
+                    W = self.W.asformat(format='csr')
+                    W.eliminate_zeros()
+                    self.W = W.asformat(format=format)
 
     def compute_W_with_model_error(self, model_err):
         """Propagate model uncertainties to weight matrix W.
