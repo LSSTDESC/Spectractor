@@ -564,7 +564,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
         epsilon = 1e-4 * guess
         epsilon[epsilon == 0] = 1e-4
-        fixed = np.copy(fit_workspace.params.fixed)
+        fixed_default = np.copy(fit_workspace.params.fixed)
 
         # fit_workspace.simulation.fast_sim = True
         # fit_workspace.simulation.fix_psf_cube = False
@@ -586,7 +586,16 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
 
         fit_workspace.spectrogram_simulation.fast_sim = False
         fit_workspace.spectrogram_simulation.fix_psf_cube = False
-        fit_workspace.params.fixed = np.copy(fixed)
+        fit_workspace.params.fixed = [True] * len(fit_workspace.params.values)
+        fit_workspace.params.fixed[fit_workspace.params.get_index(r"A1")] = False  # shift y
+        fit_workspace.params.fixed[fit_workspace.params.get_index(r"shift_y [pix]")] = False  # shift y
+        fit_workspace.params.fixed[fit_workspace.params.get_index(r"angle [deg]")] = False  # angle
+        run_minimisation(fit_workspace, "newton", epsilon, xtol=1e-2, ftol=0.01, with_line_search=False)
+        fit_workspace.params.fixed = fixed_default
+
+        fit_workspace.spectrogram_simulation.fast_sim = False
+        fit_workspace.spectrogram_simulation.fix_psf_cube = False
+        fit_workspace.params.fixed = np.copy(fixed_default)
         # guess = fit_workspace.p
         # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
         #                                            fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
