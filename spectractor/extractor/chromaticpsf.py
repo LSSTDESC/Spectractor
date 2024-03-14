@@ -889,12 +889,7 @@ class ChromaticPSF:
         if Nx != profile_params.shape[0]:
             raise ValueError(f"Number of pixels along x axis must be same as profile_params table length. "
                              f"Got {Nx=} and {profile_params.shape}.")
-        if parameters.PSF_POLY_TYPE == "legendre":
-            poly_x = np.linspace(-1, 1, Nx)
-        elif parameters.PSF_POLY_TYPE == "polynomial":
-            poly_x = np.arange(0, Nx)
-        else:
-            raise ValueError(f"Unknown polynomial type {parameters.PSF_POLY_TYPE=}.")
+        poly_x = np.linspace(-1, 1, Nx)
         polys = np.zeros((self.n_poly_params-Nx, Nx), dtype=dtype)
         ip = 0
         repeats = []
@@ -989,12 +984,7 @@ class ChromaticPSF:
         if Nx != profile_params.shape[0]:
             raise ValueError(f"Number of pixels along x axis must be same as profile_params table length. "
                              f"Got {Nx=} and {profile_params.shape}.")
-        if parameters.PSF_POLY_TYPE == "legendre":
-            poly_x = np.linspace(-1, 1, Nx)
-        elif parameters.PSF_POLY_TYPE == "polynomial":
-            poly_x = np.arange(0, Nx)
-        else:
-            raise ValueError(f"Unknown polynomial type {parameters.PSF_POLY_TYPE=}.")
+        poly_x = np.linspace(-1, 1, Nx)
         polys = np.zeros((self.n_poly_params-Nx, Nx), dtype=dtype)
         ip = 0
         repeats = []
@@ -1148,12 +1138,7 @@ class ChromaticPSF:
         if amplitude is None:
             self.my_logger.warning('\n\tAmplitude array not initialized. '
                                    'Polynomial fit for shape parameters will be unweighted.')
-        if parameters.PSF_POLY_TYPE == "legendre":
-            poly_x = np.linspace(-1, 1, len(self.table))[indices]
-        elif parameters.PSF_POLY_TYPE == "polynomial":
-            poly_x = np.arange(0, len(self.table))[indices]
-        else:
-            raise ValueError(f"Unknown polynomial type {parameters.PSF_POLY_TYPE=}.")
+        poly_x = np.linspace(-1, 1, len(self.table))[indices]
         for k, name in enumerate(self.psf.params.labels):
             delta = 0
             if name != 'amplitude':
@@ -1291,12 +1276,7 @@ class ChromaticPSF:
 
         """
         length = len(self.table)
-        if parameters.PSF_POLY_TYPE == "legendre":
-            poly_x = np.linspace(-1, 1, length)
-        elif parameters.PSF_POLY_TYPE == "polynomial":
-            poly_x = np.arange(0, length)
-        else:
-            raise ValueError(f"Unknown polynomial type {parameters.PSF_POLY_TYPE=}.")
+        poly_x = np.linspace(-1, 1, length)
         profile_params = np.zeros((length, len(self.psf.params.labels)))
         shift = 0
         for k, name in enumerate(self.psf.params.labels):
@@ -1475,7 +1455,7 @@ class ChromaticPSF:
             if parameters.PSF_POLY_TYPE == "legendre":
                 PSF_models.append(np.polynomial.polynomial.legval(rescale_x_to_legendre(all_pixels), coeffs) + delta)
             elif parameters.PSF_POLY_TYPE == "polynomial":
-                PSF_models.append(np.polynomial.polynomial.polyval(all_pixels, coeffs) + delta)
+                PSF_models.append(np.polynomial.polynomial.polyval(rescale_x_to_legendre(all_pixels), coeffs) + delta)
         for i, name in enumerate(self.psf.params.labels):
             p = ax.plot(all_pixels, self.profile_params[:, i], marker='+', linestyle='none')
             ax.plot(all_pixels[self.fitted_pixels], self.profile_params[self.fitted_pixels, i], label=name,
