@@ -100,6 +100,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
             if "y_c" in par:
                 fixed[k] = False
                 p[k] = 0
+        for k, par in enumerate(input_labels):
+            if k >= self.psf_params_start_index[0] and "y_c" not in par and "x_c" not in par and par[-2:] != f"_{spectrum.order}" and "_0_" not in par:
+                fixed[k] = True
+                p[k] = 0
 
         params = FitParameters(p, labels=input_labels, axis_names=axis_names, bounds=bounds, fixed=fixed,
                                truth=truth, filename=self.filename)

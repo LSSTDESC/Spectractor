@@ -97,8 +97,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 fixed[k] = True
                 p[k] = 0
         for k, par in enumerate(input_labels):
-            if "y_c" in par and (("y_c_0" not in par and "y_c_1" not in par) or (par[-2:] == "_2" or par[-2:]=="_3")):
+            if "y_c" in par and (("y_c_0" not in par and "y_c_1" not in par) or (par[-2:] == "_2" or par[-2:] == "_3")):
                 fixed[k] = False
+                p[k] = 0
+            elif k >= self.psf_params_start_index[0] and "y_c" not in par and "x_c" not in par and par[-2:] != f"_{spectrum.order}" and "_0_" not in par:
+                fixed[k] = True
                 p[k] = 0
 
         params = FitParameters(p, labels=input_labels, axis_names=axis_names, fixed=fixed, bounds=bounds,
