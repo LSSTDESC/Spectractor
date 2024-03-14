@@ -113,7 +113,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = "A2_T" not in self.spectrum.header
         if "A3" in params.labels:
             params.fixed[params.get_index(f"A{self.diffraction_orders[2]}")] = "A3_T" not in self.spectrum.header
-        params.fixed[params.get_index(r"shift_x [pix]")] = True  # Delta x
+        params.fixed[params.get_index(r"shift_x [pix]")] = False  # Delta x
         params.fixed[params.get_index(r"shift_y [pix]")] = True  # Delta y
         params.fixed[params.get_index(r"angle [deg]")] = True  # angle
         params.fixed[params.get_index("B")] = True  # B
