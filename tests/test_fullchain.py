@@ -1,5 +1,5 @@
 import matplotlib as mpl
-#mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
+mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
 from scipy.interpolate import interp1d  # noqa: E402
 
@@ -32,7 +32,7 @@ PSF_POLY_PARAMS_TRUTH = [1, 0, 0,
 
 PSF_POLY_PARAMS_AUXTEL_TRUTH = [1, 0, 0,
                          0, 0, 0,
-                         6, 0, 0,
+                         8, 0, 0,
                          3, 0, 0,
                          1e6] * N_DIFF_ORDERS
 
@@ -111,8 +111,8 @@ def make_auxtel_image():
     spectrum_filename = "./tests/data/test_auxtel_spectrum.fits"
     image_filename = "./tests/data/exposure_2023092800266_dmpostisrccd.fits"
     sim = ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=A2_T, A3=A3_T,
-                   psf_poly_params=PSF_POLY_PARAMS_AUXTEL_TRUTH, with_starfield=False, with_rotation=True, with_noise=False,
-                   with_flat=False)
+                   psf_poly_params=PSF_POLY_PARAMS_AUXTEL_TRUTH, with_starfield=False, with_rotation=True,
+                   with_noise=False, with_flat=False)
     return sim
 
 
@@ -249,9 +249,18 @@ def test_ctio_fullchain():
 @unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
 @astropy.config.set_temp_cache(os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache"))
 def auxtel_fullchain():
+    """
+
+    Returns
+    -------
+
+    Examples
+    --------
+    >>> test_auxtel_fullchain()
+    """
     parameters.VERBOSE = True
     parameters.DEBUG = True
-    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getObsAtmo"
     sim_image_filename = "./tests/data/sim_2023092800266_dmpostisrccd.fits"
 
     # load test and make image simulation
@@ -265,7 +274,6 @@ def auxtel_fullchain():
 
     # extractor
     load_config("./config/auxtel.ini")
-    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
     parameters.CCD_REBIN = 1
     #  JN: > 1 not working well for now: I guess CTIO spectra are too narrow
@@ -314,13 +322,11 @@ def auxtel_fullchain():
     assert np.abs(np.mean(residuals[100:-100])) < 0.25
     assert np.std(residuals[100:-100]) < 3
 
-    spectrum_file_name = "./tests/data/sim_20170530_134_spectrum.fits"
+    spectrum_file_name = "./tests/data/sim_2023092800266_dmpostisrccd_spectrum.fits"
     assert os.path.isfile(spectrum_file_name)
-    atmgrid_filename = sim_image_filename.replace('sim', 'reduc').replace('.fits', '_atmsim.fits')
-    assert os.path.isfile(atmgrid_filename)
     spectrum = Spectrum(spectrum_file_name)
-    w = SpectrumFitWorkspace(spectrum, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
-                             verbose=True, plot=True, live_fit=False)
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getObsAtmo"
+    w = SpectrumFitWorkspace(spectrum, fit_angstrom_exponent=False, verbose=True, plot=True, live_fit=False)
     run_spectrum_minimisation(w, method="newton")
     nsigma = 2
     labels = ["VAOD_T", "OZONE_T", "PWV_T"]
@@ -341,14 +347,13 @@ def auxtel_fullchain():
     assert np.isclose(np.abs(w.params.values[9]), 0, atol=1e-3)  # B
 
     parameters.DEBUG = False
-    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
-    w = SpectrogramFitWorkspace(spectrum, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
-                                verbose=True, plot=True, live_fit=False)
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getObsAtmo"
+    w = SpectrogramFitWorkspace(spectrum, fit_angstrom_exponent=False, verbose=True, plot=True, live_fit=False)
     run_spectrogram_minimisation(w, method="newton")
     nsigma = 2
     labels = ["A1_T", "A2_T", "VAOD_T", "OZONE_T", "PWV_T"]
     indices = [0, 1, 3, 5, 6]
-    A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, shift_t, B, Astar, *psf_poly_params = w.params.values
+    A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, B, Astar, D, shift_x, shift_y, shift_t, *psf_poly_params = w.params.values
     ipar = w.params.get_free_parameters()  # non fixed param indices
     cov_indices = [list(ipar).index(k) for k in indices]  # non fixed param indices in cov matrix
     assert w.costs[-1] / w.data.size < 1e-3
