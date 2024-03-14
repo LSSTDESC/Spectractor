@@ -97,8 +97,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 fixed[k] = True
                 p[k] = 0
         for k, par in enumerate(input_labels):
-            if "y_c" in par and (("y_c_0" not in par and "y_c_1" not in par) or (par[-2:] == "_2" or par[-2:]=="_3")):
+            if "y_c" in par and (("y_c_0" not in par and "y_c_1" not in par) or (par[-2:] == "_2" or par[-2:] == "_3")):
                 fixed[k] = False
+                p[k] = 0
+            elif k >= self.psf_params_start_index[0] and "y_c" not in par and "x_c" not in par and par[-2:] != f"_{spectrum.order}" and "_0_" not in par:
+                fixed[k] = True
                 p[k] = 0
 
         params = FitParameters(p, labels=input_labels, axis_names=axis_names, fixed=fixed, bounds=bounds,
@@ -806,11 +809,18 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         epsilon[epsilon == 0] = 1e-4
         fixed_default = np.copy(self.params.fixed)
         self.params.fixed = [True] * len(self.params.values)
+        strategy = copy.copy(self.amplitude_priors_method)
+        self.amplitude_priors_method = "fixed"
+        # let A1 free to help finding the spectrogram trace, with amplitude fixed to prior
+        self.params.fixed[self.params.get_index(r"A1")] = False  # A1
         self.params.fixed[self.params.get_index(r"shift_y [pix]")] = False  # shift y
         self.params.fixed[self.params.get_index(r"angle [deg]")] = False  # angle
         run_minimisation(self, "newton", epsilon, xtol=1e-2, ftol=0.01, with_line_search=False)  # 1000 / self.data.size)
         self.params.fixed = fixed_default
         self.set_mask(params=self.params.values, fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
+        # refix A1=1 and let amplitude parameters free
+        self.amplitude_priors_method = strategy
+        self.params.values[self.params.get_index(r"A1")] = 1
 
 
 def run_ffm_minimisation(w, method="newton", niter=2):

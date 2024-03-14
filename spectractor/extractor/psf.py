@@ -1187,15 +1187,15 @@ class Moffat(PSF):
             values = np.copy(self.values_default)
         labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "saturation"]
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", "saturation"]
-        bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.5, np.inf),
-                                (1.1, 100), (0, np.inf)]
+        bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf),
+                                (1.1, 10), (0, np.inf)]
         self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
         self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
-        self.params.bounds[3] = (0.5, self.max_half_width)
+        self.params.bounds[3] = (1, self.max_half_width)
 
     def evaluate(self, pixels, values=None):
         r"""Evaluate the Moffat function.
@@ -1556,16 +1556,16 @@ class MoffatGauss(PSF):
             values = np.copy(self.values_default)
         labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
-        bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.5, np.inf), (1.1, 100),
-                  (-1, -5e-3), (0.5, np.inf), (0, np.inf)]
+        bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (1.1, 10),
+                  (-1, -5e-3), (1, np.inf), (0, np.inf)]
         self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
         self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
-        self.params.bounds[3] = (0.5, self.max_half_width)
-        self.params.bounds[6] = (0.5, self.max_half_width)
+        self.params.bounds[3] = (1, self.max_half_width)
+        self.params.bounds[6] = (1, self.max_half_width)
 
     def evaluate(self, pixels, values=None):
         r"""Evaluate the MoffatGauss function.

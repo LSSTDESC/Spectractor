@@ -68,29 +68,29 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         self.saturation = self.spectrum.spectrogram_saturation
         D2CCD = np.copy(spectrum.header['D2CCD'])
-        p = np.array([1, 1, 0, 0.05, 1.2, 400, 5, D2CCD, self.spectrum.header['PIXSHIFT'],
-                      0, self.spectrum.rotation_angle, 1, 1])
+        p = np.array([1, 1, 0, 0.05, 1.2, 400, 5, 1, 1, D2CCD, self.spectrum.header['PIXSHIFT'],
+                      0, self.spectrum.rotation_angle])
         # parameter indices for which we don't need to recompute the PSF cube for model evaluation
-        self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 5, 6, 9, 10])
+        # warning: they must be contiguous to preserve psf_cube in jacobian function loop
+        self.fixed_psf_params = np.arange(0, 9, dtype=int)
         self.psf_params_start_index = np.array([p.size + len(self.psf_poly_params) * k for k in range(len(self.diffraction_orders))])
         psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.params.labels[length:])
         psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.params.axis_names[length:])
         psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
         p = np.concatenate([p] + [self.psf_poly_params] * len(self.diffraction_orders))
         input_labels = [f"A{order}" for order in self.diffraction_orders]
-        input_labels += ["VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
-                        r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B", "A_star"]
+        input_labels += ["VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]", "B", "A_star",
+                         r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]"]
         for order in self.diffraction_orders:
             input_labels += [label + f"_{order}" for label in psf_poly_params_labels]
         axis_names = [f"$A_{order}$" for order in self.diffraction_orders]
-        axis_names += ["VAOD", r'$\"a$', "ozone [db]", "PWV [mm]", r"$D_{CCD}$ [mm]",
-                       r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"$\theta$ [deg]",
-                       "$B$", r"$A_{star}$"]
+        axis_names += ["VAOD", r'$\"a$', "ozone [db]", "PWV [mm]", "$B$", r"$A_{star}$", r"$D_{CCD}$ [mm]",
+                       r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"$\theta$ [deg]"]
         for order in self.diffraction_orders:
             axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
-        bounds = [[0, 2], [0, 2], [0, 2], [0, 0.1], [0, 3], [100, 700], [0, 20],
+        bounds = [[0, 2], [0, 2], [0, 2], [0, 0.1], [0, 3], [100, 700], [0, 20], [0.8, 1.2], [0, np.inf],
                   [D2CCD - 5 * parameters.DISTANCE2CCD_ERR, D2CCD + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
-                  [-10, 10], [-90, 90], [0.8, 1.2], [0, np.inf]]
+                  [-10, 10], [-90, 90]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
         fixed = [False] * p.size
         for k, par in enumerate(input_labels):
@@ -99,6 +99,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
         for k, par in enumerate(input_labels):
             if "y_c" in par:
                 fixed[k] = False
+                p[k] = 0
+        for k, par in enumerate(input_labels):
+            if k >= self.psf_params_start_index[0] and "y_c" not in par and "x_c" not in par and par[-2:] != f"_{spectrum.order}" and "_0_" not in par:
+                fixed[k] = True
                 p[k] = 0
 
         params = FitParameters(p, labels=input_labels, axis_names=axis_names, bounds=bounds, fixed=fixed,
@@ -109,7 +113,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = "A2_T" not in self.spectrum.header
         if "A3" in params.labels:
             params.fixed[params.get_index(f"A{self.diffraction_orders[2]}")] = "A3_T" not in self.spectrum.header
-        params.fixed[params.get_index(r"shift_x [pix]")] = True  # Delta x
+        params.fixed[params.get_index(r"shift_x [pix]")] = False  # Delta x
         params.fixed[params.get_index(r"shift_y [pix]")] = True  # Delta y
         params.fixed[params.get_index(r"angle [deg]")] = True  # angle
         params.fixed[params.get_index("B")] = True  # B
@@ -216,7 +220,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.my_logger.info("\n\tReset spectrogram mask with current parameters.")
         if params is None:
             params = self.params.values
-        A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, Astar, *psf_poly_params_all = params
+        A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, B, Astar, D, shift_x, shift_y, angle, *psf_poly_params_all = params
         poly_params = np.array(psf_poly_params_all).reshape((len(self.diffraction_orders), -1))
         self.spectrogram_simulation.psf_cubes_masked = {}
         self.spectrogram_simulation.M_sparse_indices = {}
@@ -383,7 +387,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         >>> w.plot_fit()
 
         """
-        A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, Astar, *psf_poly_params = params
+        A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, B, Astar, D, shift_x, shift_y, angle, *psf_poly_params = params
         self.params.values = np.asarray(params)
         if not self.fit_angstrom_exponent:
             angstrom_exponent = None
@@ -560,7 +564,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
         epsilon = 1e-4 * guess
         epsilon[epsilon == 0] = 1e-4
-        fixed = np.copy(fit_workspace.params.fixed)
+        fixed_default = np.copy(fit_workspace.params.fixed)
 
         # fit_workspace.simulation.fast_sim = True
         # fit_workspace.simulation.fix_psf_cube = False
@@ -582,7 +586,16 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
 
         fit_workspace.spectrogram_simulation.fast_sim = False
         fit_workspace.spectrogram_simulation.fix_psf_cube = False
-        fit_workspace.params.fixed = np.copy(fixed)
+        fit_workspace.params.fixed = [True] * len(fit_workspace.params.values)
+        fit_workspace.params.fixed[fit_workspace.params.get_index(r"A1")] = False  # shift y
+        fit_workspace.params.fixed[fit_workspace.params.get_index(r"shift_y [pix]")] = False  # shift y
+        fit_workspace.params.fixed[fit_workspace.params.get_index(r"angle [deg]")] = False  # angle
+        run_minimisation(fit_workspace, "newton", epsilon, xtol=1e-2, ftol=0.01, with_line_search=False)
+        fit_workspace.params.fixed = fixed_default
+
+        fit_workspace.spectrogram_simulation.fast_sim = False
+        fit_workspace.spectrogram_simulation.fix_psf_cube = False
+        fit_workspace.params.fixed = np.copy(fixed_default)
         # guess = fit_workspace.p
         # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
         #                                            fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
