@@ -1375,6 +1375,8 @@ class ChromaticPSF:
             elif parameters.PSF_POLY_TYPE == "polynomial":
                 tmp_bounds = [[self.psf.params.bounds[k][0]] + [-np.inf] * (self.degrees[name]),
                               [self.psf.params.bounds[k][1]] + [np.inf] * (self.degrees[name])]
+                # tmp_bounds = [[self.psf.params.bounds[k][0]] + [-0.5 * 2 * (self.psf.params.bounds[k][1] - self.psf.params.bounds[k][0]) for deg in range(1, self.degrees[name] + 1)],
+                #              [self.psf.params.bounds[k][1]] + [0.5 * 2 * (self.psf.params.bounds[k][1] - self.psf.params.bounds[k][0]) for deg in range(1, self.degrees[name] + 1)]]
             else:
                 raise ValueError(f"Unknown polynomial type {parameters.PSF_POLY_TYPE=}.")
             if name == "saturation":
