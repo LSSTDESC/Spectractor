@@ -86,6 +86,7 @@ class Target:
         self.image = None
         self.image_x0 = None
         self.image_y0 = None
+        self.starfield = None
 
 
 class ArcLamp(Target):
