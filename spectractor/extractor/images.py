@@ -759,7 +759,22 @@ def load_STARDICE_image(image):  # pragma: no cover
     if "BSCALE" in image.header:
         del image.header["BSCALE"]
 
-    #Set the flip signs depending on the side of the pillar 
+    ILLUREGION = slice(None, 1032), slice(1, 1057)
+    OVERSCANA = slice(1032, None), slice(None)
+    OVERSCANB = slice(None, 1032), slice(1059, None)
+
+    def detrend(im):
+        res = im - np.mean(im[OVERSCANA], axis=0)  # [:-100]
+        return np.subtract(res[ILLUREGION].T, np.mean(res[OVERSCANB], axis=1)).T
+
+    if image.data.shape[0] > 1032 and image.data.shape[1] > 1057:
+        image.data = detrend(image.data)
+        # transformations so that stars are like in Stellarium up to a rotation
+        # with spectrogram nearly horizontal and on the right of central star
+        # no transformation if data are simulated
+        image.data = image.data[::-1, ::-1]
+
+    #Set the flip signs depending on the side of the pillar
     if image.header['MOUNTTAU'] < 90:
         parameters.OBS_CAMERA_ROTATION = 180
 
@@ -770,9 +785,6 @@ def load_STARDICE_image(image):  # pragma: no cover
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['cameraexptime'])
     image.filter_label = 'EMPTY'
-    # transformations so that stars are like in Stellarium up to a rotation
-    # with spectrogram nearly horizontal and on the right of central star
-    image.data = image.data[::-1, ::-1]
     image.airmass = 1/np.cos(np.radians(90-image.header['MOUNTALT']))
        
     image.my_logger.info('\n\tImage loaded')
@@ -790,6 +802,12 @@ def load_STARDICE_image(image):  # pragma: no cover
     image.pressure = 1000
     image.humidity = 87
     image.units = 'ADU'
+    # WCS
+    wcs_file_name = set_wcs_file_name(image.file_name)
+    if os.path.isfile(wcs_file_name):
+        image.my_logger.info(f"\n\tUse WCS {wcs_file_name}.")
+        image.wcs = load_wcs_from_file(wcs_file_name)
+
     if "PC2_1" in image.header:
         rotation_wcs = 180 / np.pi * np.arctan2(-hdu_list[0].header["PC2_1"]/hdu_list[0].header["CDELT2"], hdu_list[0].header["PC1_1"]/hdu_list[0].header["CDELT1"])
         atol = 0.02
