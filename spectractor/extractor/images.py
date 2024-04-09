@@ -798,6 +798,7 @@ def load_STARDICE_image(image):  # pragma: no cover
     if image.header['MOUNTTAU'] >= 90:
         image.hour_angle = image.hour_angle - 180*units.deg
         image.dec = 180*units.deg - image.dec
+    # TODO: here take goods values if exist
     image.temperature = 10
     image.pressure = 1000
     image.humidity = 87
