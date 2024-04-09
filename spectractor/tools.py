@@ -1800,7 +1800,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
     if title != "":
         ax.set_title(title)
     if target_pixcoords is not None:
-        ax.scatter(target_pixcoords[0], target_pixcoords[1], marker='o', s=100, edgecolors='k', facecolors='none',
+        ax.scatter(target_pixcoords[0], target_pixcoords[1], marker='o', s=100, edgecolors='r', facecolors='none',
                    label='Target', linewidth=2)
 
 
