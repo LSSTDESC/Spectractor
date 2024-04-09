@@ -54,7 +54,7 @@ def make_source_mask(data, nsigma, npixels, mask=None, sigclip_sigma=3.0,
 
     Parameters
     ----------
-    data : 2D `~numpy.ndarray`
+    data : np.ndarray
         The 2D array of the image.
     nsigma : float
         The number of standard deviations per pixel above the ``background``
@@ -236,7 +236,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     >>> from spectractor import parameters
     >>> parameters.DEBUG = True
     >>> psf = MoffatGauss()
-    >>> s0 = ChromaticPSF(psf, Nx=100, Ny=200, saturation=1000)
+    >>> s0 = ChromaticPSF(psf, Nx=100, Ny=300, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
     >>> data = s0.evaluate(s0.set_pixels(mode="1D"), poly_params=params)

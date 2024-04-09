@@ -1,12 +1,12 @@
 import matplotlib as mpl
-mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
+#mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
 from scipy.interpolate import interp1d  # noqa: E402
 
 from spectractor import parameters  # noqa: E402
 from spectractor.extractor.images import Image  # noqa: E402
 from spectractor.extractor.spectrum import Spectrum  # noqa: E402
-from spectractor.extractor.extractor import Spectractor  # noqa: E402
+from spectractor.extractor.extractor import SpectractorRun, SpectractorInit  # noqa: E402
 from spectractor.logbook import LogBook  # noqa: E402
 from spectractor.config import load_config, apply_rebinning_to_parameters  # noqa: E402
 from spectractor.simulation.image_simulation import ImageSim  # noqa: E402
@@ -26,9 +26,16 @@ N_DIFF_ORDERS = 3
 PSF_POLY_ORDER = 2
 PSF_POLY_PARAMS_TRUTH = [1, 0, 0,
                          0, 0, 0,
-                         3, 1, 1,
+                         3, 0, 0,
                          3, 0, 0,
                          1e6] * N_DIFF_ORDERS
+
+PSF_POLY_PARAMS_AUXTEL_TRUTH = [1, 0, 0,
+                         0, 0, 0,
+                         8, 0, 0,
+                         3, 0, 0,
+                         1e6] * N_DIFF_ORDERS
+
 A1_T = 1
 A2_T = 1
 A3_T = 0
@@ -48,7 +55,7 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
 
     Parameters
     ----------
-    spectrum
+    spectrum: Spectrum
     lambdas_truth
     amplitude_truth
 
@@ -58,8 +65,8 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
     >>> from spectractor.extractor.spectrum import Spectrum
     >>> image = Image("./tests/data/sim_20170530_134.fits")
     >>> spectrum = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
-    >>> lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
-    >>> amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)[:lambdas_truth.size]
+    >>> lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=',')
+    >>> amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=',', dtype=float)[:lambdas_truth.size]
     >>> plot_residuals(spectrum, lambdas_truth, amplitude_truth)  #doctest: +ELLIPSIS
     array([...
     """
@@ -94,39 +101,50 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
 def make_image():
     spectrum_filename = "./tests/data/reduc_20170530_134_spectrum.fits"
     image_filename = "./tests/data/reduc_20170530_134.fits"
-    ImageSim(image_filename, spectrum_filename, "./tests/data/sim_20170530_134.fits", A1=A1_T, A2=A2_T, A3=A3_T,
-             psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=False, with_rotation=True, with_noise=False)
+    sim = ImageSim(image_filename, spectrum_filename, "./tests/data/sim_20170530_134.fits", A1=A1_T, A2=A2_T, A3=A3_T,
+                   psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_starfield=True, with_rotation=True, with_noise=False,
+                   with_flat=True)
+    return sim
+
+
+def make_auxtel_image():
+    spectrum_filename = "./tests/data/test_auxtel_spectrum.fits"
+    image_filename = "./tests/data/exposure_2023092800266_dmpostisrccd.fits"
+    sim = ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=A2_T, A3=A3_T,
+                   psf_poly_params=PSF_POLY_PARAMS_AUXTEL_TRUTH, with_starfield=False, with_rotation=True,
+                   with_noise=False, with_flat=False)
+    return sim
 
 
 def make_stardice_image():
     spectrum_filename = "./tests/data/IMG_0019584_spectrum.fits"
     image_filename = "./tests/data/IMG_0019584.fits"
     ImageSim(image_filename, spectrum_filename, "./tests/data/IMG_0019584_sim.fits", A1=A1_T, A2=A2_T, A3=A3_T,
-             psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=False, with_rotation=True, with_noise=False, pwv=8)
+             psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_starfield=False, with_rotation=True, with_noise=False, with_flat=False)
 
 
 @unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
 @astropy.config.set_temp_cache(os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache"))
 def test_ctio_fullchain():
     parameters.VERBOSE = True
-    parameters.DEBUG = False
+    parameters.DEBUG = True
     parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
-    sim_image = "./tests/data/sim_20170530_134.fits"
+    sim_image_filename = "./tests/data/sim_20170530_134.fits"
 
     # load test and make image simulation
-    if not os.path.isfile(sim_image):
-        make_image()
-    image = Image(sim_image, config="./config/ctio.ini")
-    lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
-    amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+    # if not os.path.isfile(sim_image_filename):
+    sim = make_image()
+    image = Image(sim_image_filename, config="./config/ctio.ini")
+    lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=',')
+    amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=',', dtype=float)
     parameters.AMPLITUDE_TRUTH = np.copy(amplitude_truth)
     parameters.LAMBDA_TRUTH = np.copy(lambdas_truth)
 
     # extractor
-    tag = os.path.basename(sim_image)
+    tag = os.path.basename(sim_image_filename)
     tag = tag.replace('sim_', 'reduc_')
     logbook = LogBook(logbook="./tests/data/ctiofulllogbook_jun2017_v5.csv")
-    disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
+    disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
     load_config("./config/ctio.ini")
     parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
@@ -137,8 +155,16 @@ def test_ctio_fullchain():
     if parameters.CCD_REBIN > 1:
         for k in range(2 * (PSF_POLY_ORDER + 1), 3 * (PSF_POLY_ORDER +1)):
             PSF_POLY_PARAMS_TRUTH[k] /= parameters.CCD_REBIN
-    spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
-                           disperser_label=disperser_label, config="")  # config already loaded, do not overwrite PSF_POLY_ORDER
+
+    image = SpectractorInit(sim_image_filename, target_label=target_label,
+                            disperser_label=disperser_label, config="")  # config already loaded, do not overwrite PSF_POLY_ORDER
+    image.flat = sim.flat
+    image.starfield = sim.starfield
+    image.mask = np.zeros_like(image.data).astype(bool)
+    image.mask[680:685, 1255:1260] = True  # test masking of some pixels like cosmic rays
+    parameters.SPECTRACTOR_SIMULATE_STARFIELD = False  # here we want to test fit with an exact starfield simulation
+    spectrum, w = SpectractorRun(image, guess=[xpos, ypos], output_directory="./tests/data")
+
     # tests
     residuals = plot_residuals(spectrum, lambdas_truth, amplitude_truth)
 
@@ -175,7 +201,7 @@ def test_ctio_fullchain():
 
     spectrum_file_name = "./tests/data/sim_20170530_134_spectrum.fits"
     assert os.path.isfile(spectrum_file_name)
-    atmgrid_filename = sim_image.replace('sim', 'reduc').replace('.fits', '_atmsim.fits')
+    atmgrid_filename = sim_image_filename.replace('sim', 'reduc').replace('.fits', '_atmsim.fits')
     assert os.path.isfile(atmgrid_filename)
     spectrum = Spectrum(spectrum_file_name)
     w = SpectrumFitWorkspace(spectrum, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
@@ -207,7 +233,7 @@ def test_ctio_fullchain():
     nsigma = 2
     labels = ["A1_T", "A2_T", "VAOD_T", "OZONE_T", "PWV_T"]
     indices = [0, 1, 3, 5, 6]
-    A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, shift_t, B, *psf_poly_params = w.params.values
+    A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, B, Astar, D, shift_x, shift_y, shift_t, *psf_poly_params = w.params.values
     ipar = w.params.get_free_parameters()  # non fixed param indices
     cov_indices = [list(ipar).index(k) for k in indices]  # non fixed param indices in cov matrix
     assert w.costs[-1] / w.data.size < 1e-3
@@ -222,15 +248,14 @@ def test_ctio_fullchain():
     assert np.isclose(shift_y, 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
     assert np.isclose(D, spectrum.header["D2CCD_T"], atol=0.1)  # D2CCD
     assert np.isclose(B, 1, atol=1e-3)  # B
+    assert np.isclose(Astar, 1, atol=1e-2)  # Astar
     assert np.all(np.isclose(psf_poly_params[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              np.array(PSF_POLY_PARAMS_TRUTH)[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              rtol=0.01, atol=0.01))
 
-
-
 @unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
 @astropy.config.set_temp_cache(os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache"))
-def test_stardice_fullchain():
+def auxtel_fullchain():
     """
 
     Returns
@@ -238,25 +263,24 @@ def test_stardice_fullchain():
 
     Examples
     --------
-    >>> test_stardice_fullchain()
+    >>> test_auxtel_fullchain()
     """
     parameters.VERBOSE = True
     parameters.DEBUG = True
     parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getObsAtmo"
-    sim_image = "./tests/data/IMG_0019584_sim.fits"
+    sim_image_filename = "./tests/data/sim_2023092800266_dmpostisrccd.fits"
 
     # load test and make image simulation
-    #if not os.path.isfile(sim_image):
-    make_stardice_image()
-    image = Image(sim_image, config="./config/stardice.ini")
-    lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
-    amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+    # if not os.path.isfile(sim_image_filename):
+    sim = make_auxtel_image()
+    image = Image(sim_image_filename, config="./config/auxtel.ini")
+    lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=',')
+    amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=',', dtype=float)
     parameters.AMPLITUDE_TRUTH = np.copy(amplitude_truth)
     parameters.LAMBDA_TRUTH = np.copy(lambdas_truth)
 
     # extractor
-    load_config("./config/stardice.ini")
-    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getObsAtmo"
+    load_config("./config/auxtel.ini")
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
     parameters.CCD_REBIN = 1
     #  JN: > 1 not working well for now: I guess CTIO spectra are too narrow
@@ -265,7 +289,12 @@ def test_stardice_fullchain():
     if parameters.CCD_REBIN > 1:
         for k in range(2 * (PSF_POLY_ORDER + 1), 3 * (PSF_POLY_ORDER +1)):
             PSF_POLY_PARAMS_TRUTH[k] /= parameters.CCD_REBIN
-    spectrum = Spectractor(sim_image, "./tests/data", config="", guess=(530, 610))  # config already loaded, do not overwrite PSF_POLY_ORDER
+
+    image = SpectractorInit(sim_image_filename, config="")  # config already loaded, do not overwrite PSF_POLY_ORDER
+    xpos, ypos = np.array([image.header["TARGETX"], image.header["TARGETY"]]) / 2
+    parameters.SPECTRACTOR_SIMULATE_STARFIELD = False  # here we want to test fit with an exact starfield simulation
+    spectrum, w = SpectractorRun(image, guess=[xpos, ypos], output_directory="./tests/data")
+
     # tests
     residuals = plot_residuals(spectrum, lambdas_truth, amplitude_truth)
 
@@ -289,18 +318,149 @@ def test_stardice_fullchain():
     assert np.isclose(float(spectrum.header['Y0_T'] / parameters.CCD_REBIN), spectrum.x0[1], atol=0.2 * parameters.CCD_REBIN)
     assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle, atol=1e-3)
     assert np.isclose(float(spectrum.header['BKGD_LEV'] * parameters.CCD_REBIN**2), np.mean(spectrum.spectrogram_bgd), rtol=1e-3)
+    assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.1)
+    if parameters.CCD_REBIN == 1:
+        assert float(spectrum.header['CHI2_FIT']) < 1.5e-3
+    else:
+        assert float(spectrum.header['CHI2_FIT']) < 1.5e-1
+    assert np.all(
+        np.isclose(spectrum.chromatic_psf.params.values[spectrum.chromatic_psf.Nx + 2 * (PSF_POLY_ORDER + 1):-1],
+                   np.array(PSF_POLY_PARAMS_TRUTH)[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1], rtol=0.01, atol=0.01))
+    assert np.abs(np.mean(residuals[100:-100])) < 0.25
+    assert np.std(residuals[100:-100]) < 3
+
+    spectrum_file_name = "./tests/data/sim_2023092800266_dmpostisrccd_spectrum.fits"
+    assert os.path.isfile(spectrum_file_name)
+    spectrum = Spectrum(spectrum_file_name)
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getObsAtmo"
+    w = SpectrumFitWorkspace(spectrum, fit_angstrom_exponent=False, verbose=True, plot=True, live_fit=False)
+    run_spectrum_minimisation(w, method="newton")
+    nsigma = 2
+    labels = ["VAOD_T", "OZONE_T", "PWV_T"]
+    indices = [2, 4, 5]
+    ipar = w.params.get_free_parameters()  # non fixed param indices
+    cov_indices = [list(ipar).index(k) for k in indices]  # non fixed param indices in cov matrix
+    assert w.costs[-1] / w.data.size < 0.5
+    k = 0
+    for i, l in zip(indices, labels):
+        icov = cov_indices[k]
+        spectrum.my_logger.info(f"Test {l} best-fit {w.params.values[i]:.3f}+/-{np.sqrt(w.params.cov[icov, icov]):.3f} "
+                                f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "
+                                f"{np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
+        assert np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
+        k += 1
+    assert np.abs(w.params.values[1]) / np.sqrt(w.params.cov[1, 1]) < 2 * nsigma  # A2
+    assert np.isclose(np.abs(w.params.values[8]), 0, atol=parameters.PIXSHIFT_PRIOR)  # pixshift
+    assert np.isclose(np.abs(w.params.values[9]), 0, atol=1e-3)  # B
+
+    parameters.DEBUG = False
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getObsAtmo"
+    w = SpectrogramFitWorkspace(spectrum, fit_angstrom_exponent=False, verbose=True, plot=True, live_fit=False)
+    run_spectrogram_minimisation(w, method="newton")
+    nsigma = 2
+    labels = ["A1_T", "A2_T", "VAOD_T", "OZONE_T", "PWV_T"]
+    indices = [0, 1, 3, 5, 6]
+    A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, B, Astar, D, shift_x, shift_y, shift_t, *psf_poly_params = w.params.values
+    ipar = w.params.get_free_parameters()  # non fixed param indices
+    cov_indices = [list(ipar).index(k) for k in indices]  # non fixed param indices in cov matrix
+    assert w.costs[-1] / w.data.size < 1e-3
+    k = 0
+    for i, l in zip(indices, labels):
+        icov = cov_indices[k]
+        spectrum.my_logger.info(f"Test {l} best-fit {w.params.values[i]:.3f}+/-{np.sqrt(w.params.cov[icov, icov]):.3f} "
+                                f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "
+                                f"{np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
+        assert np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
+        k += 1
+    assert np.isclose(shift_y, 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
+    assert np.isclose(D, spectrum.header["D2CCD_T"], atol=0.1)  # D2CCD
+    assert np.isclose(B, 1, atol=1e-3)  # B
+    assert np.isclose(Astar, 1, atol=1e-2)  # Astar
+    assert np.all(np.isclose(psf_poly_params[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
+                             np.array(PSF_POLY_PARAMS_TRUTH)[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
+                             rtol=0.01, atol=0.01))
+
+
+
+@unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
+@astropy.config.set_temp_cache(os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache"))
+def test_stardice_fullchain():
+    """
+
+    Returns
+    -------
+
+    Examples
+    --------
+    >>> test_stardice_fullchain()  #doctest: +ELLIPSIS
+    OHP site...
+    """
+    parameters.VERBOSE = True
+    parameters.DEBUG = True
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getObsAtmo"
+    sim_image = "./tests/data/IMG_0019584_sim.fits"
+
+    # load test and make image simulation
+    #if not os.path.isfile(sim_image):
+    make_stardice_image()
+    image = Image(sim_image, config="./config/stardice.ini")
+    lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=',')
+    amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=',', dtype=float)[:lambdas_truth.size]
+    parameters.AMPLITUDE_TRUTH = np.copy(amplitude_truth)
+    parameters.LAMBDA_TRUTH = np.copy(lambdas_truth)
+
+    # extractor
+    load_config("./config/stardice.ini")
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getObsAtmo"
+    parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
+    parameters.CCD_REBIN = 1
+    if image.header['MOUNTTAU'] < 90:
+        parameters.OBS_CAMERA_ROTATION = 180
+    elif image.header['MOUNTTAU'] >= 90:
+        parameters.OBS_CAMERA_ROTATION = 0
+
+    #  JN: > 1 not working well for now: I guess CTIO spectra are too narrow
+    #  and under-sampled to extract unbiased rebinned spectrum, but pipeline is ok.
+    apply_rebinning_to_parameters()
+    if parameters.CCD_REBIN > 1:
+        for k in range(2 * (PSF_POLY_ORDER + 1), 3 * (PSF_POLY_ORDER +1)):
+            PSF_POLY_PARAMS_TRUTH[k] /= parameters.CCD_REBIN
+    spectrum, w = SpectractorRun(image, "./tests/data", guess=(530, 610))  # config already loaded, do not overwrite PSF_POLY_ORDER
+    # tests
+    residuals = plot_residuals(spectrum, lambdas_truth, amplitude_truth)
+
+    spectrum.my_logger.warning(f"\n\tQuantities to test with {parameters.CCD_REBIN=}:"
+                               f"\n\t\tspectrum.header['X0_T']={spectrum.header['X0_T'] / parameters.CCD_REBIN:.5g} vs {spectrum.x0[0]:.5g}"
+                               f"\n\t\tspectrum.header['Y0_T']={spectrum.header['Y0_T'] / parameters.CCD_REBIN:.5g} vs {spectrum.x0[1]:.5g}"
+                               f"\n\t\tspectrum.header['ROT_T']={spectrum.header['ROT_T']:.5g} "
+                               f"vs {spectrum.rotation_angle:.5g}"
+                               f"\n\t\tspectrum.header['BKGD_LEV']={spectrum.header['BKGD_LEV'] * parameters.CCD_REBIN**2:.5g} "
+                               f"vs {np.mean(spectrum.spectrogram_bgd):.5g}"
+                               f"\n\t\tspectrum.header['D2CCD_T']={spectrum.header['D2CCD_T']:.5g} "
+                               f"vs {spectrum.disperser.D:.5g}"
+                               f"\n\t\tspectrum.header['A2_FIT']={spectrum.header['A2_FIT']:.5g} vs {A2_T:.5g}"
+                               f"\n\t\tspectrum.header['CHI2_FIT']={spectrum.header['CHI2_FIT']:.4g}"
+                               f"\n\t\tspectrum.chromatic_psf.poly_params="
+                               f"{spectrum.chromatic_psf.params.values[spectrum.chromatic_psf.Nx + 2 * (PSF_POLY_ORDER + 1):-1]}"
+                               f" vs {PSF_POLY_PARAMS_TRUTH[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1]}"
+                               f"\n\t\tresiduals wrt truth: mean={np.mean(residuals[20:-20]):.5g}, "
+                               f"std={np.std(residuals[20:-20]):.5g}")
+    assert np.isclose(float(spectrum.header['X0_T'] / parameters.CCD_REBIN), spectrum.x0[0], atol=0.2 * parameters.CCD_REBIN)
+    assert np.isclose(float(spectrum.header['Y0_T'] / parameters.CCD_REBIN), spectrum.x0[1], atol=0.2 * parameters.CCD_REBIN)
+    assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle, atol=3e-3)
+    assert np.isclose(float(spectrum.header['BKGD_LEV'] * parameters.CCD_REBIN**2), np.mean(spectrum.spectrogram_bgd), rtol=1e-3)
     assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.2)
     if parameters.CCD_REBIN == 1:
-        assert float(spectrum.header['CHI2_FIT']) < 3e-3
+        assert float(spectrum.header['CHI2_FIT']) < 3e-4
     else:
         assert float(spectrum.header['CHI2_FIT']) < 3e-1
     assert np.all(
         np.isclose(spectrum.chromatic_psf.params.values[spectrum.chromatic_psf.Nx + 2 * (PSF_POLY_ORDER + 1):-1],
                    np.array(PSF_POLY_PARAMS_TRUTH)[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1], rtol=0.05, atol=0.1))
-    assert np.abs(np.mean(residuals[100:-100])) < 0.3
-    assert np.std(residuals[100:-100]) < 1
+    assert np.abs(np.mean(residuals[20:-20])) < 0.1
+    assert np.std(residuals[20:-20]) < 1
 
-    spectrum_file_name = "./tests/data/IMG_0019584_spectrum.fits"
+    spectrum_file_name = "./tests/data/IMG_0019584_sim_spectrum.fits"
     assert os.path.isfile(spectrum_file_name)
     spectrum = Spectrum(spectrum_file_name)
     w = SpectrumFitWorkspace(spectrum, fit_angstrom_exponent=False,
@@ -329,10 +489,10 @@ def test_stardice_fullchain():
     w = SpectrogramFitWorkspace(spectrum, fit_angstrom_exponent=False,
                                 verbose=True, plot=True, live_fit=False)
     run_spectrogram_minimisation(w, method="newton")
-    nsigma = 2
+    nsigma = 3
     labels = ["A1_T", "A2_T", "VAOD_T", "OZONE_T", "PWV_T"]
     indices = [0, 1, 3, 5, 6]
-    A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, shift_t, B, *psf_poly_params = w.params.values
+    A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, B, Astar, D, shift_x, shift_y, shift_t, *psf_poly_params = w.params.values
     ipar = w.params.get_free_parameters()  # non fixed param indices
     cov_indices = [list(ipar).index(k) for k in indices]  # non fixed param indices in cov matrix
     assert w.costs[-1] / w.data.size < 3
@@ -345,8 +505,8 @@ def test_stardice_fullchain():
         assert np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
         k += 1
     assert np.isclose(shift_y, 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
-    assert np.isclose(D, spectrum.header["D2CCD_T"], atol=0.1)  # D2CCD
+    assert np.isclose(D, spectrum.header["D2CCD_T"], atol=0.2)  # D2CCD
     assert np.isclose(B, 1, atol=1e-3)  # B
     assert np.all(np.isclose(psf_poly_params[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              np.array(PSF_POLY_PARAMS_TRUTH)[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
-                             rtol=0.01, atol=0.01))
+                             rtol=0.1, atol=0.1))

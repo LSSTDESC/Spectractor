@@ -219,6 +219,24 @@ class FitParameters:
                 out *= getattr(self, key) == getattr(other, key)
         return out
 
+    def __repr__(self):
+        """Print the best fitting parameters on screen.
+        Labels are from self.labels.
+
+        Examples
+        --------
+        >>> parameters.VERBOSE = True
+        >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params.cov = np.array([[1, -0.5], [-0.5, 4]])
+        >>> params
+        x: 1.0 (fixed)
+        y: 2 +1 -1 bounds=[-inf, inf]
+        z: 3.0 (fixed)
+        t: 4 +2 -2 bounds=[-inf, inf]
+
+        """
+        return self.print_parameters_summary()
+
     def get_index(self, label):
         """Get parameter index given its label.
 
@@ -401,7 +419,7 @@ class FitParameters:
         return np.array(np.where(np.array(self.fixed).astype(int) == 1)[0])
 
     def print_parameters_summary(self):
-        """Print the best fitting parameters on screen.
+        """Build a string with the best fitting parameters to display on screen.
         Labels are from self.labels.
 
         Returns
@@ -424,11 +442,14 @@ class FitParameters:
                 txt += "%s: %s +%s -%s" % formatting_numbers(self.values[ip], np.sqrt(np.abs(self.cov[icov, icov])),
                                                              np.sqrt(np.abs(self.cov[icov, icov])),
                                                              label=self.labels[ip])
-                txt += f" bounds={self.bounds[ip]}\n\t"
+                txt += f" bounds={self.bounds[ip]}"
                 icov += 1
             else:
-                txt += f"{self.labels[ip]}: {self.values[ip]} (fixed)\n\t"
+                txt += f"{self.labels[ip]}: {self.values[ip]} (fixed)"
+            if ip != self.ndim-1:
+                txt += "\n"
         return txt
+
 
     def get_parameter(self, key):
         """Return a FitParameter instance. key argument can be the parameter label or its index value.
@@ -921,11 +942,15 @@ class FitWorkspace:
                         f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
             else:
                 format = self.W.getformat()
-                W = self.W.tocsr()
-                W[:, bad_indices] = 0
-                W[bad_indices, :] = 0
-                W.eliminate_zeros()
-                self.W = W.asformat(format=format)
+                if format == 'dia':
+                    self.W.data[0, bad_indices] = 0
+                else:
+                    W = self.W.tolil()
+                    W[:, bad_indices] = 0
+                    W[bad_indices, :] = 0
+                    W = self.W.asformat(format='csr')
+                    W.eliminate_zeros()
+                    self.W = W.asformat(format=format)
 
     def compute_W_with_model_error(self, model_err):
         """Propagate model uncertainties to weight matrix W.
@@ -1287,7 +1312,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
                     ipar = np.delete(ipar, list(ipar).index(jp))
                     fit_workspace.params.fixed[jp] = True
                     my_logger.warning(
-                        f"\n\tStep {i}: {fit_workspace.params.labels[ip]} is degenerated with {fit_workspace.params.labels[jp]}; "
+                        f"\n\tStep {i}: {fit_workspace.params.labels[jp]} is degenerated with {fit_workspace.params.labels[ip]}; "
                         f"parameter {fit_workspace.params.labels[jp]} is fixed at its last known current value ({tmp_params[jp]}).")
                     continue
         # remove fixed and degenerated parameters; then transpose
@@ -1519,7 +1544,7 @@ def run_gradient_descent(fit_workspace, epsilon, xtol, ftol, niter, verbose=Fals
     fit_workspace.params_table = np.concatenate([fit_workspace.params_table, tmp_params_table])
     fit_workspace.costs = np.concatenate([fit_workspace.costs, tmp_costs])
     if verbose or fit_workspace.verbose:
-        fit_workspace.my_logger.info(f"\n\t{fit_workspace.params.print_parameters_summary()}")
+        fit_workspace.my_logger.info(f"\n{fit_workspace.params.print_parameters_summary()}")
     if parameters.DEBUG and (verbose or fit_workspace.verbose):
         fit_workspace.plot_gradient_descent()
         if len(fit_workspace.params.get_free_parameters()) > 1:
@@ -1531,7 +1556,7 @@ def run_simple_newton_minimisation(fit_workspace, epsilon, xtol=1e-8, ftol=1e-8,
                                                                                               epsilon, niter=niter,
                                                                                               xtol=xtol, ftol=ftol)
     if verbose or fit_workspace.verbose:
-        fit_workspace.my_logger.info(f"\n\t{fit_workspace.params.print_parameters_summary()}")
+        fit_workspace.my_logger.info(f"\n{fit_workspace.params.print_parameters_summary()}")
     if parameters.DEBUG and (verbose or fit_workspace.verbose):
         fit_workspace.plot_gradient_descent()
         if len(fit_workspace.params.get_free_parameters()) > 1:

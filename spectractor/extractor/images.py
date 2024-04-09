@@ -34,14 +34,26 @@ class Image(object):
         Units of the image.
     data: array
         Image 2D array in self.units units.
-    stat_errors: array
+    err: array
         Image 2D uncertainty array in self.units units.
     target_pixcoords: array
         Target position [x,y] in the image in pixels.
     data_rotated: array
         Rotated image 2D array in self.units units.
-    stat_errors_rotated: array
+    err_rotated: array
         Rotated image 2D uncertainty array in self.units units.
+    flat: array
+        Flat 2D array without units and median of 1.
+    starfield: array
+        Star field simulation, no units needed but better in ADU/s.
+    mask: array
+        Boolean array to mask defects.
+    flat_rotated: array
+        Rotated flat 2D array without units and median of 1.
+    starfield_rotated: array
+        Rotated star field simulation, no units needed but better in ADU/s.
+    mask_rotated: array
+        Rotated boolean array to mask defects.
     target_pixcoords_rotated: array
         Target position [x,y] in the rotated image in pixels.
     date_obs: str
@@ -116,7 +128,7 @@ class Image(object):
             :hide:
 
             >>> assert im.data is not None and np.mean(im.data) > 0
-            >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
+            >>> assert im.err is not None and np.mean(im.err) > 0
             >>> assert im.header is not None
             >>> assert im.gain is not None and np.mean(im.gain) > 0
 
@@ -140,8 +152,8 @@ class Image(object):
         self.data_rotated = None
         self.gain = None  # in e-/ADU
         self.read_out_noise = None
-        self.stat_errors = None
-        self.stat_errors_rotated = None
+        self.err = None
+        self.err_rotated = None
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.saturation = None
@@ -153,6 +165,13 @@ class Image(object):
         self.temperature = 0
         self.pressure = 0
         self.humidity = 0
+
+        self.flat = None
+        self.flat_rotated = None
+        self.starfield = None
+        self.starfield_rotated = None
+        self.mask = None
+        self.mask_rotated = None
 
         if parameters.CALLING_CODE != 'LSST_DM' and file_name != "":
             self.load_image(file_name)
@@ -193,20 +212,28 @@ class Image(object):
         --------
         >>> parameters.CCD_REBIN = 2
         >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im.mask = np.zeros_like(im.data).astype(bool)
+        >>> im.mask[700:750, 800:850] = True
         >>> im.target_guess = [810, 590]
         >>> im.data.shape
         (2048, 2048)
         >>> im.rebin()
         >>> im.data.shape
         (1024, 1024)
-        >>> im.stat_errors.shape
+        >>> im.err.shape
         (1024, 1024)
         >>> im.target_guess
         array([405., 295.])
         """
         new_shape = np.asarray(self.data.shape) // parameters.CCD_REBIN
         self.data = rebin(self.data, new_shape)
-        self.stat_errors = np.sqrt(rebin(self.stat_errors ** 2, new_shape))
+        self.err = np.sqrt(rebin(self.err ** 2, new_shape))
+        if self.mask is not None:
+            self.mask = rebin(self.mask, new_shape, FLAG_MAKESUM=True).astype(bool)
+        if self.flat is not None:
+            self.flat = rebin(self.flat, new_shape, FLAG_MAKESUM=False)
+        if self.starfield is not None:
+            self.starfield = rebin(self.starfield, new_shape)
         if self.target_guess is not None:
             self.target_guess = np.asarray(self.target_guess) / parameters.CCD_REBIN
 
@@ -284,9 +311,9 @@ class Image(object):
             >>> assert np.all(np.isclose(data_before, im.data * im.expo))
         """
         self.data = self.data.astype(np.float64) / self.expo
-        self.stat_errors /= self.expo
-        if self.stat_errors_rotated is not None:
-            self.stat_errors_rotated /= self.expo
+        self.err /= self.expo
+        if self.err_rotated is not None:
+            self.err_rotated /= self.expo
         self.units = 'ADU/s'
 
     def convert_to_ADU_units(self):
@@ -308,9 +335,9 @@ class Image(object):
             >>> assert np.all(np.isclose(data_before, im.data))
         """
         self.data *= self.expo
-        self.stat_errors *= self.expo
-        if self.stat_errors_rotated is not None:
-            self.stat_errors_rotated *= self.expo
+        self.err *= self.expo
+        if self.err_rotated is not None:
+            self.err_rotated *= self.expo
         self.units = 'ADU'
 
     def compute_statistical_error(self):
@@ -350,9 +377,9 @@ class Image(object):
         # remove negative values (due to dead columns for instance
         min_noz = np.min(err2[err2 > 0])
         err2[err2 <= 0] = min_noz
-        self.stat_errors = np.sqrt(err2)
+        self.err = np.sqrt(err2)
         # convert in ADU
-        self.stat_errors /= self.gain
+        self.err /= self.gain
         # check uncertainty model
         self.check_statistical_error()
 
@@ -398,7 +425,7 @@ class Image(object):
         data = np.copy(self.data)
         min_noz = np.min(data[data > 0])
         data[data <= 0] = min_noz
-        y = self.stat_errors.flatten() ** 2
+        y = self.err.flatten() ** 2
         x = data.flatten()
         fit, cov, model = fit_poly1d(x, y, order=1)
         gain = 1 / fit[0]
@@ -446,7 +473,7 @@ class Image(object):
         ax[0].grid()
         ax[0].set_ylabel(r"$\sigma_{\mathrm{ADU}}^2$ [ADU$^2$]")
         ax[0].set_xlabel(r"Data pixel values [ADU]")
-        plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Statistical uncertainty map",
+        plot_image_simple(ax[1], data=self.err, scale="log10", title="Statistical uncertainty map",
                           units=self.units, target_pixcoords=None, aspect="auto", cmap=None)
         fig.tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
@@ -471,7 +498,7 @@ class Image(object):
 
     def plot_image(self, ax=None, scale="lin", title="", units="", plot_stats=False,
                    target_pixcoords=None, figsize=(7.3, 6), aspect=None, vmin=None, vmax=None,
-                   cmap=None, cax=None):
+                   cmap=None, cax=None, use_flat=True):
         """Plot image.
 
         Parameters
@@ -500,10 +527,14 @@ class Image(object):
             Figure size (default: [9.3, 8]).
         plot_stats: bool
             If True, plot the uncertainty map instead of the image (default: False).
+        use_flat: bool
+            If True and self.flat exists, divide the image by the flat (default: True).
 
         Examples
         --------
         >>> im = Image('tests/data/reduc_20170605_028.fits', config="./config/ctio.ini")
+        >>> im.mask = np.zeros_like(im.data).astype(bool)
+        >>> im.mask[700:705, 1250:1260] = True  # test masking of some pixels like cosmic rays
         >>> im.plot_image(target_pixcoords=[820, 580], scale="symlog")
         >>> if parameters.DISPLAY: plt.show()
         """
@@ -512,10 +543,12 @@ class Image(object):
             ax = plt.gca()
         data = np.copy(self.data)
         if plot_stats:
-            data = np.copy(self.stat_errors)
+            data = np.copy(self.err)
         if units == "":
             units = self.units
-        plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
+        if self.flat is not None and use_flat:
+            data /= self.flat
+        plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax, mask=self.mask,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         if parameters.OBS_OBJECT_TYPE == "STAR":
             plot_compass_simple(ax, self.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
@@ -527,6 +560,16 @@ class Image(object):
             plt.show()
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
+
+    def simulate_starfield_with_gaia(self):
+        from spectractor.simulation.image_simulation import StarFieldModel
+        starfield = StarFieldModel(self, flux_factor=1)
+        yy, xx = np.mgrid[0:self.data.shape[1]:1, 0:self.data.shape[0]:1]
+        starfield.model(xx, yy)
+        if parameters.DEBUG:
+            self.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
+            starfield.plot_model()
+        return starfield.field
 
 
 def load_CTIO_image(image):
@@ -566,6 +609,8 @@ def load_CTIO_image(image):
     # compute CCD gain map
     build_CTIO_gain_map(image)
     build_CTIO_read_out_noise_map(image)
+    image.flat = image.gain / np.mean(image.gain)
+    # parallactic angle
     image.compute_parallactic_angle()
     # WCS
     wcs_file_name = set_wcs_file_name(image.file_name)
@@ -679,7 +724,10 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.my_logger.info(f'\n\tLoading AUXTEL image {image.file_name}...')
     with fits.open(image.file_name) as hdu_list:
         image.header = hdu_list[0].header
-        image.data = hdu_list[1].data.astype(np.float64)
+        if hdu_list[0].data is not None:
+            image.data = hdu_list[0].data.astype(np.float64)
+        else:
+            image.data = hdu_list[1].data.astype(np.float64)
     image.date_obs = image.header['DATE']
     image.expo = float(image.header['EXPTIME'])
     if "empty" not in image.header['FILTER'].lower():
@@ -722,7 +770,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     if parameters.OBS_CAMERA_ROTATION < -360:
         parameters.OBS_CAMERA_ROTATION += 360
     image.header["CAM_ROT"] = parameters.OBS_CAMERA_ROTATION
-    if "CD2_1" in hdu_list[1].header:
+    if len(hdu_list) > 1 and "CD2_1" in hdu_list[1].header:
         rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[1].header["CD2_1"], hdu_list[1].header["CD1_1"]) + 90
         if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=2):
             image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degree while "
@@ -953,6 +1001,8 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
         image.target.image_x0 = sub_image_x0
         image.target.image_y0 = sub_image_y0
         image.target_pixcoords = [theX, theY]
+        if image.starfield is not None:
+            image.target.starfield = np.copy(image.starfield[int(theY) - Dy:int(theY) + Dy, int(theX) - Dx:int(theX) + Dx])
         image.header['TARGETX'] = theX
         image.header.comments['TARGETX'] = 'target position on X axis'
         image.header['TARGETY'] = theY
@@ -1003,10 +1053,10 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     Dx, Dy = widths
     if rotated:
         sub_image = np.copy(image.data_rotated[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
-        sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
+        sub_errors = np.copy(image.err[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
     else:
         sub_image = np.copy(image.data[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
-        sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
+        sub_errors = np.copy(image.err[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
 
     # usually one rebin by adding pixel contents
     image.saturation = parameters.CCD_MAXADU / image.expo *parameters.CCD_REBIN**2
@@ -1430,11 +1480,21 @@ def turn_image(image):
     if not np.isnan(image.rotation_angle):
         image.data_rotated = ndimage.rotate(image.data, image.rotation_angle,
                                             prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
-        image.stat_errors_rotated = np.sqrt(
-            np.abs(ndimage.rotate(image.stat_errors ** 2, image.rotation_angle,
+        image.err_rotated = np.sqrt(
+            np.abs(ndimage.rotate(image.err ** 2, image.rotation_angle,
                                   prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)))
-        min_noz = np.min(image.stat_errors_rotated[image.stat_errors_rotated > 0])
-        image.stat_errors_rotated[image.stat_errors_rotated <= 0] = min_noz
+        min_noz = np.min(image.err_rotated[image.err_rotated > 0])
+        image.err_rotated[image.err_rotated <= 0] = min_noz
+        if image.flat is not None:
+            image.flat_rotated = ndimage.rotate(image.flat, image.rotation_angle,
+                                                prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
+        if image.starfield is not None:
+            image.starfield_rotated = ndimage.rotate(image.starfield, image.rotation_angle,
+                                                     prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
+        if image.mask is not None:
+            image.mask_rotated = ndimage.rotate(image.mask, image.rotation_angle,
+                                                prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
+
     if parameters.DEBUG:
         margin = 100 // parameters.CCD_REBIN
         y0 = int(image.target_pixcoords[1])

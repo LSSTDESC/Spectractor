@@ -1,4 +1,5 @@
 import os
+import copy
 import shutil
 from photutils.detection import IRAFStarFinder
 from scipy.optimize import curve_fit
@@ -8,6 +9,7 @@ from astropy.stats import sigma_clip, sigma_clipped_stats
 from astropy.io import fits
 from astropy import wcs as WCS
 
+from matplotlib import cm
 import matplotlib.pyplot as plt
 import matplotlib.colors
 from matplotlib.ticker import MaxNLocator
@@ -270,7 +272,7 @@ def rescale_x_from_legendre(x_norm, Xmin, Xmax):
 
     Parameters
     ----------
-    x: np.ndarray
+    x_norm: np.ndarray
     Xmin: float
     Xmax: float
 
@@ -1726,7 +1728,7 @@ def clean_target_spikes(data, saturation):  # pragma: no cover
     return data
 
 
-def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap=None,
+def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap=None, mask=None,
                       target_pixcoords=None, vmin=None, vmax=None, aspect=None, cax=None):
     """Simple function to plot a spectrum with error bars and labels.
 
@@ -1744,6 +1746,8 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         Units of the image to be written in the color bar label (default: "Image units")
     cmap: colormap
         Color map label (default: None)
+    mask: array_like
+        Mask array (default: None)
     target_pixcoords: array_like, optional
         2D array giving the (x,y) coordinates of the targets on the image: add a scatter plot (default: None)
     vmin: float
@@ -1771,6 +1775,18 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         ...                     title="tests/data/reduc_20170605_028.fits")
         >>> if parameters.DISPLAY: plt.show()
     """
+    if cmap is not None and isinstance(cmap, str):
+        colormap = copy.copy(cm.get_cmap(cmap))
+    elif isinstance(cmap, matplotlib.colors.Colormap):
+        colormap = cmap
+    else:
+        colormap = copy.copy(cm.get_cmap('viridis'))
+    cmap_nan = copy.copy(colormap)
+    cmap_nan.set_bad(color='lightgrey')
+
+    data = np.copy(data)
+    if mask is not None:
+        data[mask] = np.nan
     if scale == "log" or scale == "log10":
         # removes the zeros and negative pixels first
         zeros = np.where(data <= 0)
@@ -1784,7 +1800,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         norm = matplotlib.colors.SymLogNorm(vmin=vmin, vmax=vmax, linthresh=10, base=10)
     else:
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
-    im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect)
+    im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect, interpolation="none")
     ax.grid(color='silver', ls='solid')
     ax.grid(True)
     ax.set_xlabel(parameters.PLOT_XLABEL)
