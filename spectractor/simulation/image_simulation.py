@@ -366,7 +366,7 @@ class ImageModel(Image):
         # self.true_lambdas, self.true_spectrum = hdu_list[1].data
 
 
-def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1, A3=1, angstrom_exponent=None,
+def ImageSim(image_filename, spectrum_filename, output_filename, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1, A3=1, angstrom_exponent=None,
              psf_poly_params=None, psf_type=None,  diffraction_orders=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
@@ -492,12 +492,6 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         image.convert_to_ADU_rate_units()
         image.plot_image(scale="symlog", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
         image.convert_to_ADU_units()
-
-    # Set output path
-    ensure_dir(outputdir)
-    output_filename = image_filename.split('/')[-1]
-    output_filename = (output_filename.replace('reduc', 'sim')).replace('trim', 'sim')
-    output_filename = os.path.join(outputdir, output_filename)
 
     # Save images and parameters
     image.header['A1_T'] = A1
