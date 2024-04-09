@@ -1,5 +1,5 @@
 import matplotlib as mpl
-#mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
+mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
 from scipy.interpolate import interp1d  # noqa: E402
 
