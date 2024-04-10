@@ -829,6 +829,7 @@ def load_STARDICE_image(image):  # pragma: no cover
     elif image.header['MOUNTTAU'] >= 90:
         parameters.OBS_CAMERA_ROTATION = 0
 
+    image.units = 'ADU'
     image.target_label = image.header['mountTARGET']
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['cameraexptime'])
@@ -846,11 +847,20 @@ def load_STARDICE_image(image):  # pragma: no cover
     if image.header['MOUNTTAU'] >= 90:
         image.hour_angle = image.hour_angle - 180*units.deg
         image.dec = 180*units.deg - image.dec
-    # TODO: here take goods values if exist
-    image.temperature = 10
-    image.pressure = 1000
-    image.humidity = 87
-    image.units = 'ADU'
+
+    if "weatherAir temperature [C]" in image.header:
+        image.temperature = float(image.header["weatherAir temperature [C]"])
+    else:
+        image.temperature = 10.
+    if "weatherAir pressure [hPa]" in image.header:
+        image.pressure = float(image.header["weatherAir pressure [hPa]"])
+    else:
+        image.pressure = 950.
+    if "weatherRelative humidity [%]" in image.header:
+        image.humidity = float(image.header["weatherRelative humidity [%]"])
+    else:
+        image.humidity = 50.
+
     # WCS
     wcs_file_name = set_wcs_file_name(image.file_name)
     if os.path.isfile(wcs_file_name):
