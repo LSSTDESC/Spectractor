@@ -1532,6 +1532,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
             plt.show()
         if parameters.LSST_SAVEFIGPATH:
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'intermediate_spectrum.pdf'))
+    if parameters.DEBUG:
+        spectrum.plot_spectrum()
 
     return w, bgd_model_func
 
