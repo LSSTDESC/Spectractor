@@ -133,7 +133,7 @@ class Spectrum:
         Outside relative humidity in fraction of one.
     throughput: callable
         Instrumental throughput of the telescope.
-    spectrogram: array
+    spectrogram_data: array
         Spectrogram 2D image in image units.
     spectrogram_bgd: array
         Estimated 2D background fitted below the spectrogram in image units.
@@ -145,6 +145,12 @@ class Spectrum:
         Best fitting model of the spectrogram in image units.
     spectrogram_residuals: array
         Residuals between the spectrogram data and the best fitting model of the spectrogram in image units.
+    spectrogram_flat: array
+        Flat array for the spectrogram with average=1.
+    spectrogram_starfield: array
+        Star field simulation array for the spectrogram in ADU/s.
+    spectrogram_mask: array
+        Boolean mask array to flag the defects.
     spectrogram_x0: float
         Relative position of the target in the spectrogram array along the x axis.
     spectrogram_y0: float
@@ -237,12 +243,15 @@ class Spectrum:
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.camera_angle = 0
-        self.spectrogram = None
+        self.spectrogram_data = None
         self.spectrogram_bgd = None
         self.spectrogram_bgd_rms = None
         self.spectrogram_err = None
         self.spectrogram_residuals = None
         self.spectrogram_fit = None
+        self.spectrogram_flat = None
+        self.spectrogram_starfield = None
+        self.spectrogram_mask = None
         self.spectrogram_x0 = None
         self.spectrogram_y0 = None
         self.spectrogram_xmin = None
@@ -504,7 +513,7 @@ class Spectrum:
         if ax is None:
             plt.figure(figsize=figsize)
             ax = plt.gca()
-        data = np.copy(self.spectrogram)
+        data = np.copy(self.spectrogram_data)
         if plot_stats:
             data = np.copy(self.spectrogram_err)
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
@@ -587,7 +596,7 @@ class Spectrum:
         widthPlot.set_xlabel(r'$\lambda$ [nm]')
         widthPlot.grid()
 
-        spectrogram = np.copy(self.spectrogram)
+        spectrogram = np.copy(self.spectrogram_data)
         res = self.spectrogram_residuals.reshape((-1, self.spectrogram_Nx))
         std = np.std(res)
         if spectrogram.shape[0] != res.shape[0]:
@@ -647,8 +656,8 @@ class Spectrum:
         """
         from spectractor._version import __version__
         self.header["VERSION"] = str(__version__)
-        self.header["REBIN"] = parameters.CCD_REBIN
-        self.header.comments['REBIN'] = 'original image rebinning factor to get spectrum.'
+        self.header["CCD_REBIN"] = parameters.CCD_REBIN
+        self.header.comments['CCD_REBIN'] = 'original image rebinning factor to get spectrum.'
         self.header['UNIT1'] = "nanometer"
         self.header['UNIT2'] = self.units
         self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, ' \
@@ -669,7 +678,7 @@ class Spectrum:
             # print(f"Set header key {header_key} to {value} from attr {attribute}")
 
         extnames = ["SPECTRUM", "SPEC_COV", "ORDER2", "ORDER0"]  # spectrum data
-        extnames += ["S_DATA", "S_ERR", "S_BGD", "S_BGD_ER", "S_FIT", "S_RES"]  # spectrogram data
+        extnames += ["S_DATA", "S_ERR", "S_BGD", "S_BGD_ER", "S_FIT", "S_RES", "S_FLAT", "S_STAR", "S_MASK"]
         extnames += ["PSF_TAB"]  # PSF parameter table
         extnames += ["LINES"]  # spectroscopic line table
         extnames += ["CONFIG"]  # config parameters
@@ -688,7 +697,7 @@ class Spectrum:
                 hdus[extname].header["IM_X0"] = self.target.image_x0
                 hdus[extname].header["IM_Y0"] = self.target.image_y0
             elif extname == "S_DATA":
-                hdus[extname].data = self.spectrogram
+                hdus[extname].data = self.spectrogram_data
                 hdus[extname].header['UNIT1'] = self.units
             elif extname == "S_ERR":
                 hdus[extname].data = self.spectrogram_err
@@ -700,6 +709,15 @@ class Spectrum:
                 hdus[extname].data = self.spectrogram_fit
             elif extname == "S_RES":
                 hdus[extname].data = self.spectrogram_residuals
+            elif extname == "S_FLAT":
+                hdus[extname].data = self.spectrogram_flat
+            elif extname == "S_STAR":
+                hdus[extname].data = self.spectrogram_starfield
+            elif extname == "S_MASK":
+                if self.spectrogram_mask is not None:
+                    hdus[extname].data = self.spectrogram_mask.astype(int)
+                else:
+                    hdus[extname].data = self.spectrogram_mask
             elif extname == "PSF_TAB":
                 hdus[extname] = fits.table_to_hdu(self.chromatic_psf.table)
             elif extname == "LINES":
@@ -784,7 +802,7 @@ class Spectrum:
         hdu6 = fits.ImageHDU()
         hdu6.header["EXTNAME"] = "S_RES"
         hdu1.header = self.header
-        hdu1.data = self.spectrogram
+        hdu1.data = self.spectrogram_data
         hdu2.data = self.spectrogram_err
         hdu3.data = self.spectrogram_bgd
         hdu4.data = self.spectrogram_bgd_rms
@@ -967,7 +985,7 @@ class Spectrum:
                             self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
                 # load spectrogram info
                 if len(hdu_list) > 4:
-                    self.spectrogram = hdu_list["S_DATA"].data
+                    self.spectrogram_data = hdu_list["S_DATA"].data
                     self.spectrogram_err = hdu_list["S_ERR"].data
                     self.spectrogram_bgd = hdu_list["S_BGD"].data
                     if len(hdu_list) > 7:
@@ -1072,7 +1090,7 @@ class Spectrum:
             self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
 
         if not self.fast_load:
-            with fits.open(input_file_name) as hdu_list:
+            with (fits.open(input_file_name) as hdu_list):
                 # load other spectrum info
                 self.cov_matrix = hdu_list["SPEC_COV"].data
                 _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
@@ -1080,12 +1098,20 @@ class Spectrum:
                 self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
                 self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
                 # load spectrogram info
-                self.spectrogram = hdu_list["S_DATA"].data
+                self.spectrogram_data = hdu_list["S_DATA"].data
                 self.spectrogram_err = hdu_list["S_ERR"].data
                 self.spectrogram_bgd = hdu_list["S_BGD"].data
                 self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
                 self.spectrogram_fit = hdu_list["S_FIT"].data
                 self.spectrogram_residuals = hdu_list["S_RES"].data
+                if "S_FLAT" in [hdu.name for hdu in hdu_list]:
+                    self.spectrogram_flat = hdu_list["S_FLAT"].data
+                if "S_STAR" in [hdu.name for hdu in hdu_list]:
+                    self.spectrogram_starfield = hdu_list["S_STAR"].data
+                if "S_MASK" in [hdu.name for hdu in hdu_list]:
+                    self.spectrogram_mask = hdu_list["S_MASK"].data
+                    if self.spectrogram_mask is not None:
+                        self.spectrogram_mask = self.spectrogram_mask.astype(bool)
                 self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
                                                    saturation=self.spectrogram_saturation)
                 self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
@@ -1106,7 +1132,7 @@ class Spectrum:
         if os.path.isfile(input_file_name):
             with fits.open(input_file_name) as hdu_list:
                 header = hdu_list[0].header
-                self.spectrogram = hdu_list[0].data
+                self.spectrogram_data = hdu_list[0].data
                 self.spectrogram_err = hdu_list[1].data
                 self.spectrogram_bgd = hdu_list[2].data
                 if len(hdu_list) > 3:
