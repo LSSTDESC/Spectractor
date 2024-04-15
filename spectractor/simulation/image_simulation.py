@@ -15,7 +15,8 @@ from astropy.io import fits, ascii
 import astropy.units as units
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
-from scipy.signal import fftconvolve, gaussian
+from scipy.signal import fftconvolve
+from scipy.signal.windows import gaussian
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import numpy as np
