@@ -303,72 +303,19 @@ class Star(Target):
         self.spectra = []
         # first try if it is a Calspec star
         is_calspec = getCalspec.is_calspec(self.label)
+        is_gaia = getCalspec.is_gaia(self.label)
         if is_calspec:
-            calspec = getCalspec.Calspec(self.label)
-            self.emission_spectrum = False
-            self.hydrogen_only = False
-            self.lines = Lines(HYDROGEN_LINES + ATMOSPHERIC_LINES + STELLAR_LINES,
-                               redshift=self.redshift, emission_spectrum=self.emission_spectrum,
-                               hydrogen_only=self.hydrogen_only)
-            spec_dict = calspec.get_spectrum_numpy()
-            # official units in spectractor are nanometers for wavelengths and erg/s/cm2/nm for fluxes
-            spec_dict["WAVELENGTH"] = spec_dict["WAVELENGTH"].to(u.nm)
-            spec_dict["FLUX"] = spec_dict["FLUX"].to(u.erg / u.second / u.cm**2 / u.nm)
-            self.wavelengths.append(spec_dict["WAVELENGTH"].value)
-            self.spectra.append(spec_dict["FLUX"].value)
+            self.load_calspec()
+        elif is_gaia:
+            self.load_gaia()
         # TODO DM-33731: the use of self.label in parameters.STAR_NAMES:
         # below works for running but breaks a test so needs fixing for DM
         elif 'HD' in self.label:  # or self.label in parameters.STAR_NAMES:  # it is a star
-            self.emission_spectrum = False
-            self.hydrogen_only = False
-            self.lines = Lines(ATMOSPHERIC_LINES + HYDROGEN_LINES + STELLAR_LINES,
-                               redshift=self.redshift, emission_spectrum=self.emission_spectrum,
-                               hydrogen_only=self.hydrogen_only)
+            self.load_emission_spectrum(hydrogen_only_flag=False)
         elif 'PNG' in self.label:
-            self.emission_spectrum = True
-            self.lines = Lines(ATMOSPHERIC_LINES + ISM_LINES + HYDROGEN_LINES,
-                               redshift=self.redshift, emission_spectrum=self.emission_spectrum,
-                               hydrogen_only=self.hydrogen_only)
+            self.load_emission_spectrum(hydrogen_only_flag=True)
         else:  # maybe a quasar, try with NED query
-            from astroquery.ned import Ned
-            try:
-                hdulists = Ned.get_spectra(self.label) #, show_progress=False)
-            except Exception as err:
-                raise err
-            if len(hdulists) > 0:
-                self.emission_spectrum = True
-                self.hydrogen_only = False
-                if self.redshift > 0.2:
-                    self.hydrogen_only = True
-                    parameters.LAMBDA_MIN *= 1 + self.redshift
-                    parameters.LAMBDA_MAX *= 1 + self.redshift
-                self.lines = Lines(ATMOSPHERIC_LINES+ISM_LINES+HYDROGEN_LINES,
-                                   redshift=self.redshift, emission_spectrum=self.emission_spectrum,
-                                   hydrogen_only=self.hydrogen_only)
-                for k, h in enumerate(hdulists):
-                    if h[0].header['NAXIS'] == 1:
-                        self.spectra.append(h[0].data)
-                    else:
-                        for d in h[0].data:
-                            self.spectra.append(d)
-                    wave_n = len(h[0].data)
-                    if h[0].header['NAXIS'] == 2:
-                        wave_n = len(h[0].data.T)
-                    wave_step = h[0].header['CDELT1']
-                    wave_start = h[0].header['CRVAL1'] - (h[0].header['CRPIX1'] - 1) * wave_step
-                    wave_end = wave_start + wave_n * wave_step
-                    waves = np.linspace(wave_start, wave_end, wave_n)
-                    is_angstrom = False
-                    for key in list(h[0].header.keys()):
-                        if 'angstrom' in str(h[0].header[key]).lower():
-                            is_angstrom = True
-                    if is_angstrom:
-                        waves *= 0.1
-                    if h[0].header['NAXIS'] > 1:
-                        for i in range(h[0].header['NAXIS'] + 1):
-                            self.wavelengths.append(waves)
-                    else:
-                        self.wavelengths.append(waves)
+            self.load_ned()
         self.build_sed()
         self.my_logger.debug(f"\n\tTarget label: {self.label}"
                              f"\n\tCalspec? {is_calspec}"
@@ -377,6 +324,107 @@ class Star(Target):
                              f"\n\tEmission spectrum ? {self.emission_spectrum}")
         if self.lines is not None and len(self.lines.lines) > 0:
             self.my_logger.debug(f"\n\tLines: {[l.label for l in self.lines.lines]}")
+
+    def load_calspec(self):
+        calspec = getCalspec.Calspec(self.label)
+        self.emission_spectrum = False
+        self.hydrogen_only = False
+        self.lines = Lines(
+            HYDROGEN_LINES + ATMOSPHERIC_LINES + STELLAR_LINES,
+            redshift=self.redshift,
+            emission_spectrum=self.emission_spectrum,
+            hydrogen_only=self.hydrogen_only,
+        )
+        spec_dict = calspec.get_spectrum_numpy()
+        # official units in spectractor are nanometers for wavelengths and erg/s/cm2/nm for fluxes
+        spec_dict["WAVELENGTH"] = spec_dict["WAVELENGTH"].to(u.nm)
+        spec_dict["FLUX"] = spec_dict["FLUX"].to(u.erg / u.second / u.cm**2 / u.nm)
+        self.wavelengths.append(spec_dict["WAVELENGTH"].value)
+        self.spectra.append(spec_dict["FLUX"].value)
+
+    def load_gaia(self):
+        gaia = getCalspec.Gaia(self.label)
+        self.emission_spectrum = False
+        self.hydrogen_only = False
+        self.lines = Lines(
+            HYDROGEN_LINES + ATMOSPHERIC_LINES + STELLAR_LINES,
+            redshift=self.redshift,
+            emission_spectrum=self.emission_spectrum,
+            hydrogen_only=self.hydrogen_only,
+        )
+        spec_dict = gaia.get_spectrum_numpy()
+        # official units in spectractor are nanometers for wavelengths and erg/s/cm2/nm for fluxes
+        spec_dict["WAVELENGTH"] = spec_dict["WAVELENGTH"].to(u.nm)
+        spec_dict["FLUX"] = spec_dict["FLUX"].to(u.erg / u.second / u.cm**2 / u.nm)
+        self.wavelengths.append(spec_dict["WAVELENGTH"].value)
+        self.spectra.append(spec_dict["FLUX"].value)
+
+
+    def load_emission_spectrum(self, hydrogen_only_flag):
+        if hydrogen_only_flag:
+            self.emission_spectrum = True
+            self.lines = Lines(
+                ATMOSPHERIC_LINES + ISM_LINES + HYDROGEN_LINES,
+                redshift=self.redshift,
+                emission_spectrum=self.emission_spectrum,
+                hydrogen_only=self.hydrogen_only,
+            )
+        else:
+            self.emission_spectrum = False
+            self.hydrogen_only = False
+            self.lines = Lines(
+                ATMOSPHERIC_LINES + HYDROGEN_LINES + STELLAR_LINES,
+                redshift=self.redshift,
+                emission_spectrum=self.emission_spectrum,
+                hydrogen_only=self.hydrogen_only,
+            )
+
+    def load_ned(self):
+        from astroquery.ned import Ned
+        try:
+            hdulists = Ned.get_spectra(self.label)  # , show_progress=False)
+        except Exception as err:
+            raise err
+        if len(hdulists) > 0:
+            self.emission_spectrum = True
+            self.hydrogen_only = False
+            if self.redshift > 0.2:
+                self.hydrogen_only = True
+                parameters.LAMBDA_MIN *= 1 + self.redshift
+                parameters.LAMBDA_MAX *= 1 + self.redshift
+            self.lines = Lines(
+                ATMOSPHERIC_LINES + ISM_LINES + HYDROGEN_LINES,
+                redshift=self.redshift,
+                emission_spectrum=self.emission_spectrum,
+                hydrogen_only=self.hydrogen_only,
+            )
+            for k, h in enumerate(hdulists):
+                if h[0].header["NAXIS"] == 1:
+                    self.spectra.append(h[0].data)
+                else:
+                    for d in h[0].data:
+                        self.spectra.append(d)
+                wave_n = len(h[0].data)
+                if h[0].header["NAXIS"] == 2:
+                    wave_n = len(h[0].data.T)
+                wave_step = h[0].header["CDELT1"]
+                wave_start = (
+                    h[0].header["CRVAL1"] - (h[0].header["CRPIX1"] - 1) * wave_step
+                )
+                wave_end = wave_start + wave_n * wave_step
+                waves = np.linspace(wave_start, wave_end, wave_n)
+                is_angstrom = False
+                for key in list(h[0].header.keys()):
+                    if "angstrom" in str(h[0].header[key]).lower():
+                        is_angstrom = True
+                if is_angstrom:
+                    waves *= 0.1
+                if h[0].header["NAXIS"] > 1:
+                    for i in range(h[0].header["NAXIS"] + 1):
+                        self.wavelengths.append(waves)
+                else:
+                    self.wavelengths.append(waves)
+
 
     def get_radec_position_after_pm(self, date_obs):
         if self.simbad_table is not None:
