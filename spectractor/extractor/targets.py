@@ -13,8 +13,6 @@ from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINE
                                                 ISM_LINES, STELLAR_LINES)
 
 from getCalspec import getCalspec
-from gaiaspec import getGaia
-
 
 def load_target(label, verbose=False):
     """Load the target properties according to the type set by parameters.OBS_OBJECT_TYPE.
@@ -304,7 +302,12 @@ class Star(Target):
         self.spectra = []
         # first try if it is a Calspec star
         is_calspec = getCalspec.is_calspec(self.label)
-        is_gaia = getGaia.is_gaia(self.label)
+        try:
+            from gaiaspec import getGaia
+            is_gaia = getGaia.is_gaia(self.label)
+        except:
+            self.my_logger.warning(f"The gaiaspec module is not installed")
+            is_gaia = False
         if is_calspec:
             self.load_calspec()
         elif is_gaia:
@@ -344,6 +347,7 @@ class Star(Target):
         self.spectra.append(spec_dict["FLUX"].value)
 
     def load_gaia(self):
+        from gaiaspec import getGaia
         gaia = getGaia.Gaia(self.label)
         self.emission_spectrum = False
         self.hydrogen_only = False
