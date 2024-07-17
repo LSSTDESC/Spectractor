@@ -266,9 +266,9 @@ class Star(Target):
             print(True)
             gaia_sources = getGaia.get_gaia_sources()
             source = gaia_sources[gaia_sources == self.label]
-            table_coordinates = [{"PMRA": source["pmra"],
-                                  "PMDEC": source["pmdec"],
-                                  "PLX_VALUE": source["parallax"],}]
+            table_coordinates = [{"PMRA": source["pmra"].iloc[0],
+                                  "PMDEC": source["pmdec"].iloc[0],
+                                  "PLX_VALUE": source["parallax"].iloc[0],}]
 
             self.radec_position = SkyCoord(ra = source["ra"].iloc[0], 
                                            dec = source["dec"].iloc[0] , 
