@@ -230,7 +230,6 @@ class Star(Target):
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = set_logger(self.__class__.__name__)
-        self.simbad_table = None
         self.load()
 
     def load(self):
@@ -256,30 +255,54 @@ class Star(Target):
         # ``Simbad...`` methods secretly makes an instance, which stays around,
         # has a connection go stale, and then raises an exception seemingly
         # at some random time later
-        simbadQuerier = SimbadClass()
-        patchSimbadURL(simbadQuerier)
 
-        simbadQuerier.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
-                                         'parallax', 'pm', 'z_value')
-        if not getCalspec.is_calspec(self.label) and getCalspec.is_calspec(self.label.replace(".", " ")):
-            self.label = self.label.replace(".", " ")
-        astroquery_label = self.label
-        if getCalspec.is_calspec(self.label):
-            calspec = getCalspec.Calspec(self.label)
-            astroquery_label = calspec.Astroquery_Name
-        self.simbad_table = simbadQuerier.query_object(astroquery_label)
+        try:
+            from gaiaspec import getGaia
+            is_gaia = getGaia.is_gaia(self.label)
+        except:
+            self.my_logger.warning(f"The gaiaspec module is not installed")
+            is_gaia = False
+        if is_gaia:
+            print(True)
+            gaia_sources = getGaia.get_gaia_sources()
+            source = gaia_sources[gaia_sources == self.label]
+            table_coordinates = [{"PMRA": source["pmra"],
+                                  "PMDEC": source["pmdec"],
+                                  "PLX_VALUE": source["parallax"],}]
 
-        if self.simbad_table is not None:
-            if self.verbose or True:
-                self.my_logger.info(f'\n\tSimbad:\n{self.simbad_table}')
-            self.radec_position = SkyCoord(self.simbad_table['RA'][0] + ' ' + self.simbad_table['DEC'][0], unit=(u.hourangle, u.deg))
-        else:
-            raise RuntimeError(f"Target {self.label} not found in Simbad")
-        self.get_radec_position_after_pm(date_obs="J2000")
-        if not np.ma.is_masked(self.simbad_table['Z_VALUE']):
-            self.redshift = float(self.simbad_table['Z_VALUE'])
-        else:
+            self.radec_position = SkyCoord(ra = source["ra"].iloc[0], 
+                                           dec = source["dec"].iloc[0] , 
+                                           unit=u.deg)
             self.redshift = 0
+            date_reference="J2016"
+        else:
+            simbadQuerier = SimbadClass()
+            patchSimbadURL(simbadQuerier)
+            simbadQuerier.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
+                                            'parallax', 'pm', 'z_value')
+            if not getCalspec.is_calspec(self.label) and getCalspec.is_calspec(self.label.replace(".", " ")):
+                self.label = self.label.replace(".", " ")
+            astroquery_label = self.label
+            if getCalspec.is_calspec(self.label):
+                calspec = getCalspec.Calspec(self.label)
+                astroquery_label = calspec.Astroquery_Name
+            table_coordinates = simbadQuerier.query_object(astroquery_label)
+
+            if table_coordinates is not None:
+                if self.verbose or True:
+                    self.my_logger.info(f'\n\tSimbad:\n{table_coordinates}')
+                self.radec_position = SkyCoord(table_coordinates['RA'][0] + ' ' + table_coordinates['DEC'][0], unit=(u.hourangle, u.deg))
+            else:
+                raise RuntimeError(f"Target {self.label} not found in Simbad")
+            if not np.ma.is_masked(table_coordinates['Z_VALUE']):
+                self.redshift = float(table_coordinates['Z_VALUE'])
+            else:
+                self.redshift = 0
+            date_reference="J2000"
+
+        self.get_radec_position_after_pm(table_coordinates, 
+                                         date_obs="J2000", 
+                                         date_reference = date_reference)
         self.load_spectra()
 
     def load_spectra(self):
@@ -431,21 +454,21 @@ class Star(Target):
                     self.wavelengths.append(waves)
 
 
-    def get_radec_position_after_pm(self, date_obs):
-        if self.simbad_table is not None:
-            target_pmra = self.simbad_table[0]['PMRA'] * u.mas / u.yr
+    def get_radec_position_after_pm(self, table_coordinates, date_obs="J2000", date_reference="J2000"):
+        if table_coordinates is not None:
+            target_pmra = table_coordinates[0]['PMRA'] * u.mas / u.yr
             if np.isnan(target_pmra):
                 target_pmra = 0 * u.mas / u.yr
-            target_pmdec = self.simbad_table[0]['PMDEC'] * u.mas / u.yr
+            target_pmdec = table_coordinates[0]['PMDEC'] * u.mas / u.yr
             if np.isnan(target_pmdec):
                 target_pmdec = 0 * u.mas / u.yr
-            target_parallax = self.simbad_table[0]['PLX_VALUE'] * u.mas
+            target_parallax = table_coordinates[0]['PLX_VALUE'] * u.mas
             if target_parallax == 0 * u.mas:
                 target_parallax = 1e-4 * u.mas
             target_coord = SkyCoord(ra=self.radec_position.ra, dec=self.radec_position.dec,
                                     distance=Distance(parallax=target_parallax),
                                     pm_ra_cosdec=target_pmra, pm_dec=target_pmdec, frame='icrs', equinox="J2000",
-                                    obstime="J2000")
+                                    obstime=date_reference)
             self.radec_position_after_pm = target_coord.apply_space_motion(new_obstime=Time(date_obs))
             return self.radec_position_after_pm
         else:
