@@ -57,7 +57,13 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         """
         if not getCalspec.is_calspec(spectrum.target.label):
-            raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
+            try:
+                from gaiaspec import getGaia
+                is_gaia = getGaia.is_gaia(spectrum.target.label)
+                if not is_gaia:
+                    raise ValueError(f"{spectrum.target.label=} must be a CALSPEC or GAIA star.")
+            except:
+                raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
         self.filename = spectrum.filename.replace("spectrum", "spectrogram")
         self.diffraction_orders = np.arange(spectrum.order, spectrum.order + 3 * np.sign(spectrum.order), np.sign(spectrum.order))
