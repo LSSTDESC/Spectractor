@@ -450,6 +450,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
                                                                     order=self.diffraction_orders[0])
         M = None
+        # distance = None
         for k, order in enumerate(self.diffraction_orders):
             if self.tr[k] is None or self.params[f"A{order}"] == 0:  # diffraction order undefined
                 self.psf_profile_params[order] = None
@@ -469,6 +470,15 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.psf_profile_params[order][:, 0] = self.params[f"A{order}"] * self.tr[k](self.lambdas)
             self.psf_profile_params[order][:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0
             self.psf_profile_params[order][:, 2] += dispersion_law.imag - self.bgd_width
+
+            # if k == 0:
+            #     distance = np.abs(dispersion_law)
+            # else:
+            #     distance_order = np.abs(dispersion_law)
+            #     for p in range(3, self.psf_profile_params[order].shape[1]):
+            #         self.psf_profile_params[order][:, p] = np.copy(self.psf_profile_params[self.spectrum.order][:, p])
+            #         self.psf_profile_params[order][:, p] = interpolate.interp1d(distance, self.psf_profile_params[order][:, p],
+            #                                                kind="cubic", fill_value="extrapolate")(distance_order)
 
             # Matrix filling
             M_order = self.spectrum.chromatic_psf.build_sparse_M(self.pixels, self.psf_profile_params[order],

@@ -691,7 +691,10 @@ class Spectrum:
             if extname == "SPEC_COV":
                 hdus[extname].data = self.cov_matrix
             elif extname == "ORDER2":
-                hdus[extname].data = [self.lambdas, self.data_next_order, self.err_next_order]
+                if self.data_next_order is not None:
+                    hdus[extname].data = [self.lambdas, self.data_next_order, self.err_next_order]
+                else:
+                    hdus[extname].data = [self.lambdas, np.zeros_like(self.lambdas), np.zeros_like(self.lambdas)]
             elif extname == "ORDER0":
                 hdus[extname].data = self.target.image
                 hdus[extname].header["IM_X0"] = self.target.image_x0
