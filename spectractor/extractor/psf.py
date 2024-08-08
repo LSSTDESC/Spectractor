@@ -2837,6 +2837,8 @@ def load_PSF(psf_type=parameters.PSF_TYPE, target=None, clip=False):
         psf = MoffatGauss(clip=clip)
     elif psf_type == "Gauss":
         psf = Gauss(clip=clip)
+    elif psf_type == "DoubleMoffat":
+        psf = DoubleMoffat(clip=clip)
     elif psf_type == "Order0":
         if target is None:
             raise ValueError(f"A Target instance must be given when PSF_TYPE='Order0'. I got target={target}.")
