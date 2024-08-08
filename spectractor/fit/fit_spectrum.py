@@ -145,8 +145,15 @@ class SpectrumFitWorkspace(FitWorkspace):
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))
+        bad_indices = None
+        if len(self.outliers) > 0 or len(self.mask) > 0:
+            bad_indices = np.array(list(self.get_bad_indices()) + list(self.mask)).astype(int)
+
         plot_spectrum_simple(ax, lambdas=lambdas, data=self.data, data_err=self.err,
                              units=self.spectrum.units)
+        if bad_indices is not None:
+            plot_spectrum_simple(ax, lambdas=lambdas[bad_indices], data=self.data[bad_indices], data_err=self.err[bad_indices],
+                                 units=self.spectrum.units, color='gray')
         p0 = ax.plot(lambdas, self.model, label='model')
         ax.fill_between(lambdas, self.model - self.model_err,
                         self.model + self.model_err, alpha=0.3, color=p0[0].get_color())
@@ -168,7 +175,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax2.axhline(0, color=p0[0].get_color())
         ax2.grid(True)
         ylim = ax2.get_ylim()
-        residuals_model = self.model_err[sub][idx] / self.err[sub][idx]
+        residuals_model = self.model_err[sub][idx] / norm
         ax2.fill_between(lambdas[sub][idx], -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
         std = np.nanstd(residuals)  # max(np.std(residuals), np.std(residuals_model))
         ax2.set_ylim(-5*std, 5*std)
