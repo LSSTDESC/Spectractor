@@ -2133,7 +2133,7 @@ class DoubleMoffat(PSF):
 
     def __init__(self, values=None, clip=False):
         PSF.__init__(self, clip=clip)
-        self.values_default = np.array([1, 0, 0, 3, 2, 0.005, 3, 1.5]).astype(float)
+        self.values_default = np.array([1, 0, 0, 3, 2, 0.005, 3, 1.5, 10]).astype(float)
         if values is None:
             values = np.copy(self.values_default)
         labels = ["amplitude", "x_c", "y_c", "gamma1", "alpha1", "eta", "gamma2", "alpha2", "saturation"]
