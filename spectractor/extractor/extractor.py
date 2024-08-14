@@ -960,6 +960,16 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.params.set(r"shift_x [pix]", w.spectrum.header['PIXSHIFT'])
             w.spectrum.convert_from_flam_to_ADUrate()
 
+            # Mask forgotten cosmics
+            from spectractor.tools import mask_cosmics
+            cr_mask = mask_cosmics(w.spectrum.spectrogram_residuals, maxiter=3, sigma_clip=5, convolve_kernel_size=0)
+            if np.sum(cr_mask) > 0:
+                my_logger.info(f"\n\t{np.sum(cr_mask)} new pixels identified and masked as cosmics.")
+                cr_mask_flat = cr_mask.flatten()
+                w.mask += [i for i in range(cr_mask_flat.size) if cr_mask_flat[i]]
+                w.mask = list(set(w.mask))
+                w.mask.sort()
+
         if w.filename != "":
             parameters.SAVE = True
             w.params.plot_correlation_matrix()

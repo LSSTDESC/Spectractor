@@ -1521,6 +1521,54 @@ def fftconvolve_gaussian(array, reso):
     return array
 
 
+def mask_cosmics(data, maxiter=3, sigma_clip=5, border_mode='mirror', convolve_kernel_size=3):
+    """Simple method to mask cosmic rays, inspired from L.A. Cosmic algorithm.
+
+    Parameters
+    ----------
+    data
+    maxiter
+    border_mode
+
+    Returns
+    -------
+    mask: np.ndarray
+
+    Examples
+    --------
+    >>> data = np.zeros((50, 100))
+    >>> data[20, 50:60] = 1
+    >>> cr_mask = mask_cosmics(data, maxiter=3, convolve_kernel_size=0)
+    >>> fig = plt.figure()
+    >>> _ = plt.imshow(cr_mask, cmap='gray', aspect='auto', origin='lower')
+    >>> plt.show()
+    >>> assert np.sum(data) == np.sum(cr_mask)
+
+    """
+    from astropy.nddata import block_reduce, block_replicate
+    from scipy import ndimage
+    block_size = 2.0
+    kernel = np.array([[0.0, -1.0, 0.0], [-1.0, 4.0, -1.0], [0.0, -1.0, 0.0]])
+
+    clean_data = data.copy()
+    final_crmask = np.zeros(data.shape, dtype=bool)
+
+    for iteration in range(maxiter):
+        sampled_img = block_replicate(clean_data, block_size)
+        convolved_img = ndimage.convolve(sampled_img, kernel,
+                                     mode=border_mode)  #.clip(min=0.0)
+        laplacian_img = block_reduce(convolved_img, block_size)
+
+        final_crmask[laplacian_img > 5*np.nanstd(laplacian_img)] = True
+        clean_data[final_crmask] = np.nan
+
+    if convolve_kernel_size > 0:
+        final_crmask = fftconvolve(final_crmask,
+                               np.ones((convolve_kernel_size, convolve_kernel_size), dtype=int),
+                               mode='same').astype(int)
+    return final_crmask.astype(bool)
+
+
 def formatting_numbers(value, error_high, error_low, std=None, label=None):
     """Format a physical value and its uncertainties. Round the uncertainties
     to the first significant digit, and do the same for the physical value.
