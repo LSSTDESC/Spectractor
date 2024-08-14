@@ -1838,7 +1838,7 @@ class ChromaticPSF:
                     f"below the trace of the prior covariance matrix "
                     f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
                     f"high regularisation parameter in case of a bad fit. Therefore the final "
-                    f"covariance matrix is mulitiplied by the ratio of the traces and "
+                    f"covariance matrix is multiplied by the ratio of the traces and "
                     f"the amplitude parameters are very close the amplitude priors.")
                 r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
                 w.amplitude_cov_matrix *= r
