@@ -14,7 +14,11 @@ from spectractor.fit.fitter import (FitWorkspace, FitParameters, run_minimisatio
                                     write_fitparameter_json)
 from spectractor.tools import plot_spectrum_simple
 
-
+try:
+    from gaiaspec import getGaia
+except ModuleNotFoundError:
+    getGaia = None
+    
 class SpectrumFitWorkspace(FitWorkspace):
 
     def __init__(self, spectrum, atmgrid_file_name="", fit_angstrom_exponent=False,
@@ -58,13 +62,11 @@ class SpectrumFitWorkspace(FitWorkspace):
         """
         self.my_logger = set_logger(self.__class__.__name__)
         if not getCalspec.is_calspec(spectrum.target.label):
-            try:
-                from gaiaspec import getGaia
-                is_gaia = getGaia.is_gaia(spectrum.target.label)
+            if getGaia is not None:
+                is_gaia, _ = getGaia.is_gaia(spectrum.target.label)
                 if not is_gaia:
                     raise ValueError(f"{spectrum.target.label=} must be a CALSPEC or GAIA star.")
-            except:
-                raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
+            raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
         p = np.array([1, 0, 0.05, 1.2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size

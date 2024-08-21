@@ -15,6 +15,10 @@ from spectractor.simulation.simulator import SpectrogramModel
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 from spectractor.fit.fitter import (FitWorkspace, FitParameters, run_minimisation, run_minimisation_sigma_clipping,
                                     write_fitparameter_json)
+try:
+    from gaiaspec import getGaia
+except ModuleNotFoundError:
+    getGaia = None
 
 plot_counter = 0
 
@@ -57,13 +61,11 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         """
         if not getCalspec.is_calspec(spectrum.target.label):
-            try:
-                from gaiaspec import getGaia
-                is_gaia = getGaia.is_gaia(spectrum.target.label)
+            if getGaia is not None:
+                is_gaia, _ = getGaia.is_gaia(spectrum.target.label)
                 if not is_gaia:
                     raise ValueError(f"{spectrum.target.label=} must be a CALSPEC or GAIA star.")
-            except:
-                raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
+            raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
         self.filename = spectrum.filename.replace("spectrum", "spectrogram")
         self.diffraction_orders = np.arange(spectrum.order, spectrum.order + 3 * np.sign(spectrum.order), np.sign(spectrum.order))

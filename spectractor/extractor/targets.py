@@ -266,8 +266,10 @@ class Star(Target):
         if getGaia is None:
             is_gaia = False
         else:
-            is_gaia = getGaia.is_gaia(self.label)
-        if is_gaia:
+            is_gaia, is_online = getGaia.is_gaia(self.label)
+        if is_gaia&(not is_online):
+            # In the case where the gaia spectrum is not available in the 
+            # package data, get source info from simbadQuerier
             gaia_sources = getGaia.get_gaia_sources()
             source = gaia_sources[gaia_sources == self.label]
             table_coordinates = [{"PMRA": source["pmra"].iloc[0],
@@ -332,11 +334,11 @@ class Star(Target):
         if getGaia is None:
             is_gaia = False
         else:
-            is_gaia = getGaia.is_gaia(self.label)
+            is_gaia, cache_catalog = getGaia.is_gaia(self.label)
         if is_calspec:
             self.load_calspec()
         elif is_gaia:
-            self.load_gaia()
+            self.load_gaia(cache_catalog)
         # TODO DM-33731: the use of self.label in parameters.STAR_NAMES:
         # below works for running but breaks a test so needs fixing for DM
         elif 'HD' in self.label:  # or self.label in parameters.STAR_NAMES:  # it is a star
