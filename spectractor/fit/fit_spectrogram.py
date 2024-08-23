@@ -69,6 +69,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 if not is_gaiaspec:
                     if not is_gaia_full:
                         raise ValueError(f"{spectrum.target.label=} must be a CALSPEC or GAIA star.")
+        else:
             raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
         self.filename = spectrum.filename.replace("spectrum", "spectrogram")

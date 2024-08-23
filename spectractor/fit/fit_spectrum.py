@@ -70,7 +70,8 @@ class SpectrumFitWorkspace(FitWorkspace):
                 if not is_gaiaspec:
                     if not is_gaia_full:
                         raise ValueError(f"{spectrum.target.label=} must be a CALSPEC or GAIA star.")
-            raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
+            else:
+                raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
         p = np.array([1, 0, 0.05, 1.2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size
