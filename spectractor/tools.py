@@ -1536,9 +1536,13 @@ def mask_cosmics(data, maxiter=3, sigma_clip=5, border_mode='mirror', convolve_k
 
     Examples
     --------
-    >>> from spectractor.extractor.spectrum import Spectrum
-    >>> spec = Spectrum("/Users/jneveu/Downloads/test_auxtel_spectrum.fits")
-    >>> cr_mask = mask_cosmics(spec.spectrogram_residuals.reshape((-1,spec.spectrogram_Nx)))
+    >>> data = np.zeros((50, 100))
+    >>> data[20, 50:60] = 1
+    >>> cr_mask = mask_cosmics(data, maxiter=3, convolve_kernel_size=0)
+    >>> fig = plt.figure()
+    >>> _ = plt.imshow(cr_mask, cmap='gray', aspect='auto', origin='lower')
+    >>> plt.show()
+    >>> assert np.sum(data) == np.sum(cr_mask)
 
     """
     from astropy.nddata import block_reduce, block_replicate
@@ -1563,7 +1567,7 @@ def mask_cosmics(data, maxiter=3, sigma_clip=5, border_mode='mirror', convolve_k
                                np.ones((convolve_kernel_size, convolve_kernel_size), dtype=int),
                                mode='same').astype(int)
     return final_crmask.astype(bool)
-    
+
 
 def formatting_numbers(value, error_high, error_low, std=None, label=None):
     """Format a physical value and its uncertainties. Round the uncertainties

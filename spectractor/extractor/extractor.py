@@ -198,6 +198,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
         self.data_before_mask = np.copy(self.data)
+        self.mask_before_mask = list(np.copy(self.mask))
         self.W_before_mask = np.copy(self.W)
         self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
 
@@ -317,18 +318,18 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 self.boundaries[order]["ymin"] = np.zeros_like(self.boundaries[order]["ymin"])
                 self.boundaries[order]["ymax"] = self.Ny * np.ones_like(self.boundaries[order]["ymax"])
             self.psf_cube_sparse_indices[order], self.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(self.boundaries[order])
-        mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
+        # mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
         # cumulate the boolean values as int
         weight_mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]], axis=0)
         # look for indices with maximum weight per column (all sheets of the psf cube have contributed)
         res = np.max(weight_mask, axis=0)[np.newaxis,:] * np.ones((weight_mask.shape[0],1))
         # keep only the pixels where all psf_cube sheets have contributed per column
         mask = (weight_mask != res).ravel()
-        self.W = np.copy(self.W_before_mask)
-        self.W[mask] = 0
-        self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
-        self.mask += list(np.where(mask)[0])
+        self.mask = list(self.mask_before_mask) + list(np.where(mask)[0])
         self.mask = list(set(self.mask))
+        self.W = np.copy(self.W_before_mask)
+        self.W[self.mask] = 0
+        self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
 
     def simulate(self, *params):
         r"""

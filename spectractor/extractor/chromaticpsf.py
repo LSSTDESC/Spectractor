@@ -1839,7 +1839,7 @@ class ChromaticPSF:
                     f"below the trace of the prior covariance matrix "
                     f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
                     f"high regularisation parameter in case of a bad fit. Therefore the final "
-                    f"covariance matrix is mulitiplied by the ratio of the traces and "
+                    f"covariance matrix is multiplied by the ratio of the traces and "
                     f"the amplitude parameters are very close the amplitude priors.")
                 r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
                 w.amplitude_cov_matrix *= r
@@ -1940,6 +1940,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
         self.profile_params = self.chromatic_psf.from_poly_params_to_profile_params(self.poly_params)
         self.data_before_mask = np.copy(self.data)
+        self.mask_before_mask = list(np.copy(self.mask))
         self.boundaries = None
         self.psf_cube_sparse_indices = None
         self.psf_cube_masked = None
@@ -2075,19 +2076,19 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.psf_cube_masked = self.chromatic_psf.convolve_psf_cube_masked(psf_cube_masked)
         self.boundaries, self.psf_cube_masked = self.chromatic_psf.set_rectangular_boundaries(self.psf_cube_masked)
         self.psf_cube_sparse_indices, self.M_sparse_indices = self.chromatic_psf.get_sparse_indices(self.boundaries)
-        mask = np.sum(self.psf_cube_masked.reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
+        # mask = np.sum(self.psf_cube_masked.reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
         # cumulate the boolean values as int
         weight_mask = np.sum(self.psf_cube_masked, axis=0)
         # look for indices with maximum weight per column (all sheets of the psf cube have contributed)
         res = np.max(weight_mask, axis=0)[np.newaxis,:] * np.ones((weight_mask.shape[0],1))
         # keep only the pixels where all psf_cube sheets have contributed per column
         mask = (weight_mask != res).ravel()
+        self.mask = list(self.mask_before_mask) + list(np.where(mask)[0])
+        self.mask = list(set(self.mask))
         W = np.copy(self.W_before_mask.data.ravel())
-        W[mask] = 0
+        W[self.mask] = 0
         self.W = sparse.diags(W, dtype="float32", format="dia")
         self.sqrtW = self.W.sqrt()
-        self.mask += list(np.where(mask)[0])
-        self.mask = list(set(self.mask))
 
     def simulate(self, *shape_params):
         r"""
