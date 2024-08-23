@@ -264,10 +264,10 @@ class Star(Target):
         # at some random time later
 
         if getGaia is None:
-            is_gaia = False
+            is_gaiaspec = False
         else:
-            is_gaia, is_online = getGaia.is_gaia(self.label)
-        if is_gaia&(not is_online):
+            is_gaiaspec = getGaia.is_gaiaspec(self.label)
+        if is_gaiaspec:
             # In the case where the gaia spectrum is not available in the 
             # package data, get source info from simbadQuerier
             gaia_sources = getGaia.get_gaia_sources()
@@ -332,13 +332,17 @@ class Star(Target):
         # first try if it is a Calspec star
         is_calspec = getCalspec.is_calspec(self.label)
         if getGaia is None:
-            is_gaia = False
+            is_gaiaspec = False
+            is_gaia_full = False
         else:
-            is_gaia, cache_catalog = getGaia.is_gaia(self.label)
+            is_gaiaspec = getGaia.is_gaiaspec(self.label)
+            is_gaia_full = False
+            if is_gaiaspec == False:
+                is_gaia_full = getGaia.is_gaia_full(self.label)
         if is_calspec:
             self.load_calspec()
-        elif is_gaia:
-            self.load_gaia(cache_catalog)
+        elif is_gaiaspec|is_gaia_full:
+            self.load_gaia()
         # TODO DM-33731: the use of self.label in parameters.STAR_NAMES:
         # below works for running but breaks a test so needs fixing for DM
         elif 'HD' in self.label:  # or self.label in parameters.STAR_NAMES:  # it is a star

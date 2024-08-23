@@ -62,9 +62,13 @@ class SpectrogramFitWorkspace(FitWorkspace):
         """
         if not getCalspec.is_calspec(spectrum.target.label):
             if getGaia is not None:
-                is_gaia, _ = getGaia.is_gaia(spectrum.target.label)
-                if not is_gaia:
-                    raise ValueError(f"{spectrum.target.label=} must be a CALSPEC or GAIA star.")
+                is_gaiaspec = getGaia.is_gaiaspec(spectrum.target.label)
+                is_gaia_full = False
+                if is_gaiaspec == False:
+                    is_gaia_full = getGaia.is_gaia_full(spectrum.target.label)
+                if not is_gaiaspec:
+                    if not is_gaia_full:
+                        raise ValueError(f"{spectrum.target.label=} must be a CALSPEC or GAIA star.")
             raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
         self.filename = spectrum.filename.replace("spectrum", "spectrogram")
