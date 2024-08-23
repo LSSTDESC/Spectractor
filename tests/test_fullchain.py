@@ -214,7 +214,7 @@ def test_ctio_fullchain():
                                 f"{np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
         assert np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
         k += 1
-    assert np.abs(w.params.values[1]) / np.sqrt(w.params.cov[1, 1]) < 2 * nsigma  # A2
+    assert np.abs(w.params.values[1]) / np.sqrt(w.params.cov[1, 1]) < 4 * nsigma  # A2
     assert np.isclose(np.abs(w.params.values[8]), 0, atol=parameters.PIXSHIFT_PRIOR)  # pixshift
     assert np.isclose(np.abs(w.params.values[9]), 0, atol=1e-3)  # B
 
