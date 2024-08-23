@@ -62,7 +62,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.spectrum = spectrum
         p = np.array([1, 0, 0.05, 1.2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size
-        # fixed[0] = True
+        fixed[0] = True
         fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
         fixed[5] = False
         # fixed[6:8] = [True, True]
@@ -71,7 +71,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         # fixed[-1] = True
         if not fit_angstrom_exponent:
             fixed[3] = True  # angstrom_exponent
-        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (0, 3), (100, 700), (0, 20),
+        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 1), (0, 3), (100, 700), (0, 20),
                        (0.1, 10),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
                   (-2, 2), (-np.inf, np.inf)]
         params = FitParameters(p, labels=["A1", "A2", "VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]",
@@ -330,7 +330,7 @@ def lnprob_spectrum(p):  # pragma: no cover
     return lp + w.lnlike(p)
 
 
-def run_spectrum_minimisation(fit_workspace, method="newton"):
+def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
     """Interface function to fit spectrum simulation parameters to data.
 
     Parameters
@@ -373,16 +373,14 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         #                                 verbose=False)
 
         fit_workspace.simulation.fast_sim = False
-        # fit_workspace.fixed[0] = True
         fixed = copy.copy(fit_workspace.params.fixed)
-        fit_workspace.params.fixed = [True] * len(fit_workspace.params.values)
-        fit_workspace.params.fixed[0] = False
-        run_minimisation(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-3, ftol=100 / fit_workspace.data.size,
-                         verbose=False)
-        # fit_workspace.fixed[0] = False
+        #fit_workspace.params.fixed = [True] * len(fit_workspace.params.values)
+        #fit_workspace.params.fixed[0] = False
+        #run_minimisation(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-3, ftol=100 / fit_workspace.data.size,
+        #                 verbose=False)
         fit_workspace.params.fixed = fixed
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-6,
-                                        ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3, verbose=False)
+                                        ftol=1 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False)
 
         fit_workspace.params.plot_correlation_matrix()
         fit_workspace.plot_fit()
