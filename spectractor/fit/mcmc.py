@@ -346,7 +346,8 @@ class Contours(Grid):
         if plot:
             plt.xlabel(self.axis_names[0])
             plt.ylabel(self.axis_names[1])
-            plt.show()
+            if parameters.DISPLAY:
+                plt.show()
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
 

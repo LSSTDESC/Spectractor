@@ -929,7 +929,8 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
             plt.figure(figsize=(5, 5))
             plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
                                 target_pixcoords=[theX - x0 + Dx, theX - x0 + Dx])
-            plt.show()
+            if parameters.DISPLAY:
+                plt.show()
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
 

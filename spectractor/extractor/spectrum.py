@@ -622,7 +622,8 @@ class Spectrum:
         fig.subplots_adjust(hspace=0)
         if save_as:
             plt.savefig(save_as)
-        plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
     def save_spectrum(self, output_file_name, overwrite=False):
         """Save the spectrum into a fits file (data, error and wavelengths).
