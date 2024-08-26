@@ -1787,8 +1787,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             Y = -Gauss / Continuum
             Ydata = 1 - spectr_data / Continuum
 
-            line.fit_eqwidth_mod = integrate.simps(Y, x_int)  # sol1
-            line.fit_eqwidth_data = integrate.simps(Ydata, x_int)  # sol2
+            line.fit_eqwidth_mod = integrate.simpson(Y, x=x_int)  # sol1
+            line.fit_eqwidth_data = integrate.simpson(Ydata, x=x_int)  # sol2
 
             line.fit_popt = popt
             line.fit_pcov = pcov
