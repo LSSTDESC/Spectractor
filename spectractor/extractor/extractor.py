@@ -16,7 +16,7 @@ from spectractor.extractor.spectrum import Spectrum, calibrate_spectrum
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
-from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple
+from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple, mask_cosmics
 from spectractor.fit.fitter import (run_minimisation, run_minimisation_sigma_clipping, write_fitparameter_json,
                                     RegFitWorkspace, FitWorkspace, FitParameters)
 
@@ -85,7 +85,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                   [D2CCD - 3 * parameters.DISTANCE2CCD_ERR, D2CCD + 3 * parameters.DISTANCE2CCD_ERR],
                   [-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR],
                   [-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR],
-                  [-90, 90], [0.2, 5], [0.5, 2], [-360, 360], [300, 1100], [-100, 100], [1.001, 3]]
+                  [-90, 90], [0.2, 5], [0.5, 2], [-360, 360], [0, np.inf], [-100, 100], [1.001, 3]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
         fixed = [False] * p.size
         for k, par in enumerate(input_labels):
@@ -96,10 +96,16 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 fixed[k] = True
                 p[k] = 0
         for k, par in enumerate(input_labels):
-            if "y_c" in par and (("y_c_0" not in par and "y_c_1" not in par) or (par[-2:] == "_2" or par[-2:] == "_3")):
-                fixed[k] = False
+            #if "y_c" in par and (("y_c_0" not in par and "y_c_1" not in par)) and par[-2:] == f"_{spectrum.order}": # or (par[-2:] == "_2" or par[-2:] == "_3")):
+            #    fixed[k] = False
+            #    p[k] = 0
+            #if k >= self.psf_params_start_index[0] and "y_c" in par and par[-2:] != f"_{spectrum.order}": # and (("y_c_0" in par or "y_c_1" in par)): # or (par[-2:] == "_2" or par[-2:] == "_3")):
+            #    fixed[k] = False
+            #    p[k] = 0
+            if k >= self.psf_params_start_index[0] and "y_c" not in par and "x_c" not in par and par[-2:] != f"_{spectrum.order}" and "_0_" not in par:
+                fixed[k] = True
                 p[k] = 0
-            elif k >= self.psf_params_start_index[0] and "y_c" not in par and "x_c" not in par and par[-2:] != f"_{spectrum.order}" and "_0_" not in par:
+            if k >= self.psf_params_start_index[0] and "eta" in par and par[-2:] != f"_{spectrum.order}":
                 fixed[k] = True
                 p[k] = 0
 
@@ -120,7 +126,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         params.fixed[params.get_index("angle [deg]")] = False  # angle
         params.fixed[params.get_index("B")] = True  # B: not needed in simulations, to check with data
         params.fixed[params.get_index("R")] = True  # camera rot
-        params.fixed[params.get_index("P [hPa]")] = True  # pressure
+        params.fixed[params.get_index("P [hPa]")] = False  # pressure
         params.fixed[params.get_index("T [Celsius]")] = True  # temperature
         params.fixed[params.get_index("z")] = True  # airmass
 
@@ -191,6 +197,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
         self.data_before_mask = np.copy(self.data)
+        self.mask_before_mask = list(np.copy(self.mask))
         self.W_before_mask = np.copy(self.W)
         self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
 
@@ -310,18 +317,18 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 self.boundaries[order]["ymin"] = np.zeros_like(self.boundaries[order]["ymin"])
                 self.boundaries[order]["ymax"] = self.Ny * np.ones_like(self.boundaries[order]["ymax"])
             self.psf_cube_sparse_indices[order], self.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(self.boundaries[order])
-        mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
+        # mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
         # cumulate the boolean values as int
         weight_mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]], axis=0)
         # look for indices with maximum weight per column (all sheets of the psf cube have contributed)
         res = np.max(weight_mask, axis=0)[np.newaxis,:] * np.ones((weight_mask.shape[0],1))
         # keep only the pixels where all psf_cube sheets have contributed per column
         mask = (weight_mask != res).ravel()
-        self.W = np.copy(self.W_before_mask)
-        self.W[mask] = 0
-        self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
-        self.mask += list(np.where(mask)[0])
+        self.mask = list(self.mask_before_mask) + list(np.where(mask)[0])
         self.mask = list(set(self.mask))
+        self.W = np.copy(self.W_before_mask)
+        self.W[self.mask] = 0
+        self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
 
     def simulate(self, *params):
         r"""
@@ -939,8 +946,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.chromatic_psf.table["amplitude"] = np.copy(w.amplitude_params)
             w.spectrum.chromatic_psf.from_profile_params_to_shape_params(w.psf_profile_params[w.diffraction_orders[0]])
             w.spectrum.chromatic_psf.params.values = w.spectrum.chromatic_psf.from_table_to_poly_params()
-            w.spectrum.spectrogram_fit = w.model
-            w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err
+            w.spectrum.spectrogram_fit = w.model.reshape((w.Ny, w.Nx))
+            w.spectrum.spectrogram_residuals = (w.data.reshape((w.Ny, w.Nx)) - w.spectrum.spectrogram_fit) / w.err.reshape((w.Ny, w.Nx))
             w.spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask))
             w.spectrum.header['PIXSHIFT'] = w.params[r"shift_x [pix]"]
             w.spectrum.header['D2CCD'] = w.params[r"D_CCD [mm]"]
@@ -958,6 +965,15 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.params.set(r"D_CCD [mm]", w.spectrum.disperser.D)
             w.params.set(r"shift_x [pix]", w.spectrum.header['PIXSHIFT'])
             w.spectrum.convert_from_flam_to_ADUrate()
+
+            # Mask forgotten cosmics
+            cr_mask = mask_cosmics(w.spectrum.spectrogram_residuals, maxiter=3, sigma_clip=5, convolve_kernel_size=0)
+            if np.sum(cr_mask) > 0:
+                my_logger.info(f"\n\t{np.sum(cr_mask)} new pixels identified and masked as cosmics.")
+                cr_mask_flat = cr_mask.flatten()
+                w.mask += [i for i in range(cr_mask_flat.size) if cr_mask_flat[i]]
+                w.mask = list(set(w.mask))
+                w.mask.sort()
 
         if w.filename != "":
             parameters.SAVE = True

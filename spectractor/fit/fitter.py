@@ -1658,12 +1658,14 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
             data = np.concatenate(fit_workspace.data).ravel()  # [indices_no_nan]
             model = np.concatenate(fit_workspace.model).ravel()  # [indices_no_nan]
             err = np.concatenate(fit_workspace.err).ravel()  # [indices_no_nan]
+            model_err = np.concatenate(fit_workspace.model_err).ravel()  # [indices_no_nan]
         else:
             # indices_no_nan = ~np.isnan(fit_workspace.data.flatten())
             data = fit_workspace.data.flatten()  # [indices_no_nan]
             model = fit_workspace.model.flatten()  # [indices_no_nan]
             err = fit_workspace.err.flatten()  # [indices_no_nan]
-        residuals = np.abs(data - model) / err
+            model_err = fit_workspace.model_err.flatten()  # [indices_no_nan]
+        residuals = np.abs(data - model) / np.sqrt(err**2 + model_err**2)
         outliers = residuals > sigma_clip
         outliers = [i for i in range(data.size) if outliers[i]]
         outliers.sort()
