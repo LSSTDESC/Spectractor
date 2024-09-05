@@ -85,7 +85,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                   [D2CCD - 3 * parameters.DISTANCE2CCD_ERR, D2CCD + 3 * parameters.DISTANCE2CCD_ERR],
                   [-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR],
                   [-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR],
-                  [-90, 90], [0.2, 5], [0.5, 2], [-360, 360], [0, np.inf], [-100, 100], [1.001, 3]]
+                  [-90, 90], [0.2, 5], [0., np.inf], [-360, 360], [0, np.inf], [-100, 100], [1.001, 3]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
         fixed = [False] * p.size
         for k, par in enumerate(input_labels):
@@ -1328,7 +1328,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     if image.mask_rotated is not None:
         mask = image.mask_rotated[ymin:ymax, xmin:xmax]
     else:
-        mask = None
+        mask = np.zeros_like(data).astype(bool)
 
     Ny, Nx = data.shape
     my_logger.info(f'\n\tExtract spectrogram: crop rotated image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
@@ -1357,6 +1357,14 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     # Fit the transverse profile
     my_logger.info('\n\t  ======================= Fit the transverse profile =============================')
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
+    # clean the data: this is truly a backward spectrum extraction to feed correctly the forward model
+    # if available, subtract starfield before 1D spectrum estimate
+    # it is important to have a clean 1D spectrum as it is used as a prior for regularisation
+    if image.starfield_rotated is not None:
+        # data -= image.starfield_rotated[ymin:ymax, xmin:xmax]
+        starfield = np.copy(image.starfield_rotated[ymin:ymax, xmin:xmax])
+        mask += starfield > 2 * np.median(starfield) # + np.std(starfield)
+
     psf = load_PSF(psf_type=parameters.PSF_TYPE, target=image.target, clip=False)
     s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
                      deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
@@ -1364,12 +1372,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     debug = copy.copy(parameters.DEBUG)
     parameters.VERBOSE = False
     parameters.DEBUG = False
-
-    # clean the data: this is truly a backward spectrum extraction to feed correctly the forward model
-    # if available, subtract starfield before 1D spectrum estimate
-    # it is important to have a clean 1D spectrum as it is used as a prior for regularisation
-    if image.starfield_rotated is not None:
-        data -= image.starfield_rotated[ymin:ymax, xmin:xmax]
 
     s.fit_transverse_PSF1D_profile(data, err, signal_width, ws, pixel_step=parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT,
                                    sigma_clip=5, bgd_model_func=bgd_model_func, saturation=image.saturation,
@@ -1384,6 +1386,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     my_logger.debug(f'\n\tTransverse fit table:\n{s.table}')
     if parameters.DEBUG:
         s.plot_summary()
+        spectrum.lambdas = spectrum.pixels
+        spectrum.plot_spectrum(xlim=[xmin, xmax])
 
     # Fit the data:
     method = "noprior"
@@ -1416,6 +1420,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     spectrum.err = np.copy(w.amplitude_params_err[:new_Nx])
     spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix[:new_Nx, :new_Nx])
     spectrum.chromatic_psf = s
+    spectrum.lambdas = np.arange(0, spectrum.data.size, 1)
+    spectrum.plot_spectrum(xlim=[0, spectrum.data.size])
 
     # Extract the spectrogram edges
     Ny, Nx = image.data.shape
@@ -1610,8 +1616,8 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
         data /= spectrum.spectrogram_flat
     # if available, subtract starfield before 1D spectrum estimate
     # (important as it is used as a prior for regularisation)
-    if spectrum.spectrogram_starfield is not None:
-        data -= spectrum.spectrogram_starfield
+    #if spectrum.spectrogram_starfield is not None:
+    #    data -= spectrum.spectrogram_starfield
 
     my_logger.info('\n\t  ======================= ChromaticPSF2D polynomial fit  =============================')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, live_fit=False, mask=spectrum.spectrogram_mask,
@@ -1638,6 +1644,7 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
 
     # Plot FHWM(lambda)
     if parameters.DEBUG:  # pragma: no cover
+        spectrum.plot_spectrum()
         fig, ax = plt.subplots(2, 1, figsize=(10, 8), sharex="all")
         ax[0].plot(spectrum.lambdas, np.array(s.table['fwhm']))
         ax[0].set_xlabel(r"$\lambda$ [nm]")
