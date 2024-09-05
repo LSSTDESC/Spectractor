@@ -2093,8 +2093,9 @@ class PSFFitWorkspace(FitWorkspace):
             if self.bgd_model_func is not None:
                 data = data + self.bgd_model_func(self.pixels)
             ax[0].errorbar(self.pixels, data, yerr=self.err, fmt='ro', label="Data")
-            if len(self.outliers) > 0:
-                ax[0].errorbar(self.outliers, data[self.outliers], yerr=self.err[self.outliers], fmt='go',
+            if len(self.outliers) > 0 or len(self.mask) > 0:
+                bads = list(np.unique(np.concatenate([self.mask, self.outliers])).astype(int))
+                ax[0].errorbar(bads, data[bads], yerr=self.err[bads], fmt='go',
                                label=rf"Outliers ({self.sigma_clip}$\sigma$)")
             if self.bgd_model_func is not None:
                 ax[0].plot(self.pixels, self.bgd_model_func(self.pixels), 'b--', label="fitted bgd")
@@ -2124,10 +2125,11 @@ class PSFFitWorkspace(FitWorkspace):
             residuals = (data - model) / self.err
             residuals_err = np.ones_like(self.err)
             ax[1].errorbar(self.pixels, residuals, yerr=residuals_err, fmt='ro')
-            if len(self.outliers) > 0:
-                residuals_outliers = (data[self.outliers] - model[self.outliers]) / self.err[self.outliers]
+            if len(self.outliers) > 0 or len(self.mask) > 0:
+                bads = list(np.unique(np.concatenate([self.mask, self.outliers])).astype(int))
+                residuals_outliers = (data[bads] - model[bads]) / self.err[bads]
                 residuals_outliers_err = np.ones_like(residuals_outliers)
-                ax[1].errorbar(self.outliers, residuals_outliers, yerr=residuals_outliers_err, fmt='go')
+                ax[1].errorbar(bads, residuals_outliers, yerr=residuals_outliers_err, fmt='go')
             ax[1].axhline(0, color='b')
             ax[1].grid(True)
             std = np.std(residuals)

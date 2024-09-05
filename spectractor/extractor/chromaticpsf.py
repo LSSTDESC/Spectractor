@@ -1480,7 +1480,7 @@ class ChromaticPSF:
             plt.show()
 
     def fit_transverse_PSF1D_profile(self, data, err, w, ws, pixel_step=1, bgd_model_func=None, saturation=None,
-                                     live_fit=False, sigma_clip=5):
+                                     live_fit=False, sigma_clip=5, mask=None):
         """
         Fit the transverse profile of a 2D data image with a PSF profile.
         Loop is done on the x-axis direction.
@@ -1525,6 +1525,7 @@ class ChromaticPSF:
         >>> bgd += 1000*np.exp(-((xx-20)**2+(yy-10)**2)/(2*2))
         >>> data += bgd
         >>> data_errors = np.sqrt(data+1)
+        >>> mask = bgd > np.median(bgd)
 
         Extract the background:
 
@@ -1533,8 +1534,8 @@ class ChromaticPSF:
         Fit the transverse profile:
 
         >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=4, saturation=saturation)
-        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=5,
-        ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False, sigma_clip=5)
+        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=5, mask=mask,
+        ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False, sigma_clip=5,)
         >>> s.plot_summary(truth=s0)
 
         ..  doctest::
@@ -1645,8 +1646,12 @@ class ChromaticPSF:
             psf.params.bounds = bounds
             w = PSFFitWorkspace(psf, signal, data_errors=err[:, x], bgd_model_func=None,
                                 live_fit=False, verbose=False, jacobian_analytical=True)
+            if mask is not None:
+                w.mask = list(np.where(mask[:, x])[0])
             try:
                 run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma_clip, niter_clip=1, verbose=False)
+                if x>10 and x<40:
+                    w.plot_fit()
             except:
                 pass
             best_fit = w.params.values
