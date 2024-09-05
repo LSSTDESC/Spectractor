@@ -687,6 +687,7 @@ class FitWorkspace:
         self.err = None
         self.data_cov = None
         self.W = None
+        self.W_before_mask = None
         self.x = None
         self.outliers = []
         self.mask = []
@@ -707,22 +708,29 @@ class FitWorkspace:
         Examples
         --------
         >>> w = FitWorkspace()
-        >>> w.data = np.array([np.array([1,2,3]), np.array([1,2,3,4])], dtype=object)
+        >>> w.data = np.array([1,2,3,4,5,6])
+        >>> w.mask = [2, 4]
         >>> w.outliers = [2, 6]
         >>> w.get_bad_indices()
-        [array([2]), array([3])]
+        array([2, 4, 6])
+        >>> w.data = np.array([np.array([1,2,3]), np.array([1,2,3,4])], dtype=object)
+        >>> w.mask = [2, 4]
+        >>> w.outliers = [2, 6]
+        >>> w.get_bad_indices()
+        [array([2]), array([1, 3])]
         """
-        bad_indices = np.asarray(self.outliers, dtype=int)
+        bad_indices = np.unique(np.concatenate([self.outliers, self.mask])).astype(int)
         if self.data.dtype == object:
-            if len(self.outliers) > 0:
+            if len(self.outliers) > 0 or len(self.mask) > 0:
                 bad_indices = []
+                bads = np.unique(np.concatenate([self.outliers, self.mask])).astype(int)
                 start_index = 0
                 for k in range(self.data.shape[0]):
                     mask = np.zeros(self.data[k].size, dtype=bool)
-                    outliers = np.asarray(self.outliers)[np.logical_and(np.asarray(self.outliers) > start_index,
-                                                                        np.asarray(self.outliers) < start_index +
+                    bad = np.asarray(bads)[np.logical_and(np.asarray(bads) > start_index,
+                                                                        np.asarray(bads) < start_index +
                                                                         self.data[k].size)]
-                    mask[outliers - start_index] = True
+                    mask[bad - start_index] = True
                     bad_indices.append(np.arange(self.data[k].size)[mask])
                     start_index += self.data[k].size
             else:
@@ -852,7 +860,8 @@ class FitWorkspace:
 
     def prepare_weight_matrices(self):
         r"""Compute weight matrix :math:`\mathbf{W}` `self.W` as the inverse of data covariance matrix `self.data_cov`.
-        Cancel weights of data outliers given by `self.outliers`.
+        Cancel weights of data outliers given by `self.outliers` or masked data given by `self.mask`.
+        It uses `self.W_before_mask` to reset the null weights at each computation.
 
         Examples
         --------
@@ -886,8 +895,8 @@ class FitWorkspace:
 
         Use sparse matrix:
 
-        >>> w.W = scipy.sparse.diags(np.ones(3))
-        >>> w.W.toarray()
+        >>> w.W_before_mask = scipy.sparse.diags(np.ones(3))
+        >>> w.W_before_mask.toarray()
         array([[1., 0., 0.],
                [0., 1., 0.],
                [0., 0., 1.]])
@@ -899,29 +908,39 @@ class FitWorkspace:
                [0., 1., 0.],
                [0., 0., 0.]])
 
+        Add mask but no outliers on same matrix:
+
+        >>> w.outliers = []
+        >>> w.mask = np.array([1])
+        >>> w.prepare_weight_matrices()
+        >>> w.W.toarray()
+        array([[1., 0., 0.],
+               [0., 0., 0.],
+               [0., 0., 1.]])
 
         """
         # Prepare covariance matrix for data
         if self.data_cov is None:
             self.data_cov = np.asarray(self.err.flatten() ** 2)
         # Prepare inverse covariance matrix for data
-        if self.W is None:
+        if self.W_before_mask is None:
             if self.data_cov.ndim == 1 and self.data_cov.dtype != object:
-                self.W = 1 / self.data_cov
+                self.W_before_mask = 1 / self.data_cov
             elif self.data_cov.ndim == 2 and self.data_cov.dtype != object:
-                self.W = np.linalg.inv(self.data_cov)
+                self.W_before_mask = np.linalg.inv(self.data_cov)
             elif self.data_cov.dtype is object:
                 if self.data_cov[0].ndim == 1:
-                    self.W = np.array([1 / self.data_cov[k] for k in range(self.data_cov.shape[0])])
+                    self.W_before_mask = np.array([1 / self.data_cov[k] for k in range(self.data_cov.shape[0])])
                 else:
-                    self.W = []
+                    self.W_before_mask = []
                     for k in range(len(self.data_cov)):
                         L = np.linalg.inv(np.linalg.cholesky(self.data_cov[k]))
-                        self.W[k] = L.T @ L
-                    self.W = np.asarray(self.W)
-        if len(self.outliers) > 0:
+                        self.W_before_mask[k] = L.T @ L
+                    self.W_before_mask = np.asarray(self.W_before_mask)
+        self.W = self.W_before_mask.copy()
+        if len(self.outliers) > 0 or len(self.mask) > 0:
             bad_indices = self.get_bad_indices()
-            if not scipy.sparse.issparse(self.W):
+            if not scipy.sparse.issparse(self.W_before_mask):
                 if self.W.ndim == 1 and self.W.dtype != object:
                     self.W[bad_indices] = 0
                 elif self.W.ndim == 2 and self.W.dtype != object:
@@ -1031,13 +1050,13 @@ class FitWorkspace:
                 elif self.W.ndim == 2 and self.W.dtype != object:
                     cov = self.data_cov + np.diag(model_err * model_err)
                     self.W = np.linalg.inv(cov)
-                # needs to reapply the mask of outliers
+                # needs to reapply the mask of outliers and masked data
                 self.W[zeros] = 0
             else:
                 cov = self.data_cov + np.diag(model_err * model_err)
                 L = np.linalg.inv(np.linalg.cholesky(cov))
                 W = L.T @ L
-                # needs to reapply the mask of outliers
+                # needs to reapply the mask of outliers and masked data
                 rows, cols = self.W.nonzero()
                 self.W = scipy.sparse.csr_matrix((W[rows, cols], (rows, cols)), dtype=self.W.dtype, shape=self.W.shape)
         return self.W

@@ -1945,6 +1945,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
         self.profile_params = self.chromatic_psf.from_poly_params_to_profile_params(self.poly_params)
         self.data_before_mask = np.copy(self.data)
+        self.mask_before_mask = list(np.copy(self.mask))
         self.boundaries = None
         self.psf_cube_sparse_indices = None
         self.psf_cube_masked = None
@@ -1959,7 +1960,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # (which is not exactly true in rotated images)
         self.data_cov = sparse.diags(self.err * self.err, dtype="float32", format="dia")
         self.W = sparse.diags(1 / (self.err * self.err), dtype="float32", format="dia")
-        self.sqrtW = self.W.sqrt()
         self.W_before_mask = self.W.copy()
 
         # design matrix
@@ -2088,11 +2088,11 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # keep only the pixels where all psf_cube sheets have contributed per column
         mask = (weight_mask != res).ravel()
         W = np.copy(self.W_before_mask.data.ravel())
-        W[mask] = 0
-        self.W = sparse.diags(W, dtype="float32", format="dia")
-        self.sqrtW = self.W.sqrt()
+        self.mask = list(np.copy(self.mask_before_mask))
         self.mask += list(np.where(mask)[0])
         self.mask = list(set(self.mask))
+        W[self.mask] = 0
+        self.W = sparse.diags(W, dtype="float32", format="dia")
 
     def simulate(self, *shape_params):
         r"""
@@ -2287,7 +2287,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             M = self.chromatic_psf.build_sparse_M(self.pixels, profile_params, dtype="float32",
                                                   M_sparse_indices=self.M_sparse_indices, boundaries=self.boundaries)
 
-            M_dot_W = M.T @ self.sqrtW
+            M_dot_W = M.T @ self.W.sqrt()
             W_dot_data = self.W @ self.data
             # Compute the minimizing amplitudes
             if sparse_dot_mkl is None:

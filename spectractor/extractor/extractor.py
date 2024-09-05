@@ -191,8 +191,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
         self.data_before_mask = np.copy(self.data)
-        self.W_before_mask = np.copy(self.W)
-        self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
+        self.W_before_mask = self.W.copy()
+        self.mask_before_mask = list(np.copy(self.mask))
 
         # design matrix
         self.M = None
@@ -317,11 +317,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         res = np.max(weight_mask, axis=0)[np.newaxis,:] * np.ones((weight_mask.shape[0],1))
         # keep only the pixels where all psf_cube sheets have contributed per column
         mask = (weight_mask != res).ravel()
-        self.W = np.copy(self.W_before_mask)
-        self.W[mask] = 0
-        self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
+        self.W = self.W_before_mask.copy()
+        self.mask = list(np.copy(self.mask_before_mask))
         self.mask += list(np.where(mask)[0])
         self.mask = list(set(self.mask))
+        self.W[self.mask] = 0
 
     def simulate(self, *params):
         r"""
@@ -498,7 +498,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
-            M_dot_W = M.T @ self.sqrtW
+            M_dot_W = M.T @ sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
             if sparse_dot_mkl is None:
                 M_dot_W_dot_M = M_dot_W @ M_dot_W.T
             else:
