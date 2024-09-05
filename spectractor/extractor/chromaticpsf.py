@@ -1650,8 +1650,6 @@ class ChromaticPSF:
                 w.mask = list(np.where(mask[:, x])[0])
             try:
                 run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma_clip, niter_clip=1, verbose=False)
-                if x>10 and x<40:
-                    w.plot_fit()
             except:
                 pass
             best_fit = w.params.values
