@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from astropy.io import fits, ascii
 import astropy.units as u
 from astropy.table import Table
+from astropy.table.column import MaskedColumn
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, Distance
 
@@ -102,7 +103,7 @@ def load_gaia_catalog(coord, radius=5 * u.arcmin, gaia_mag_g_limit=23):
     job = Gaia.cone_search_async(coord, radius=radius, verbose=False, columns=['ra', 'dec', 'pmra', 'pmdec', 'ref_epoch',
                                                                                'parallax', 'phot_g_mean_mag'])
     my_logger.debug(f"\n\t{job}")
-    gaia_catalog = job.get_results()
+    gaia_catalog = MaskedColumn(job.get_results())
     my_logger.debug(f"\n\t{gaia_catalog}")
     gaia_catalog = gaia_catalog[gaia_catalog["phot_g_mean_mag"]<gaia_mag_g_limit]
     gaia_catalog.fill_value = 0
@@ -323,7 +324,7 @@ class Astrometry():  # pragma: no cover
         self.gaia_radec_positions_after_pm = None
         if os.path.isfile(self.gaia_file_name):
             self.my_logger.info(f"\n\tLoad Gaia catalog from {self.gaia_file_name}.")
-            self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
+            self.gaia_catalog = Table(ascii.read(self.gaia_file_name, format="ecsv"), masked=True)
             self.gaia_radec_positions_after_pm = get_gaia_coords_after_proper_motion(self.gaia_catalog, self.image.date_obs)
         self.sources = None
         self.sources_radec_positions = None
