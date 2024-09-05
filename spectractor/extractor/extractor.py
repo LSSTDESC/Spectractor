@@ -197,9 +197,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
         self.data_before_mask = np.copy(self.data)
+        self.W_before_mask = self.W.copy()
         self.mask_before_mask = list(np.copy(self.mask))
-        self.W_before_mask = np.copy(self.W)
-        self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
 
         # design matrix
         self.M = None
@@ -324,11 +323,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         res = np.max(weight_mask, axis=0)[np.newaxis,:] * np.ones((weight_mask.shape[0],1))
         # keep only the pixels where all psf_cube sheets have contributed per column
         mask = (weight_mask != res).ravel()
-        self.mask = list(self.mask_before_mask) + list(np.where(mask)[0])
+        self.W = self.W_before_mask.copy()
+        self.mask = list(np.copy(self.mask_before_mask))
+        self.mask += list(np.where(mask)[0])
         self.mask = list(set(self.mask))
-        self.W = np.copy(self.W_before_mask)
         self.W[self.mask] = 0
-        self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
 
     def simulate(self, *params):
         r"""
@@ -457,6 +456,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
                                                                     order=self.diffraction_orders[0])
         M = None
+        # distance = None
         for k, order in enumerate(self.diffraction_orders):
             if self.tr[k] is None or self.params[f"A{order}"] == 0:  # diffraction order undefined
                 self.psf_profile_params[order] = None
@@ -477,6 +477,15 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.psf_profile_params[order][:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0
             self.psf_profile_params[order][:, 2] += dispersion_law.imag - self.bgd_width
 
+            # if k == 0:
+            #     distance = np.abs(dispersion_law)
+            # else:
+            #     distance_order = np.abs(dispersion_law)
+            #     for p in range(3, self.psf_profile_params[order].shape[1]):
+            #         self.psf_profile_params[order][:, p] = np.copy(self.psf_profile_params[self.spectrum.order][:, p])
+            #         self.psf_profile_params[order][:, p] = interpolate.interp1d(distance, self.psf_profile_params[order][:, p],
+            #                                                kind="cubic", fill_value="extrapolate")(distance_order)
+
             # Matrix filling
             M_order = self.spectrum.chromatic_psf.build_sparse_M(self.pixels, self.psf_profile_params[order],
                                                                  dtype="float32", M_sparse_indices=self.M_sparse_indices[order],
@@ -495,7 +504,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
-            M_dot_W = M.T @ self.sqrtW
+            M_dot_W = M.T @ sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
             if sparse_dot_mkl is None:
                 M_dot_W_dot_M = M_dot_W @ M_dot_W.T
             else:
@@ -1554,6 +1563,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
             plt.show()
         if parameters.LSST_SAVEFIGPATH:
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'intermediate_spectrum.pdf'))
+    if parameters.DEBUG:
+        spectrum.plot_spectrum()
 
     return w, bgd_model_func
 

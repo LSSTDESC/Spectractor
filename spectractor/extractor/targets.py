@@ -231,6 +231,9 @@ class Star(Target):
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = set_logger(self.__class__.__name__)
+        self.lines = Lines(HYDROGEN_LINES + ATMOSPHERIC_LINES + STELLAR_LINES,
+                           redshift=self.redshift, emission_spectrum=self.emission_spectrum,
+                           hydrogen_only=self.hydrogen_only)
         self.simbad_table = None
         self.load()
 
