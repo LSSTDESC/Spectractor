@@ -81,10 +81,12 @@ class Target:
         self.type = None
         self.wavelengths = []
         self.spectra = []
+        self.spectra_err = []
         self.verbose = verbose
         self.emission_spectrum = False
         self.hydrogen_only = False
         self.sed = None
+        self.sed_err = None
         self.lines = None
         self.radec_position = None
         self.radec_position_after_pm = None
@@ -329,6 +331,7 @@ class Star(Target):
         """
         self.wavelengths = []  # in nm
         self.spectra = []
+        self.spectra_err = []
         # first try if it is a Calspec star
         is_calspec = getCalspec.is_calspec(self.label)
         if getGaia is None:
@@ -373,9 +376,11 @@ class Star(Target):
         spec_dict = calspec.get_spectrum_numpy()
         # official units in spectractor are nanometers for wavelengths and erg/s/cm2/nm for fluxes
         spec_dict["WAVELENGTH"] = spec_dict["WAVELENGTH"].to(u.nm)
-        spec_dict["FLUX"] = spec_dict["FLUX"].to(u.erg / u.second / u.cm**2 / u.nm)
+        for key in ["FLUX", "STATERROR", "SYSERROR"]:
+            spec_dict[key] = spec_dict[key].to(u.erg / u.second / u.cm**2 / u.nm)
         self.wavelengths.append(spec_dict["WAVELENGTH"].value)
         self.spectra.append(spec_dict["FLUX"].value)
+        self.spectra_err.append(np.sqrt(spec_dict["STATERROR"].value**2+spec_dict["SYSERROR"].value**2))
 
     def load_gaia(self):
         gaia = getGaia.Gaia(self.label)
@@ -390,10 +395,11 @@ class Star(Target):
         spec_dict = gaia.get_spectrum_numpy()
         # official units in spectractor are nanometers for wavelengths and erg/s/cm2/nm for fluxes
         spec_dict["WAVELENGTH"] = spec_dict["WAVELENGTH"].to(u.nm)
-        spec_dict["FLUX"] = spec_dict["FLUX"].to(u.erg / u.second / u.cm**2 / u.nm)
+        for key in ["FLUX", "STATERROR", "SYSERROR"]:
+            spec_dict[key] = spec_dict[key].to(u.erg / u.second / u.cm**2 / u.nm)
         self.wavelengths.append(spec_dict["WAVELENGTH"].value)
         self.spectra.append(spec_dict["FLUX"].value)
-
+        self.spectra_err.append(np.sqrt(spec_dict["STATERROR"].value**2+spec_dict["SYSERROR"].value**2))
 
     def load_emission_spectrum(self, hydrogen_only_flag):
         if hydrogen_only_flag:
@@ -501,9 +507,13 @@ class Star(Target):
         if len(self.spectra) == 0:
             self.sed = interp1d(parameters.LAMBDAS, np.zeros_like(parameters.LAMBDAS), kind='linear', bounds_error=False,
                                 fill_value=0.)
+            self.sed_err = interp1d(parameters.LAMBDAS, np.zeros_like(parameters.LAMBDAS), kind='linear', bounds_error=False,
+                                fill_value=0.)
         else:
             self.sed = interp1d(self.wavelengths[index], self.spectra[index], kind='linear', bounds_error=False,
                                 fill_value=0.)
+            self.sed_err = interp1d(self.wavelengths[index], self.spectra_err[index], kind='linear', bounds_error=False,
+                                fill_value=10*np.max(self.spectra_err[index]))
 
     def plot_spectra(self):
         """ Plot the spectra stored in the self.spectra list.
