@@ -92,11 +92,11 @@ class SpectrumSimulation(Spectrum):
         self.data *= self.throughput.transmission(lambdas)
         self.data *= self.target.sed(lambdas)
         self.err = np.zeros_like(self.data)
-        idx = np.where(self.throughput.transmission(lambdas) > 0)[0]
-        self.err[idx] = self.throughput.transmission_err(lambdas)[idx] / self.throughput.transmission(lambdas)[idx]
-        self.err[idx] *= self.data[idx]
-        idx = np.where(self.throughput.transmission(lambdas) <= 0)[0]
-        self.err[idx] = 1e6 * np.max(self.err)
+        idx = (self.throughput.transmission(lambdas) > 0) & (self.target.sed(lambdas) > 0)
+        self.err[idx] = np.sqrt((self.throughput.transmission_err(lambdas[idx]) / self.throughput.transmission(lambdas[idx]))**2 + (self.target.sed_err(lambdas[idx])/self.target.sed(lambdas[idx]))**2)
+        self.err[idx] *= np.abs(self.data[idx])
+        idx = (self.throughput.transmission(lambdas) <= 0) | (self.target.sed(lambdas) <= 0)
+        self.err[idx] = 10 * np.max(self.err)
         return self.data, self.err
 
     def simulate(self, A1=1.0, A2=0., aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, reso=0.,
@@ -383,10 +383,16 @@ class SpectrogramModel(Spectrum):
         spectrum_err = np.zeros_like(spectrum)
         idx = telescope_transmission > 0
         spectrum_err[idx] = self.throughput.transmission_err(lambdas)[idx] / telescope_transmission[idx] * spectrum[idx]
-        # idx = telescope_transmission <= 0: not ready yet to be implemented
+        idx = (telescope_transmission > 0) & (self.target.sed(lambdas) > 0)
+        spectrum_err[idx] = np.sqrt((self.throughput.transmission_err(lambdas[idx]) / telescope_transmission[idx])**2 + (self.target.sed_err(lambdas[idx])/self.target.sed(lambdas[idx]))**2)
+        spectrum_err[idx] *= np.abs(spectrum[idx])
+        idx = (telescope_transmission <= 0) | (self.target.sed(lambdas) <= 0)
+        spectrum_err[idx] = 10 * np.max(spectrum_err)
+        ####TOCHECK idx = telescope_transmission <= 0: not ready yet to be implemented
         # spectrum_err[idx] = 1e6 * np.max(spectrum_err)
         return spectrum, spectrum_err
 
+    
     def simulate(self, A1=1.0, A2=0., A3=0., aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5,
                  D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., angle=0., psf_poly_params=None):
         """
