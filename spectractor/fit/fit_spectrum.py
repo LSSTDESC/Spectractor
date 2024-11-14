@@ -63,6 +63,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         p = np.array([1, 0, 0.05, 1.2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size
         # fixed[0] = True
+        # TODO: StarDICE data for HD93521 clearly needs to fit A2 and shift_x => find a better way to decontaminate from order 2
         fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
         fixed[5] = False
         # fixed[6:8] = [True, True]
@@ -75,9 +76,9 @@ class SpectrumFitWorkspace(FitWorkspace):
                        (0.1, 10),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
                   (-2, 2), (-np.inf, np.inf)]
         params = FitParameters(p, labels=["A1", "A2", "VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]",
-                                          "reso [pix]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],
+                                          "reso [nm]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],
                                axis_names=["$A_1$", "$A_2$", "VAOD", r'$\"a$', "ozone [db]", "PWV [mm]",
-                                           "reso [pix]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"],
+                                           "reso [nm]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"],
                                bounds=bounds, fixed=fixed, truth=truth, filename=spectrum.filename)
         FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=spectrum.filename)
         if atmgrid_file_name == "":
@@ -229,7 +230,9 @@ class SpectrumFitWorkspace(FitWorkspace):
         """
         if not self.fit_angstrom_exponent:
             angstrom_exponent = None
-        lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x, B)
+        lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x)
+        if B != 0:
+            model += B / (lambdas * np.gradient(lambdas))
         self.model = model
         self.model_err = model_err
         return lambdas, model, model_err

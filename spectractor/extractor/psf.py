@@ -1187,15 +1187,15 @@ class Moffat(PSF):
             values = np.copy(self.values_default)
         labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "saturation"]
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", "saturation"]
-        bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf),
-                                (1.1, 100), (0, np.inf)]
+        bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf),
+                                (1.1, 10), (0, np.inf)]
         self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.params.bounds[2] = (0, 2 * self.max_half_width)
-        self.params.bounds[3] = (0.1, self.max_half_width)
+        self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
+        self.params.bounds[3] = (1, self.max_half_width)
 
     def evaluate(self, pixels, values=None):
         r"""Evaluate the Moffat function.
@@ -1390,7 +1390,7 @@ class Gauss(PSF):
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.params.bounds[2] = (0, 2 * self.max_half_width)
+        self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
         self.params.bounds[3] = (1, self.max_half_width)
 
     def evaluate(self, pixels, values=None):
@@ -1556,16 +1556,16 @@ class MoffatGauss(PSF):
             values = np.copy(self.values_default)
         labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
-        bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 100),
-                  (-1, -5e-3), (0.5, np.inf), (0, np.inf)]
+        bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (1.1, 10),
+                  (-1, -5e-3), (1, np.inf), (0, np.inf)]
         self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.params.bounds[2] = (0, 2 * self.max_half_width)
-        self.params.bounds[3] = (0.1, self.max_half_width)
-        self.params.bounds[6] = (0.5, self.max_half_width)
+        self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
+        self.params.bounds[3] = (1, self.max_half_width)
+        self.params.bounds[6] = (1, self.max_half_width)
 
     def evaluate(self, pixels, values=None):
         r"""Evaluate the MoffatGauss function.
@@ -1769,7 +1769,7 @@ class Order0(PSF):
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.params.bounds[2] = (0, 2 * self.max_half_width)
+        self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
 
     def evaluate(self, pixels, values=None):
         r"""Evaluate the Order 0 interpolated function.
@@ -2093,8 +2093,9 @@ class PSFFitWorkspace(FitWorkspace):
             if self.bgd_model_func is not None:
                 data = data + self.bgd_model_func(self.pixels)
             ax[0].errorbar(self.pixels, data, yerr=self.err, fmt='ro', label="Data")
-            if len(self.outliers) > 0:
-                ax[0].errorbar(self.outliers, data[self.outliers], yerr=self.err[self.outliers], fmt='go',
+            if len(self.outliers) > 0 or len(self.mask) > 0:
+                bads = list(np.unique(np.concatenate([self.mask, self.outliers])).astype(int))
+                ax[0].errorbar(bads, data[bads], yerr=self.err[bads], fmt='go',
                                label=rf"Outliers ({self.sigma_clip}$\sigma$)")
             if self.bgd_model_func is not None:
                 ax[0].plot(self.pixels, self.bgd_model_func(self.pixels), 'b--', label="fitted bgd")
@@ -2124,10 +2125,11 @@ class PSFFitWorkspace(FitWorkspace):
             residuals = (data - model) / self.err
             residuals_err = np.ones_like(self.err)
             ax[1].errorbar(self.pixels, residuals, yerr=residuals_err, fmt='ro')
-            if len(self.outliers) > 0:
-                residuals_outliers = (data[self.outliers] - model[self.outliers]) / self.err[self.outliers]
+            if len(self.outliers) > 0 or len(self.mask) > 0:
+                bads = list(np.unique(np.concatenate([self.mask, self.outliers])).astype(int))
+                residuals_outliers = (data[bads] - model[bads]) / self.err[bads]
                 residuals_outliers_err = np.ones_like(residuals_outliers)
-                ax[1].errorbar(self.outliers, residuals_outliers, yerr=residuals_outliers_err, fmt='go')
+                ax[1].errorbar(bads, residuals_outliers, yerr=residuals_outliers_err, fmt='go')
             ax[1].axhline(0, color='b')
             ax[1].grid(True)
             std = np.std(residuals)
