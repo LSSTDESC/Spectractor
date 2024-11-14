@@ -1603,7 +1603,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         x_scale = np.abs(guess)
         x_scale[x_scale == 0] = 0.1
         p = optimize.least_squares(fit_workspace.weighted_residuals, guess, verbose=2, ftol=1e-6, x_scale=x_scale,
-                                   diff_step=0.001, bounds=bounds.T)
+                                   diff_step=0.001, bounds=list(np.array(bounds).T))
         fit_workspace.params.values = p.x  # m.np_values()
         if verbose:
             my_logger.debug(f"\n\t{p}")
