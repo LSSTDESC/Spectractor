@@ -1,4 +1,5 @@
 import os
+import copy
 import shutil
 from photutils.detection import IRAFStarFinder
 from scipy.optimize import curve_fit
@@ -8,6 +9,7 @@ from astropy.stats import sigma_clip, sigma_clipped_stats
 from astropy.io import fits
 from astropy import wcs as WCS
 
+from matplotlib import cm
 import matplotlib.pyplot as plt
 import matplotlib.colors
 from matplotlib.ticker import MaxNLocator
@@ -270,7 +272,7 @@ def rescale_x_from_legendre(x_norm, Xmin, Xmax):
 
     Parameters
     ----------
-    x: np.ndarray
+    x_norm: np.ndarray
     Xmin: float
     Xmax: float
 
@@ -1519,6 +1521,54 @@ def fftconvolve_gaussian(array, reso):
     return array
 
 
+def mask_cosmics(data, maxiter=3, sigma_clip=5, border_mode='mirror', convolve_kernel_size=3):
+    """Simple method to mask cosmic rays, inspired from L.A. Cosmic algorithm.
+
+    Parameters
+    ----------
+    data
+    maxiter
+    border_mode
+
+    Returns
+    -------
+    mask: np.ndarray
+
+    Examples
+    --------
+    >>> data = np.zeros((50, 100))
+    >>> data[20, 50:60] = 1
+    >>> cr_mask = mask_cosmics(data, maxiter=3, convolve_kernel_size=0)
+    >>> fig = plt.figure()
+    >>> _ = plt.imshow(cr_mask, cmap='gray', aspect='auto', origin='lower')
+    >>> plt.show()
+    >>> assert np.sum(data) == np.sum(cr_mask)
+
+    """
+    from astropy.nddata import block_reduce, block_replicate
+    from scipy import ndimage
+    block_size = 2.0
+    kernel = np.array([[0.0, -1.0, 0.0], [-1.0, 4.0, -1.0], [0.0, -1.0, 0.0]])
+
+    clean_data = data.copy()
+    final_crmask = np.zeros(data.shape, dtype=bool)
+
+    for iteration in range(maxiter):
+        sampled_img = block_replicate(clean_data, block_size)
+        convolved_img = ndimage.convolve(sampled_img, kernel,
+                                     mode=border_mode)  #.clip(min=0.0)
+        laplacian_img = block_reduce(convolved_img, block_size)
+
+        final_crmask[laplacian_img > 5*np.nanstd(laplacian_img)] = True
+        clean_data[final_crmask] = np.nan
+
+    if convolve_kernel_size > 0:
+        final_crmask = fftconvolve(final_crmask,
+                               np.ones((convolve_kernel_size, convolve_kernel_size), dtype=int),
+                               mode='same').astype(int)
+    return final_crmask.astype(bool)
+
+
 def formatting_numbers(value, error_high, error_low, std=None, label=None):
     """Format a physical value and its uncertainties. Round the uncertainties
     to the first significant digit, and do the same for the physical value.
@@ -1726,7 +1776,7 @@ def clean_target_spikes(data, saturation):  # pragma: no cover
     return data
 
 
-def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap=None,
+def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap=None, mask=None,
                       target_pixcoords=None, vmin=None, vmax=None, aspect=None, cax=None):
     """Simple function to plot a spectrum with error bars and labels.
 
@@ -1744,6 +1794,8 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         Units of the image to be written in the color bar label (default: "Image units")
     cmap: colormap
         Color map label (default: None)
+    mask: array_like
+        Mask array (default: None)
     target_pixcoords: array_like, optional
         2D array giving the (x,y) coordinates of the targets on the image: add a scatter plot (default: None)
     vmin: float
@@ -1771,6 +1823,18 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         ...                     title="tests/data/reduc_20170605_028.fits")
         >>> if parameters.DISPLAY: plt.show()
     """
+    if cmap is not None and isinstance(cmap, str):
+        colormap = copy.copy(cm.get_cmap(cmap))
+    elif isinstance(cmap, matplotlib.colors.Colormap):
+        colormap = cmap
+    else:
+        colormap = copy.copy(cm.get_cmap('viridis'))
+    cmap_nan = copy.copy(colormap)
+    cmap_nan.set_bad(color='lightgrey')
+
+    data = np.copy(data)
+    if mask is not None:
+        data[mask] = np.nan
     if scale == "log" or scale == "log10":
         # removes the zeros and negative pixels first
         zeros = np.where(data <= 0)
@@ -1784,7 +1848,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         norm = matplotlib.colors.SymLogNorm(vmin=vmin, vmax=vmax, linthresh=10, base=10)
     else:
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
-    im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect)
+    im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect, interpolation="none")
     ax.grid(color='silver', ls='solid')
     ax.grid(True)
     ax.set_xlabel(parameters.PLOT_XLABEL)

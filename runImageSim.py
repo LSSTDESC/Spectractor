@@ -49,4 +49,4 @@ if __name__ == "__main__":
             continue
 
         image = ImageSim(file_name, spectrum_file_name, args.output_directory, A2=1,
-                         psf_poly_params=psf_poly_params, with_stars=False)
+                         psf_poly_params=psf_poly_params, with_starfield=False)

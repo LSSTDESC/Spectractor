@@ -62,7 +62,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.spectrum = spectrum
         p = np.array([1, 0, 0.05, 1.2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size
-        # fixed[0] = True
+        fixed[0] = True
         fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
         fixed[5] = False
         # fixed[6:8] = [True, True]
@@ -71,13 +71,13 @@ class SpectrumFitWorkspace(FitWorkspace):
         # fixed[-1] = True
         if not fit_angstrom_exponent:
             fixed[3] = True  # angstrom_exponent
-        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (0, 3), (100, 700), (0, 20),
+        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 1), (0, 3), (100, 700), (0, 20),
                        (0.1, 10),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
                   (-2, 2), (-np.inf, np.inf)]
         params = FitParameters(p, labels=["A1", "A2", "VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]",
-                                          "reso [pix]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],
+                                          "reso [nm]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],
                                axis_names=["$A_1$", "$A_2$", "VAOD", r'$\"a$', "ozone [db]", "PWV [mm]",
-                                           "reso [pix]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"],
+                                           "reso [nm]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"],
                                bounds=bounds, fixed=fixed, truth=truth, filename=spectrum.filename)
         FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=spectrum.filename)
         if atmgrid_file_name == "":
@@ -145,8 +145,15 @@ class SpectrumFitWorkspace(FitWorkspace):
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))
+        bad_indices = None
+        if len(self.outliers) > 0 or len(self.mask) > 0:
+            bad_indices = np.array(list(self.get_bad_indices()) + list(self.mask)).astype(int)
+
         plot_spectrum_simple(ax, lambdas=lambdas, data=self.data, data_err=self.err,
                              units=self.spectrum.units)
+        if bad_indices is not None:
+            plot_spectrum_simple(ax, lambdas=lambdas[bad_indices], data=self.data[bad_indices], data_err=self.err[bad_indices],
+                                 units=self.spectrum.units, color='gray')
         p0 = ax.plot(lambdas, self.model, label='model')
         ax.fill_between(lambdas, self.model - self.model_err,
                         self.model + self.model_err, alpha=0.3, color=p0[0].get_color())
@@ -168,7 +175,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax2.axhline(0, color=p0[0].get_color())
         ax2.grid(True)
         ylim = ax2.get_ylim()
-        residuals_model = self.model_err[sub][idx] / self.err[sub][idx]
+        residuals_model = self.model_err[sub][idx] / norm
         ax2.fill_between(lambdas[sub][idx], -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
         std = np.nanstd(residuals)  # max(np.std(residuals), np.std(residuals_model))
         ax2.set_ylim(-5*std, 5*std)
@@ -229,7 +236,9 @@ class SpectrumFitWorkspace(FitWorkspace):
         """
         if not self.fit_angstrom_exponent:
             angstrom_exponent = None
-        lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x, B)
+        lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x)
+        if B != 0:
+            model += B / (lambdas * np.gradient(lambdas))
         self.model = model
         self.model_err = model_err
         return lambdas, model, model_err
@@ -321,7 +330,7 @@ def lnprob_spectrum(p):  # pragma: no cover
     return lp + w.lnlike(p)
 
 
-def run_spectrum_minimisation(fit_workspace, method="newton"):
+def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
     """Interface function to fit spectrum simulation parameters to data.
 
     Parameters
@@ -364,16 +373,14 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         #                                 verbose=False)
 
         fit_workspace.simulation.fast_sim = False
-        # fit_workspace.fixed[0] = True
         fixed = copy.copy(fit_workspace.params.fixed)
-        fit_workspace.params.fixed = [True] * len(fit_workspace.params.values)
-        fit_workspace.params.fixed[0] = False
-        run_minimisation(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-3, ftol=100 / fit_workspace.data.size,
-                         verbose=False)
-        # fit_workspace.fixed[0] = False
+        #fit_workspace.params.fixed = [True] * len(fit_workspace.params.values)
+        #fit_workspace.params.fixed[0] = False
+        #run_minimisation(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-3, ftol=100 / fit_workspace.data.size,
+        #                 verbose=False)
         fit_workspace.params.fixed = fixed
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-6,
-                                        ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3, verbose=False)
+                                        ftol=1 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False)
 
         fit_workspace.params.plot_correlation_matrix()
         fit_workspace.plot_fit()

@@ -100,7 +100,7 @@ class SpectrumSimulation(Spectrum):
         return self.data, self.err
 
     def simulate(self, A1=1.0, A2=0., aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, reso=0.,
-                 D=parameters.DISTANCE2CCD, shift_x=0., B=0.):
+                 D=parameters.DISTANCE2CCD, shift_x=0.):
         """Simulate the cross spectrum of an object and its uncertainties
         after its transmission throught the instrument and the atmosphere.
 
@@ -125,8 +125,6 @@ class SpectrumSimulation(Spectrum):
             Distance between the CCD and the disperser in mm (default: parameters.DISTANCE2CCD)
         shift_x: float
             Shift in pixels of the order 0 position estimate (default: 0).
-        B: float
-            Amplitude level for the background (default: 0).
 
         Returns
         -------
@@ -143,7 +141,7 @@ class SpectrumSimulation(Spectrum):
         >>> atmosphere = AtmosphereGrid(atmgrid_filename="./tests/data/reduc_20170530_134_atmsim.fits")
         >>> sim = SpectrumSimulation(spectrum, atmosphere=atmosphere, fast_sim=True)
         >>> lambdas, model, model_err = sim.simulate(A1=1, A2=1, ozone=300, pwv=5, aerosols=0.05, reso=0.,
-        ... D=parameters.DISTANCE2CCD, shift_x=0., B=0.)
+        ... D=parameters.DISTANCE2CCD, shift_x=0.)
         >>> sim.plot_spectrum()
 
         .. doctest::
@@ -205,8 +203,6 @@ class SpectrumSimulation(Spectrum):
             self.data = (sim_conv(lambdas) + A2 * spectrum_order2) / lambdas
             self.data_order2 = A2 * spectrum_order2 / lambdas
             self.err = (err_conv(lambdas) + A2 * err_order2) / lambdas
-        if B != 0:
-            self.data += B / (lambdas * np.gradient(lambdas))
         if np.any(self.err <= 0) and not np.all(self.err<=0):
             min_positive = np.min(self.err[self.err > 0])
             self.err[np.isclose(self.err, 0., atol=0.01 * min_positive)] = min_positive
@@ -226,7 +222,7 @@ class SpectrumSimulation(Spectrum):
 class SpectrogramModel(Spectrum):
 
     def __init__(self, spectrum, target=None, disperser=None, throughput=None, atmosphere=None, diffraction_orders=None,
-                 with_background=True, fast_sim=True, full_image=False, with_adr=True):
+                 fast_sim=True, full_image=False, with_adr=True):
         """Class to simulate a spectrogram.
 
         Parameters
@@ -243,8 +239,6 @@ class SpectrogramModel(Spectrum):
             Atmosphere or AtmosphereGrid instance to make the atmospheric simulation (default: None).
         diffraction_orders: array_like, optional
             List of diffraction orders to simulate. If None, takes first three (default: None).
-        with_background: bool, optional
-            If True, add the background model to the simulated spectrogram (default: True).
         fast_sim: bool, optional
             If True, perform a fast simulation of the spectrum without integrated the spectrum
             in pixel bins (default: True).
@@ -258,7 +252,7 @@ class SpectrogramModel(Spectrum):
         --------
         >>> spectrum = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
         >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
-        >>> sim = SpectrogramModel(spectrum, atmosphere=atmosphere, with_background=True, fast_sim=True)
+        >>> sim = SpectrogramModel(spectrum, atmosphere=atmosphere, fast_sim=True)
         """
         Spectrum.__init__(self)
         if diffraction_orders is None:
@@ -321,7 +315,6 @@ class SpectrogramModel(Spectrum):
         self.fix_atm_sim = False
         self.atmosphere_sim = None
         self.fast_sim = fast_sim
-        self.with_background = with_background
         self.full_image = full_image
         self.with_adr = with_adr
         if self.full_image:
@@ -395,7 +388,7 @@ class SpectrogramModel(Spectrum):
         return spectrum, spectrum_err
 
     def simulate(self, A1=1.0, A2=0., A3=0., aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5,
-                 D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., angle=0., B=1., psf_poly_params=None):
+                 D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., angle=0., psf_poly_params=None):
         """
 
         Parameters
@@ -423,8 +416,6 @@ class SpectrogramModel(Spectrum):
             Shift in pixels along y axis of the order 0 position estimate (default: 0).
         angle: float
             Angle of the dispersion axis in degree (default: 0).
-        B: float
-            Amplitude level for the background (default: 0).
         psf_poly_params: array_like
             Polynomial parameters describing the PSF dependence in wavelength (default: None).
 
@@ -443,7 +434,7 @@ class SpectrogramModel(Spectrum):
         >>> spec.disperser.ratio_ratio_order_3over2 = lambda lbda: 0.1
         >>> psf_poly_params = list(spec.chromatic_psf.from_table_to_poly_params()) * 3
         >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
-        >>> sim = SpectrogramModel(spec, atmosphere=atmosphere, with_background=True, fast_sim=True)
+        >>> sim = SpectrogramModel(spec, atmosphere=atmosphere, fast_sim=True)
         >>> lambdas, model, model_err = sim.simulate(A2=1, angle=-1.5, psf_poly_params=psf_poly_params)
         >>> sim.plot_spectrogram()
 
@@ -521,11 +512,9 @@ class SpectrogramModel(Spectrum):
                 self.profile_params[order][:, 0] = spec
 
         # self.spectrogram is in ADU/s units here
-        self.spectrogram = A1 * ima
+        self.spectrogram_data = A1 * ima
         self.spectrogram_err = A1 * np.sqrt(ima_err2)
 
-        if self.with_background:
-            self.spectrogram += B * self.spectrogram_bgd
         # Save the simulation parameters
         self.psf_poly_params = np.copy(poly_params[0])
         self.header['OZONE_T'] = ozone
@@ -539,7 +528,7 @@ class SpectrogramModel(Spectrum):
         self.header['Y0_T'] = shift_y
         self.header['ROTANGLE'] = angle
 
-        return self.lambdas, self.spectrogram, self.spectrogram_err
+        return self.lambdas, self.spectrogram_data, self.spectrogram_err
 
 
 if __name__ == "__main__":
