@@ -14,7 +14,11 @@ from spectractor.fit.fitter import (FitWorkspace, FitParameters, run_minimisatio
                                     write_fitparameter_json)
 from spectractor.tools import plot_spectrum_simple
 
-
+try:
+    from gaiaspec import getGaia
+except ModuleNotFoundError:
+    getGaia = None
+    
 class SpectrumFitWorkspace(FitWorkspace):
 
     def __init__(self, spectrum, atmgrid_file_name="", fit_angstrom_exponent=False,
@@ -58,7 +62,16 @@ class SpectrumFitWorkspace(FitWorkspace):
         """
         self.my_logger = set_logger(self.__class__.__name__)
         if not getCalspec.is_calspec(spectrum.target.label):
-            raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
+            if getGaia is not None:
+                is_gaiaspec = getGaia.is_gaiaspec(spectrum.target.label)
+                is_gaia_full = False
+                if is_gaiaspec == False:
+                    is_gaia_full = getGaia.is_gaia_full(spectrum.target.label)
+                if not is_gaiaspec:
+                    if not is_gaia_full:
+                        raise ValueError(f"{spectrum.target.label=} must be a CALSPEC or GAIA star.")
+            else:
+                raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
         p = np.array([1, 0, 0.05, 1.2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size
@@ -72,7 +85,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         if not fit_angstrom_exponent:
             fixed[3] = True  # angstrom_exponent
         bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 1), (0, 3), (100, 700), (0, 20),
-                       (0.1, 10),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
+                       (0.1, 20),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
                   (-2, 2), (-np.inf, np.inf)]
         params = FitParameters(p, labels=["A1", "A2", "VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]",
                                           "reso [nm]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],

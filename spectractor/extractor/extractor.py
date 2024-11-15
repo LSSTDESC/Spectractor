@@ -237,6 +237,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.amplitude_priors = np.copy(self.spectrum.data)
         if self.amplitude_priors_method == "spectrum":
             self.amplitude_priors_cov_matrix = np.copy(self.spectrum.cov_matrix)
+        else:
+            self.amplitude_priors_cov_matrix = np.diag(self.spectrum.err**2)
         if self.spectrum.data.size != self.Nx:  # must rebin the priors
             old_x = np.linspace(0, 1, self.spectrum.data.size)
             new_x = np.linspace(0, 1, self.Nx)
@@ -513,7 +515,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                     #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
                     #     cov_matrix = L.T @ L
                     # except np.linalg.LinAlgError:
-                    cov_matrix = np.linalg.inv(M_dot_W_dot_M)
+                    cov_matrix = np.linalg.inv(M_dot_W_dot_M.toarray())
                     amplitude_params = cov_matrix @ (M.T @ W_dot_data)
                     if self.amplitude_priors_method == "positive":
                         amplitude_params[amplitude_params < 0] = 0
@@ -952,7 +954,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.header['PIXSHIFT'] = w.params[r"shift_x [pix]"]
             w.spectrum.header['D2CCD'] = w.params[r"D_CCD [mm]"]
             if len(w.diffraction_orders) >= 2:
-                w.spectrum.header['A2_FIT'] = w.params.values[w.diffraction_orders[1]]
+                w.spectrum.header['A2_FIT'] = w.params[f"A{w.diffraction_orders[1]}"]
             w.spectrum.header["ROTANGLE"] = w.params[r"angle [deg]"]
             w.spectrum.header["AM_FIT"] = w.params["z"]
             # Compute next order contamination
