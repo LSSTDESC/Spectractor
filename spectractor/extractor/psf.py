@@ -230,15 +230,15 @@ def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda, f
     return J
 
 
-@njit(["float32[:](int64[:], float32, float32, float32, float32, float32, float32, float32)",
-       "float32[:](float32[:], float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm_moffat):  # pragma: no cover
+@njit(["float32[:](int64[:], float32, float32, float32, float32, float32, float32, float32, float32)",
+       "float32[:](float32[:], float32, float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
+def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, y_g, sigma, norm_moffat):  # pragma: no cover
     r"""Compute a 1D Moffat-Gaussian function, whose integral is normalised to unity.
 
     .. math ::
 
         f(y) \propto A \left\lbrace
-        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}+ \eta e^{-(y-y_c)^2/(2\sigma^2)}\right\rbrace
+        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}+ \eta e^{-(y-y_g)^2/(2\sigma^2)}\right\rbrace
         \quad\text{ and } \quad \eta < 0, \alpha > 1/2
 
     Note that this function is defined only for :math:`\alpha > 1/2`. The normalisation factor for the Moffat+Gauss
@@ -259,6 +259,8 @@ def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, no
         Exponent :math:`\alpha` of the Moffat function.
     eta_gauss: float
         Relative negative amplitude of the Gaussian function.
+    y_g: float
+        Center  :math:`y_g` of the Gaussian function.
     sigma: float
         Width :math:`\sigma` of the Gaussian function.
     norm_moffat: float
@@ -280,7 +282,7 @@ def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, no
     >>> eta_gauss = -0.1
     >>> sigma = 1
     >>> norm = evaluate_moffat1d_normalisation(gamma, alpha)
-    >>> a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha, eta_gauss=eta_gauss, sigma=sigma, norm_moffat=norm)
+    >>> a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha, eta_gauss=eta_gauss, y_g=Ny/2+3, sigma=sigma, norm_moffat=norm)
     >>> print(f"{np.sum(a):.6f}")
     9.966492
     >>> a.dtype
@@ -301,7 +303,7 @@ def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, no
         y = np.arange(Ny)
         amplitude = 10
         norm = evaluate_moffat1d_normalisation(gamma, alpha)
-        a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1, norm_moffat=norm)
+        a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, y_c=Ny/2+3, sigma=1, norm_moffat=norm)
         plt.plot(a)
         plt.grid()
         plt.xlabel("y")
@@ -312,27 +314,23 @@ def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, no
     yc = y - y_c
     rr = yc * yc
     rr_gg = rr / (gamma * gamma)
-    rr_ss = rr / (sigma * sigma)
+    rr_ss = (y - y_g) * (y - y_g) / (sigma * sigma)
     norm = (1. / norm_moffat) + eta_gauss * np.sqrt(2 * np.pi) * sigma
     a = (1 + rr_gg) ** -alpha + eta_gauss * np.exp(-(rr_ss / 2))
     a *= (amplitude / norm)
     return a
 
 
-@njit(["float32[:](int64[:], float32, float32, float32, float32, float32, float32, float32, float32, float32)",
-       "float32[:](float32[:], float32, float32, float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_doublemoffat1d(y, amplitude, y_c, gamma1, alpha1, eta, gamma2, alpha2, norm1, norm2):  # pragma: no cover
+@njit(["float32[:](int64[:], float32, float32, float32, float32, float32, float32, float32, float32, float32, float32)",
+       "float32[:](float32[:], float32, float32, float32, float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
+def evaluate_doublemoffat1d(y, amplitude, y_c, gamma1, alpha1, eta, y_c2, gamma2, alpha2, norm1, norm2):  # pragma: no cover
     r"""Compute a 1D DoubleMoffat function, whose integral is normalised to unity.
 
     .. math ::
 
         f(y) \propto A \left\lbrace
-        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}+ \eta e^{-(y-y_c)^2/(2\sigma^2)}\right\rbrace
+        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}+ \eta \frac{1}{\left[ 1 +\left(\frac{y-y_{c,2}}{\gamma_2}\right)^2 \right]^{\alpha_2}}\right\rbrace
         \quad\text{ and } \quad \eta < 0, \alpha > 1/2
-
-    Note that this function is defined only for :math:`\alpha > 1/2`. The normalisation factor for the Moffat+Gauss
-    :math:`\frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)} + \eta \sqrt{2\pi} \sigma` is not included as special functions
-    are not supproted by the numba library.
 
     Parameters
     ----------
@@ -348,6 +346,8 @@ def evaluate_doublemoffat1d(y, amplitude, y_c, gamma1, alpha1, eta, gamma2, alph
         Exponent :math:`\alpha_1` of the Moffat function.
     eta: float
         Relative amplitude of the second Moffat function.
+    y_c2: float
+        Center  :math:`y_{c,2}` of the second Moffat function.
     gamma2: float
         Width  :math:`\gamma_2` of the second Moffat function.
     alpha2: float
@@ -370,14 +370,14 @@ def evaluate_doublemoffat1d(y, amplitude, y_c, gamma1, alpha1, eta, gamma2, alph
     >>> amplitude = 10
     >>> gamma1 = 5
     >>> alpha1 = 2
-    >>> eta = 2
+    >>> eta = 0.1
     >>> gamma2 = 4
     >>> alpha2 = 3
     >>> norm1 = evaluate_moffat1d_normalisation(gamma1, alpha1)
     >>> norm2 = evaluate_moffat1d_normalisation(gamma2, alpha2)
-    >>> a = evaluate_doublemoffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma1=gamma1, alpha1=alpha1, eta=eta, gamma2=gamma2, alpha2=alpha2, norm1=norm1, norm2=norm2)
+    >>> a = evaluate_doublemoffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma1=gamma1, alpha1=alpha1, eta=eta, y_c2=Ny/2+3, gamma2=gamma2, alpha2=alpha2, norm1=norm1, norm2=norm2)
     >>> print(f"{np.sum(a):.6f}")
-    9.985071
+    9.969373
     >>> a.dtype
     dtype('float32')
 
@@ -402,7 +402,7 @@ def evaluate_doublemoffat1d(y, amplitude, y_c, gamma1, alpha1, eta, gamma2, alph
         alpha2 = 3
         norm1 = evaluate_moffat1d_normalisation(gamma1, alpha1)
         norm2 = evaluate_moffat1d_normalisation(gamma2, alpha2)
-        a = evaluate_doublemoffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma1=gamma1, alpha1=alpha1, eta=eta, gamma2=gamma2, alpha2=alpha2, norm1=norm1, norm2=norm2)
+        a = evaluate_doublemoffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma1=gamma1, alpha1=alpha1, eta=eta, y_c2=Ny/2+3, gamma2=gamma2, alpha2=alpha2, norm1=norm1, norm2=norm2)
         plt.plot(a)
         plt.grid()
         plt.xlabel("y")
@@ -413,22 +413,22 @@ def evaluate_doublemoffat1d(y, amplitude, y_c, gamma1, alpha1, eta, gamma2, alph
     yc = y - y_c
     rr = yc * yc
     rr_gg1 = rr / (gamma1 * gamma1)
-    rr_gg2 = rr / (gamma2 * gamma2)
+    rr_gg2 = (y - y_c2) * (y - y_c2) / (gamma2 * gamma2)
     norm = 1. / norm1 + eta / norm2
     a = (1 + rr_gg1) ** -alpha1 + eta * (1 + rr_gg2) ** -alpha2
     a *= (amplitude / norm)
     return a
 
 
-@njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
-def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm_moffat, dnormda, fixed):  # pragma: no cover
+@njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
+def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, y_g, sigma, norm_moffat, dnormda, fixed):  # pragma: no cover
     r"""Compute a 1D Moffat-Gaussian Jacobian, whose integral is normalised to unity.
 
     .. math ::
 
         f(y) \propto A \left\lbrace
         \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha} \times \frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)}
-         - \eta e^{-(y-y_c)^2/(2\sigma^2)}\right\rbrace
+         - \eta e^{-(y-y_g)^2/(2\sigma^2)}\right\rbrace
         \quad\text{ and } \quad \eta < 0, \alpha > 1/2
 
     Note that this function is defined only for :math:`\alpha > 1/2`. The normalisation factor for the Moffat
@@ -442,13 +442,15 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
     amplitude: float
         Integral :math:`A` of the function.
     y_c: float
-        Center  :math:`y_c` of the function.
+        Center  :math:`y_c` of the Moffat function.
     gamma: float
         Width  :math:`\gamma` of the Moffat function.
     alpha: float
         Exponent :math:`\alpha` of the Moffat function.
     eta_gauss: float
         Relative negative amplitude of the Gaussian function.
+    y_g: float
+        Center  :math:`y_g` of the Gaussian function.
     sigma: float
         Width :math:`\sigma` of the Gaussian function.
     norm_moffat: float
@@ -476,9 +478,9 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
     >>> norm = evaluate_moffat1d_normalisation(gamma, alpha)
     >>> dnormda = evaluate_moffat1d_normalisation_dalpha(norm, alpha)
     >>> a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha,
-    ... eta_gauss=eta_gauss, sigma=sigma, norm_moffat=norm)
+    ... eta_gauss=eta_gauss, y_g=Ny/2+3, sigma=sigma, norm_moffat=norm)
     >>> J = evaluate_moffatgauss1d_jacobian(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha,
-    ... eta_gauss=eta_gauss, sigma=sigma, norm_moffat=norm, dnormda=dnormda, fixed=np.array([False, False, True, False, False]))
+    ... eta_gauss=eta_gauss, y_g=Ny/2+3, sigma=sigma, norm_moffat=norm, dnormda=dnormda, fixed=np.array([False, False, True, False, False, False]))
     >>> J.shape
     (7, 50)
     >>> J.dtype
@@ -493,9 +495,10 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
 
     """
     yc = y - y_c
+    ys = y - y_g
     rr = yc * yc
     rr_gg = rr / (gamma * gamma)
-    rr_ss = rr / (sigma * sigma)
+    rr_ss = ys * ys / (sigma * sigma)
     inv_moffat = 1 / (1 + rr_gg)
     psf_moffat = inv_moffat ** alpha
     dpsf_moffat = alpha * inv_moffat * psf_moffat
@@ -507,7 +510,7 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
         J[0] = (norm / amplitude) * psf  # amplitude
     # fixed x_c so J[1] = 0
     if not fixed[2]:
-        J[2] = (norm / (sigma * sigma)) * yc * eta_gauss * psf_gauss + (2 * norm / (gamma * gamma)) * yc * dpsf_moffat  # y_c
+        J[2] = (2 * norm / (gamma * gamma)) * yc * dpsf_moffat  # y_c
     if not fixed[3]:
         J[3] = (2 * norm / gamma) * rr_gg * dpsf_moffat - (norm * norm / (amplitude * norm_moffat * gamma)) * psf   # gamma
     if not fixed[4]:
@@ -515,19 +518,20 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
     if not fixed[5]:
         J[5] = norm * psf_gauss - (np.sqrt(2 * np.pi) * sigma * norm * norm / amplitude) * psf  # eta
     if not fixed[6]:
-        J[6] = (-eta_gauss * np.sqrt(2*np.pi) * norm * norm / amplitude) * psf + (eta_gauss * norm / sigma) * rr_ss * psf_gauss  # sigma
+        J[6] = (norm / (sigma * sigma)) * ys * eta_gauss * psf_gauss   # y_g
+    if not fixed[7]:
+        J[7] = (-eta_gauss * np.sqrt(2*np.pi) * norm * norm / amplitude) * psf + (eta_gauss * norm / sigma) * rr_ss * psf_gauss  # sigma
     return J
 
 
-@njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32, float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
-def evaluate_doublemoffat1d_jacobian(y, amplitude, y_c, gamma1, alpha1, eta, gamma2, alpha2, norm1, dnormda1, norm2, dnormda2, fixed):  # pragma: no cover
+@njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32, float32, float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
+def evaluate_doublemoffat1d_jacobian(y, amplitude, y_c, gamma1, alpha1, eta, y_c2, gamma2, alpha2, norm1, dnormda1, norm2, dnormda2, fixed):  # pragma: no cover
     r"""Compute a 1D DoubleMoffat Jacobian, whose integral is normalised to unity.
 
     .. math ::
 
         f(y) \propto A \left\lbrace
-        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha} \times \frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)}
-         - \eta e^{-(y-y_c)^2/(2\sigma^2)}\right\rbrace
+        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}+ \eta \frac{1}{\left[ 1 +\left(\frac{y-y_{c,2}}{\gamma_2}\right)^2 \right]^{\alpha_2}}\right\rbrace
         \quad\text{ and } \quad \eta < 0, \alpha > 1/2
 
     Note that this function is defined only for :math:`\alpha > 1/2`. The normalisation factor for the Moffat
@@ -548,6 +552,8 @@ def evaluate_doublemoffat1d_jacobian(y, amplitude, y_c, gamma1, alpha1, eta, gam
         Exponent :math:`\alpha_1` of the Moffat function.
     eta: float
         Relative amplitude of the second Moffat function.
+    y_c2: float
+        Center  :math:`y_{c,2}` of the second Moffat function.
     gamma2: float
         Width  :math:`\gamma_2` of the second Moffat function.
     alpha2: float
@@ -583,10 +589,10 @@ def evaluate_doublemoffat1d_jacobian(y, amplitude, y_c, gamma1, alpha1, eta, gam
     >>> dnormda1 = evaluate_moffat1d_normalisation_dalpha(norm1, alpha1)
     >>> norm2 = eta * evaluate_moffat1d_normalisation(gamma2, alpha2)
     >>> dnormda2 = evaluate_moffat1d_normalisation_dalpha(norm2, alpha2)
-    >>> a = evaluate_doublemoffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma1=gamma1, alpha1=alpha1, eta=eta, gamma2=gamma2, alpha2=alpha2, norm1=norm1, norm2=norm2)
+    >>> a = evaluate_doublemoffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma1=gamma1, alpha1=alpha1, eta=eta, y_c2=Ny/2+3, gamma2=gamma2, alpha2=alpha2, norm1=norm1, norm2=norm2)
     >>> J = evaluate_doublemoffat1d_jacobian(y, amplitude=amplitude, y_c=Ny/2, gamma1=gamma1, alpha1=alpha1,
-    ... eta=eta, gamma2=gamma2, alpha2=alpha2, norm1=norm1, dnormda1=dnormda1, norm2=norm2, dnormda2=dnormda2,
-    ... fixed=np.array([False, False, True, False, False, False, False]))
+    ... eta=eta, y_c2=Ny/2+3, gamma2=gamma2, alpha2=alpha2, norm1=norm1, dnormda1=dnormda1, norm2=norm2, dnormda2=dnormda2,
+    ... fixed=np.array([False, False, True, False, False, False, False, False]))
     >>> J.shape
     (8, 50)
     >>> J.dtype
@@ -603,7 +609,7 @@ def evaluate_doublemoffat1d_jacobian(y, amplitude, y_c, gamma1, alpha1, eta, gam
     yc = y - y_c
     rr = yc * yc
     rr_gg1 = rr / (gamma1 * gamma1)
-    rr_gg2 = rr / (gamma2 * gamma2)
+    rr_gg2 = (y - y_c2) * (y - y_c2) / (gamma2 * gamma2)
     inv_moffat1 = 1 / (1 + rr_gg1)
     psf_moffat1 = inv_moffat1 ** alpha1
     dpsf_moffat1 = alpha1 * inv_moffat1 * psf_moffat1
@@ -751,7 +757,7 @@ def evaluate_moffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, fixed): 
     >>> yy, xx = np.mgrid[:Ny, :Nx]
     >>> amplitude = 10
     >>> a = evaluate_moffat2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2)
-    >>> J = evaluate_moffat2d_jacobian(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2, fixed=np.array([False, False, True, False, False]))
+    >>> J = evaluate_moffat2d_jacobian(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2, fixed=np.array([False, False, True, False, False, False]))
     >>> J.shape
     (5, 2500)
     >>> J.dtype
@@ -786,15 +792,15 @@ def evaluate_moffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, fixed): 
     return J
 
 
-@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma):  # pragma: no cover
+@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
+def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, x_g, y_g, sigma):  # pragma: no cover
     r"""Compute a 2D Moffat+Gauss function, whose integral is normalised to unity.
 
     .. math ::
 
         f(x, y) = \frac{A}{\frac{\pi \gamma^2}{\alpha-1} + 2 \pi \eta \sigma^2}\left\lbrace \frac{1}{
         \left[ 1 +\frac{\left(x-x_c\right)^2+\left(y-y_c\right)^2}{\gamma^2} \right]^\alpha}
-         + \eta e^{-\left[ \left(x-x_c\right)^2+\left(y-y_c\right)^2\right]/(2 \sigma^2)}
+         + \eta e^{-\left[ \left(x-x_g\right)^2+\left(y-y_g\right)^2\right]/(2 \sigma^2)}
         \right\rbrace
 
     .. math ::
@@ -813,15 +819,19 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
     amplitude: float
         Integral :math:`A` of the function.
     x_c: float
-        X axis center  :math:`x_c` of the function.
+        X axis center  :math:`x_c` of the Moffat function.
     y_c: float
-        Y axis center  :math:`y_c` of the function.
+        Y axis center  :math:`y_c` of the Moffat function.
     gamma: float
         Width  :math:`\gamma` of the Moffat function.
     alpha: float
         Exponent :math:`\alpha` of the Moffat function.
     eta_gauss: float
         Relative negative amplitude of the Gaussian function.
+    x_g: float
+        X axis center  :math:`x_g` of the Gaussian function.
+    y_g: float
+        Y axis center  :math:`y_g` of the Gaussian function.
     sigma: float
         Width :math:`\sigma` of the Gaussian function.
 
@@ -838,9 +848,9 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
     >>> yy, xx = np.mgrid[:Ny, :Nx]
     >>> amplitude = 10
     >>> a = evaluate_moffatgauss2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2,
-    ... eta_gauss=-0.1, sigma=1)
+    ... eta_gauss=0.1, x_g=Nx/2+3, y_g=Ny/2+3, sigma=2)
     >>> print(f"{np.sum(a):.6f}")
-    9.680574
+    9.692955
     >>> a.dtype
     dtype('float32')
 
@@ -858,12 +868,12 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
         Ny = 50
         yy, xx = np.mgrid[:Nx, :Ny]
         amplitude = 10
-        a = evaluate_moffatgauss2d(xx, yy, amplitude, Nx/2, Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1)
+        a = evaluate_moffatgauss2d(xx, yy, amplitude, Nx/2, Ny/2, gamma=5, alpha=2, eta_gauss=0.1, Nx/2+3, Ny/2+3, sigma=2)
         im = plt.pcolor(xx, yy, a)
         plt.grid()
         plt.xlabel("x")
         plt.ylabel("y")
-        plt.colorbar(im, label="Moffat 2D")
+        plt.colorbar(im, label="Moffat+Gauss 2D")
         plt.show()
 
     """
@@ -871,15 +881,15 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
     yc = y - y_c
     rr = xc * xc + yc * yc
     rr_gg = rr / (gamma * gamma)
-    rr_ss = rr / (sigma * sigma)
+    rr_ss = ((x - x_g) * (x - x_g) + (y - y_g) * (y - y_g)) / (sigma * sigma)
     a = (1 + rr_gg) ** -alpha + eta_gauss * np.exp(-(rr_ss / 2))
     norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * sigma * sigma
     a *= amplitude / norm
     return a
 
 
-@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_doublemoffat2d(x, y, amplitude, x_c, y_c, gamma1, alpha1, eta, gamma2, alpha2):  # pragma: no cover
+@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
+def evaluate_doublemoffat2d(x, y, amplitude, x_c, y_c, gamma1, alpha1, eta, x_c2, y_c2, gamma2, alpha2):  # pragma: no cover
     r"""Compute a 2D Double Moffat function, whose integral is normalised to unity.
 
     .. math ::
@@ -887,7 +897,7 @@ def evaluate_doublemoffat2d(x, y, amplitude, x_c, y_c, gamma1, alpha1, eta, gamm
         f(x, y) = \frac{A}{\frac{\pi \gamma_1^2}{\alpha_1-1} + \eta \frac{\pi \gamma_2^2}{\alpha_2-1}}\left\lbrace \frac{1}{
         \left[ 1 +\frac{\left(x-x_c\right)^2+\left(y-y_c\right)^2}{\gamma_1^2} \right]^\alpha_1}
          + \eta \frac{1}{
-        \left[ 1 +\frac{\left(x-x_c\right)^2+\left(y-y_c\right)^2}{\gamma_2^2} \right]^\alpha_2}
+        \left[ 1 +\frac{\left(x-x_{c,2}\right)^2+\left(y-y_{c,2}\right)^2}{\gamma_2^2} \right]^\alpha_2}
         \right\rbrace
 
     .. math ::
@@ -915,6 +925,10 @@ def evaluate_doublemoffat2d(x, y, amplitude, x_c, y_c, gamma1, alpha1, eta, gamm
         Exponent :math:`\alpha_1` of the Moffat function.
     eta: float
         Relative amplitude of the second Moffat function.
+    x_c2: float
+        X axis center  :math:`x_{c,2}` of the second Moffat function.
+    y_c2: float
+        Y axis center  :math:`y_{c,2}` of the second Moffat function.
     gamma2: float
         Width  :math:`\gamma_2` of the second Moffat function.
     alpha2: float
@@ -933,9 +947,9 @@ def evaluate_doublemoffat2d(x, y, amplitude, x_c, y_c, gamma1, alpha1, eta, gamm
     >>> yy, xx = np.mgrid[:Ny, :Nx]
     >>> amplitude = 10
     >>> a = evaluate_doublemoffat2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma1=5, alpha1=2,
-    ... eta=2, gamma2=4, alpha2=3)
+    ... eta=2, x_c2=Nx/2+3, y_c2=Ny/2+3, gamma2=4, alpha2=3)
     >>> print(f"{np.sum(a):.6f}")
-    9.805085
+    9.804738
     >>> a.dtype
     dtype('float32')
 
@@ -953,7 +967,7 @@ def evaluate_doublemoffat2d(x, y, amplitude, x_c, y_c, gamma1, alpha1, eta, gamm
         Ny = 50
         yy, xx = np.mgrid[:Nx, :Ny]
         amplitude = 10
-        a = evaluate_doublemoffat2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma1=5, alpha1=2, eta=2, gamma2=4, alpha2=1.5)
+        a = evaluate_doublemoffat2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma1=5, alpha1=2, eta=2, x_c2=Nx/2+3, y_c2=Ny/2+3, gamma2=4, alpha2=1.5)
         im = plt.pcolor(xx, yy, a)
         plt.grid()
         plt.xlabel("x")
@@ -966,7 +980,7 @@ def evaluate_doublemoffat2d(x, y, amplitude, x_c, y_c, gamma1, alpha1, eta, gamm
     yc = y - y_c
     rr = xc * xc + yc * yc
     rr_gg1 = rr / (gamma1 * gamma1)
-    rr_gg2 = rr / (gamma2 * gamma2)
+    rr_gg2 = ((x - x_c2) * (x - x_c2) + (y - y_c2) * (y - y_c2)) / (gamma2 * gamma2)
     a = (1 + rr_gg1) ** -alpha1 + eta * (1 + rr_gg2) ** -alpha2
     norm = (np.pi * gamma1 * gamma1) / (alpha1 - 1) + eta * (np.pi * gamma2 * gamma2) / (alpha2 - 1)
     a *= amplitude / norm
@@ -1255,8 +1269,8 @@ def evaluate_gauss2d_jacobian(x, y, amplitude, x_c, y_c, sigma, fixed):  # pragm
 
 
 
-@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
-def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma, fixed):  # pragma: no cover
+@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
+def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, x_g, y_g, sigma, fixed):  # pragma: no cover
     r"""Compute a 2D Moffat+Gauss Jacobian, whose integral is normalised to unity.
 
     Parameters
@@ -1277,6 +1291,10 @@ def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta
         Exponent :math:`\alpha` of the Moffat function.
     eta_gauss: float
         Relative negative amplitude of the Gaussian function.
+    x_g: float
+        X axis center  :math:`x_g` of the Gaussian function.
+    y_g: float
+        Y axis center  :math:`y_g` of the Gaussian function.
     sigma: float
         Width :math:`\sigma` of the Gaussian function.
     fixed: array_like
@@ -1296,9 +1314,9 @@ def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta
     >>> yy, xx = np.mgrid[:Ny, :Nx]
     >>> amplitude = 10
     >>> a = evaluate_moffatgauss2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2,
-    ... eta_gauss=-0.1, sigma=1)
+    ... eta_gauss=0.1, x_g=Nx/2+3, y_g=Ny/2+3, sigma=1)
     >>> J = evaluate_moffatgauss2d_jacobian(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2,
-    ... eta_gauss=-0.1, sigma=1, fixed=np.array([False, False, True, False, False, False, False]))
+    ... eta_gauss=0.1, x_g=Nx/2+3, y_g=Ny/2+3, sigma=1, fixed=np.array([False, False, True, False, False, False, False, False, False]))
     >>> J.shape
     (7, 2500)
     >>> J.dtype
@@ -1315,8 +1333,11 @@ def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta
     xc = (x - x_c).ravel()
     yc = (y - y_c).ravel()
     rr = xc * xc + yc * yc
+    xg = (x - x_g).ravel()
+    yg = (y - y_g).ravel()
+    rrg = xg * xg + yg * yg
     rr_gg = rr / (gamma * gamma)
-    rr_ss = rr / (sigma * sigma)
+    rr_ss = rrg / (sigma * sigma)
     inv_moffat = 1 / (1 + rr_gg)
     psf_moffat = inv_moffat ** alpha
     dpsf_moffat = alpha * inv_moffat * psf_moffat
@@ -1327,22 +1348,26 @@ def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta
     if not fixed[0]:
         J[0] = (norm / amplitude) * psf  # amplitude
     if not fixed[1]:
-        J[1] = (norm / (sigma * sigma)) * xc * eta_gauss * psf_gauss + (2 * norm / (gamma * gamma)) * xc * dpsf_moffat  # x_c
+        J[1] = (2 * norm / (gamma * gamma)) * xc * dpsf_moffat  # x_c
     if not fixed[2]:
-        J[2] = (norm / (sigma * sigma)) * yc * eta_gauss * psf_gauss + (2 * norm / (gamma * gamma)) * yc * dpsf_moffat  # y_c
+        J[2] = (2 * norm / (gamma * gamma)) * yc * dpsf_moffat  # y_c
     if not fixed[3]:
         J[3] = (-2 * np.pi * gamma * norm * norm / (alpha-1) / amplitude) * psf + (2 * norm / gamma) * rr_gg * dpsf_moffat  # gamma
     if not fixed[4]:
         J[4] = (np.pi * gamma * gamma) * norm * norm / (amplitude * (alpha-1) * (alpha-1)) * psf - norm * psf_moffat * np.log(1 + rr_gg)  # alpha
     if not fixed[5]:
-        J[5] = norm * psf_gauss - (2 * np.pi * sigma * sigma * norm * norm / amplitude) * psf
+        J[5] = norm * psf_gauss - (2 * np.pi * sigma * sigma * norm * norm / amplitude) * psf  # eta
     if not fixed[6]:
-        J[6] = (-4 * eta_gauss * np.pi * sigma * norm * norm / amplitude) * psf + (eta_gauss * norm / sigma) * rr_ss * psf_gauss
+        J[6] = (norm / (sigma * sigma)) * xg * eta_gauss * psf_gauss  # x_g
+    if not fixed[7]:
+        J[7] = (norm / (sigma * sigma)) * yg * eta_gauss * psf_gauss  # y_g
+    if not fixed[8]:
+        J[8] = (-4 * eta_gauss * np.pi * sigma * norm * norm / amplitude) * psf + (eta_gauss * norm / sigma) * rr_ss * psf_gauss  # sigma
     return J
 
 
-@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
-def evaluate_doublemoffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma1, alpha1, eta, gamma2, alpha2, fixed):  # pragma: no cover
+@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
+def evaluate_doublemoffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma1, alpha1, eta, x_c2, y_c2, gamma2, alpha2, fixed):  # pragma: no cover
     r"""Compute a 2D Double Moffat Jacobian, whose integral is normalised to unity.
 
     Parameters
@@ -1354,15 +1379,19 @@ def evaluate_doublemoffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma1, alpha1, 
     amplitude: float
         Integral :math:`A` of the function.
     x_c: float
-        X axis center  :math:`x_c` of the function.
+        X axis center  :math:`x_c` of the Moffat function.
     y_c: float
-        Y axis center  :math:`y_c` of the function.
+        Y axis center  :math:`y_c` of the Moffat function.
     gamma1: float
         Width  :math:`\gamma_1` of the Moffat function.
     alpha1: float
         Exponent :math:`\alpha_1` of the Moffat function.
     eta: float
         Relative amplitude of the second Moffat function.
+    x_c2: float
+        X axis center  :math:`x_{c,2}` of the second Moffat function.
+    y_c2: float
+        Y axis center  :math:`y_{c,2}` of the second Moffat function.
     gamma2: float
         Width  :math:`\gamma_2` of the second Moffat function.
     alpha2: float
@@ -1384,9 +1413,9 @@ def evaluate_doublemoffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma1, alpha1, 
     >>> yy, xx = np.mgrid[:Ny, :Nx]
     >>> amplitude = 10
     >>> a = evaluate_doublemoffat2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma1=5, alpha1=2,
-    ... eta=2, gamma2=1, alpha2=3)
+    ... eta=2, x_c2=Nx/2+3, y_c2=Ny/2+3, gamma2=1, alpha2=3)
     >>> J = evaluate_doublemoffat2d_jacobian(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma1=5, alpha1=2,
-    ... eta=2, gamma2=1, alpha2=3, fixed=np.array([False, False, True, False, False, False, False, False]))
+    ... eta=2, x_c2=Nx/2+3, y_c2=Ny/2+3, gamma2=1, alpha2=3, fixed=np.array([False, False, True, False, False, False, False, False, False, False]))
     >>> J.shape
     (8, 2500)
     >>> J.dtype
@@ -1402,9 +1431,12 @@ def evaluate_doublemoffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma1, alpha1, 
     """
     xc = (x - x_c).ravel()
     yc = (y - y_c).ravel()
+    xc2 = (x - x_c2).ravel()
+    yc2 = (y - y_c2).ravel()
     rr = xc * xc + yc * yc
+    rr2 = xc2 * xc2 + yc2 * yc2
     rr_gg1 = rr / (gamma1 * gamma1)
-    rr_gg2 = rr / (gamma2 * gamma2)
+    rr_gg2 = rr2 / (gamma2 * gamma2)
     inv_moffat1 = 1 / (1 + rr_gg1)
     psf_moffat1 = inv_moffat1 ** alpha1
     inv_moffat2 = 1 / (1 + rr_gg2)
@@ -1417,19 +1449,23 @@ def evaluate_doublemoffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma1, alpha1, 
     if not fixed[0]:
         J[0] = (norm / amplitude) * psf  # amplitude
     if not fixed[1]:
-        J[1] = (2 * norm / (gamma1 * gamma1)) * xc * dpsf_moffat1 + eta * (2 * norm / (gamma2 * gamma2)) * xc * dpsf_moffat2  # x_c
+        J[1] = (2 * norm / (gamma1 * gamma1)) * xc * dpsf_moffat1  # x_c
     if not fixed[2]:
-        J[2] = (2 * norm / (gamma1 * gamma1)) * yc * dpsf_moffat1 + eta * (2 * norm / (gamma2 * gamma2)) * yc * dpsf_moffat2  # y_c
+        J[2] = (2 * norm / (gamma1 * gamma1)) * yc * dpsf_moffat1  # y_c
     if not fixed[3]:
         J[3] = (-2 * np.pi * gamma1 * norm * norm / (alpha1-1) / amplitude) * psf + (2 * norm / gamma1) * rr_gg1 * dpsf_moffat1  # gamma1
     if not fixed[4]:
         J[4] = (np.pi * gamma1 * gamma1) * norm * norm / (amplitude * (alpha1-1) * (alpha1-1)) * psf - norm * psf_moffat1 * np.log(1 + rr_gg1)  # alpha1
     if not fixed[5]:
-        J[5] = norm * psf_moffat2 - ((np.pi * gamma2 * gamma2) / (alpha2 - 1) * norm * norm / amplitude) * psf
+        J[5] = norm * psf_moffat2 - ((np.pi * gamma2 * gamma2) / (alpha2 - 1) * norm * norm / amplitude) * psf  # eta
     if not fixed[6]:
-        J[6] = eta * (-2 * np.pi * gamma2 * norm * norm / (alpha2-1) / amplitude) * psf + eta * (2 * norm / gamma2) * rr_gg2 * dpsf_moffat2  # gamma2
+        J[6] = eta * (2 * norm / (gamma2 * gamma2)) * xc2 * dpsf_moffat2  # x_c2
     if not fixed[7]:
-        J[7] = eta * (np.pi * gamma2 * gamma2) * norm * norm / (amplitude * (alpha2-1) * (alpha2-1)) * psf - eta * norm * psf_moffat2 * np.log(1 + rr_gg2)  # alpha2
+        J[7] = eta * (2 * norm / (gamma2 * gamma2)) * yc2 * dpsf_moffat2  # y_c2
+    if not fixed[8]:
+        J[8] = eta * (-2 * np.pi * gamma2 * norm * norm / (alpha2-1) / amplitude) * psf + eta * (2 * norm / gamma2) * rr_gg2 * dpsf_moffat2  # gamma2
+    if not fixed[9]:
+        J[9] = eta * (np.pi * gamma2 * gamma2) * norm * norm / (amplitude * (alpha2-1) * (alpha2-1)) * psf - eta * norm * psf_moffat2 * np.log(1 + rr_gg2)  # alpha2
     return J
 
 
