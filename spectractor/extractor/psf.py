@@ -480,9 +480,9 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
     >>> a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha,
     ... eta_gauss=eta_gauss, y_g=Ny/2+3, sigma=sigma, norm_moffat=norm)
     >>> J = evaluate_moffatgauss1d_jacobian(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha,
-    ... eta_gauss=eta_gauss, y_g=Ny/2+3, sigma=sigma, norm_moffat=norm, dnormda=dnormda, fixed=np.array([False, False, True, False, False, False]))
+    ... eta_gauss=eta_gauss, y_g=Ny/2+3, sigma=sigma, norm_moffat=norm, dnormda=dnormda, fixed=np.array([False, False, True, False, False, False, False, False]))
     >>> J.shape
-    (7, 50)
+    (9, 50)
     >>> J.dtype
     dtype('float32')
     >>> np.allclose(J[2], 0)
@@ -505,7 +505,7 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
     psf_gauss = np.exp(-(rr_ss / 2))
     psf = psf_moffat + eta_gauss * psf_gauss
     norm = amplitude / ((1. / norm_moffat) + eta_gauss * np.sqrt(2 * np.pi) * sigma)
-    J = np.zeros((7, y.size), dtype=np.float32)
+    J = np.zeros((9, y.size), dtype=np.float32)
     if not fixed[0]:
         J[0] = (norm / amplitude) * psf  # amplitude
     # fixed x_c so J[1] = 0
@@ -517,10 +517,11 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
         J[4] = -norm * psf_moffat * np.log(1 + rr_gg) + psf * (norm * norm / amplitude) * (dnormda / (norm_moffat * norm_moffat))   # alpha
     if not fixed[5]:
         J[5] = norm * psf_gauss - (np.sqrt(2 * np.pi) * sigma * norm * norm / amplitude) * psf  # eta
-    if not fixed[6]:
-        J[6] = (norm / (sigma * sigma)) * ys * eta_gauss * psf_gauss   # y_g
+    # fixed x_c so J[6] = 0
     if not fixed[7]:
-        J[7] = (-eta_gauss * np.sqrt(2*np.pi) * norm * norm / amplitude) * psf + (eta_gauss * norm / sigma) * rr_ss * psf_gauss  # sigma
+        J[7] = (norm / (sigma * sigma)) * ys * eta_gauss * psf_gauss   # y_g
+    if not fixed[8]:
+        J[8] = (-eta_gauss * np.sqrt(2*np.pi) * norm * norm / amplitude) * psf + (eta_gauss * norm / sigma) * rr_ss * psf_gauss  # sigma
     return J
 
 
@@ -592,9 +593,9 @@ def evaluate_doublemoffat1d_jacobian(y, amplitude, y_c, gamma1, alpha1, eta, y_c
     >>> a = evaluate_doublemoffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma1=gamma1, alpha1=alpha1, eta=eta, y_c2=Ny/2+3, gamma2=gamma2, alpha2=alpha2, norm1=norm1, norm2=norm2)
     >>> J = evaluate_doublemoffat1d_jacobian(y, amplitude=amplitude, y_c=Ny/2, gamma1=gamma1, alpha1=alpha1,
     ... eta=eta, y_c2=Ny/2+3, gamma2=gamma2, alpha2=alpha2, norm1=norm1, dnormda1=dnormda1, norm2=norm2, dnormda2=dnormda2,
-    ... fixed=np.array([False, False, True, False, False, False, False, False]))
+    ... fixed=np.array([False, False, True, False, False, False, False, False, False]))
     >>> J.shape
-    (8, 50)
+    (9, 50)
     >>> J.dtype
     dtype('float32')
     >>> np.allclose(J[2], 0)
@@ -607,9 +608,10 @@ def evaluate_doublemoffat1d_jacobian(y, amplitude, y_c, gamma1, alpha1, eta, y_c
 
     """
     yc = y - y_c
+    yc2 = y - y_c2
     rr = yc * yc
     rr_gg1 = rr / (gamma1 * gamma1)
-    rr_gg2 = (y - y_c2) * (y - y_c2) / (gamma2 * gamma2)
+    rr_gg2 = yc2 * yc2 / (gamma2 * gamma2)
     inv_moffat1 = 1 / (1 + rr_gg1)
     psf_moffat1 = inv_moffat1 ** alpha1
     dpsf_moffat1 = alpha1 * inv_moffat1 * psf_moffat1
@@ -618,22 +620,25 @@ def evaluate_doublemoffat1d_jacobian(y, amplitude, y_c, gamma1, alpha1, eta, y_c
     dpsf_moffat2 = alpha2 * inv_moffat2 * psf_moffat2
     psf = psf_moffat1 + eta * psf_moffat2
     norm = amplitude / (1/norm1 + eta/norm2)
-    J = np.zeros((8, y.size), dtype=np.float32)
+    J = np.zeros((10, y.size), dtype=np.float32)
     if not fixed[0]:
         J[0] = (norm / amplitude) * psf  # amplitude
     # fixed x_c so J[1] = 0
     if not fixed[2]:
-        J[2] = (2 * norm / (gamma1 * gamma1)) * yc * dpsf_moffat1 + eta * (2 * norm / (gamma2 * gamma2)) * yc * dpsf_moffat2  # y_c
+        J[2] = (2 * norm / (gamma1 * gamma1)) * yc * dpsf_moffat1  # y_c
     if not fixed[3]:
         J[3] = (2 * norm / gamma1) * rr_gg1 * dpsf_moffat1 - (norm * norm / (amplitude * norm1 * gamma1)) * psf  # gamma1
     if not fixed[4]:
         J[4] = -norm * psf_moffat1 * np.log(1 + rr_gg1) + psf * (norm * norm / amplitude) * (dnormda1 / (norm1 * norm1))  # alpha1
     if not fixed[5]:
         J[5] = norm * psf_moffat2 - (1/norm2 * norm * norm / amplitude) * psf  # eta
-    if not fixed[6]:
-        J[6] = eta * (2 * norm / gamma2) * rr_gg2 * dpsf_moffat2 - (eta * norm * norm / (amplitude * norm2 * gamma2)) * psf  # gamma2
+    # fixed x_c so J[6] = 0
     if not fixed[7]:
-        J[7] = -eta * norm * psf_moffat2 * np.log(1 + rr_gg2) + psf * (norm * norm / amplitude) * (eta * dnormda2 / (norm2 * norm2))  # alpha2
+        J[7] = eta * (2 * norm / (gamma2 * gamma2)) * yc2 * dpsf_moffat2  # y_c2
+    if not fixed[8]:
+        J[8] = eta * (2 * norm / gamma2) * rr_gg2 * dpsf_moffat2 - (eta * norm * norm / (amplitude * norm2 * gamma2)) * psf  # gamma2
+    if not fixed[9]:
+        J[9] = -eta * norm * psf_moffat2 * np.log(1 + rr_gg2) + psf * (norm * norm / amplitude) * (eta * dnormda2 / (norm2 * norm2))  # alpha2
     return J
 
 
@@ -1300,7 +1305,6 @@ def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta
     fixed: array_like
         Array of booleans, with True values for fixed parameters.
 
-
     Returns
     -------
     J: array_like
@@ -1318,7 +1322,7 @@ def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta
     >>> J = evaluate_moffatgauss2d_jacobian(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2,
     ... eta_gauss=0.1, x_g=Nx/2+3, y_g=Ny/2+3, sigma=1, fixed=np.array([False, False, True, False, False, False, False, False, False]))
     >>> J.shape
-    (7, 2500)
+    (9, 2500)
     >>> J.dtype
     dtype('float32')
     >>> np.allclose(J[2], 0)
@@ -1344,7 +1348,7 @@ def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta
     psf_gauss = np.exp(-(rr_ss / 2))
     psf = psf_moffat + eta_gauss * psf_gauss
     norm = amplitude / ((np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * sigma * sigma)
-    J = np.zeros((7, x.size), dtype=np.float32)
+    J = np.zeros((9, x.size), dtype=np.float32)
     if not fixed[0]:
         J[0] = (norm / amplitude) * psf  # amplitude
     if not fixed[1]:
@@ -1417,7 +1421,7 @@ def evaluate_doublemoffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma1, alpha1, 
     >>> J = evaluate_doublemoffat2d_jacobian(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma1=5, alpha1=2,
     ... eta=2, x_c2=Nx/2+3, y_c2=Ny/2+3, gamma2=1, alpha2=3, fixed=np.array([False, False, True, False, False, False, False, False, False, False]))
     >>> J.shape
-    (8, 2500)
+    (10, 2500)
     >>> J.dtype
     dtype('float32')
     >>> np.allclose(J[2], 0)
@@ -1445,7 +1449,7 @@ def evaluate_doublemoffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma1, alpha1, 
     dpsf_moffat2 = alpha2 * inv_moffat2 * psf_moffat2
     psf = psf_moffat1 + eta * psf_moffat2
     norm = amplitude / ((np.pi * gamma1 * gamma1) / (alpha1 - 1) + eta * (np.pi * gamma2 * gamma2) / (alpha2 - 1))
-    J = np.zeros((8, x.size), dtype=np.float32)
+    J = np.zeros((10, x.size), dtype=np.float32)
     if not fixed[0]:
         J[0] = (norm / amplitude) * psf  # amplitude
     if not fixed[1]:
@@ -1987,13 +1991,13 @@ class MoffatGauss(PSF):
 
     def __init__(self, values=None, clip=False):
         PSF.__init__(self, clip=clip)
-        self.values_default = np.array([1, 0, 0, 3, 2, -0.5, 1, 1]).astype(float)
+        self.values_default = np.array([1, 0, 0, 3, 2, 0.5, 0, 2, 1, 1]).astype(float)
         if values is None:
             values = np.copy(self.values_default)
-        labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
-        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
+        labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "x_g", "y_g", "stddev", "saturation"]
+        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$x_g$", r"$y_g$", r"$\sigma$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (1.1, 10),
-                  (-1, -5e-3), (1, np.inf), (0, np.inf)]
+                  (-1, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (0, np.inf)]
         self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
@@ -2001,7 +2005,7 @@ class MoffatGauss(PSF):
             self.max_half_width = max_half_width
         self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
         self.params.bounds[3] = (1, self.max_half_width)
-        self.params.bounds[6] = (1, self.max_half_width)
+        self.params.bounds[8] = (1, self.max_half_width)
 
     def evaluate(self, pixels, values=None):
         r"""Evaluate the MoffatGauss function.
@@ -2028,7 +2032,7 @@ class MoffatGauss(PSF):
 
         Examples
         --------
-        >>> p = [2,20,30,4,2,-0.5,1,10]
+        >>> p = [2,20,30,4,2,0.5,23,33,1,10]
         >>> psf = MoffatGauss(p)
         >>> yy, xx = np.mgrid[:50, :60]
         >>> out = psf.evaluate(pixels=np.array([xx, yy]), values=p)
@@ -2038,7 +2042,7 @@ class MoffatGauss(PSF):
             import matplotlib.pyplot as plt
             import numpy as np
             from spectractor.extractor.psf import MoffatGauss
-            p = [2,20,30,4,2,-0.5,1,10]
+            p = [2,20,30,4,2,0.5,23,33,1,10]
             psf = MoffatGauss(p)
             yy, xx = np.mgrid[:50, :60]
             out = psf.evaluate(pixels=np.array([xx, yy]), values=p)
@@ -2051,10 +2055,10 @@ class MoffatGauss(PSF):
         """
         if values is not None:
             self.params.values = np.asarray(values).astype(float)
-        amplitude, x_c, y_c, gamma, alpha, eta_gauss, stddev, saturation = self.params.values
+        amplitude, x_c, y_c, gamma, alpha, eta_gauss, x_g, y_g, stddev, saturation = self.params.values
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
-            out = evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, stddev)
+            out = evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, x_g, y_g, stddev)
             if self.clip:
                 out = np.clip(out, 0, saturation)
             return out
@@ -2062,7 +2066,7 @@ class MoffatGauss(PSF):
             y = np.array(pixels)
             if alpha > 0.5:
                 norm = evaluate_moffat1d_normalisation(gamma, alpha)
-                out = evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, stddev, norm_moffat=norm)
+                out = evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, y_g, stddev, norm_moffat=norm)
                 if self.clip:
                     out = np.clip(out, 0, saturation)
                 return out
@@ -2098,10 +2102,10 @@ class MoffatGauss(PSF):
 
         Examples
         --------
-        >>> p = [2,20,30,4,2,-0.5,1,10]
+        >>> p = [2,20,30,4,2,0.5,23,33,1,10]
         >>> epsilon = [0.001] * len(p)
         >>> psf = MoffatGauss(p)
-        >>> psf.params.fixed = [True, True, False, False, False, False, False, True]  # fix amplitude, x_c, saturation
+        >>> psf.params.fixed = [True, True, False, False, False, False, False, False, False, True]  # fix amplitude, x_c, saturation
 
         2D case
 
@@ -2129,7 +2133,7 @@ class MoffatGauss(PSF):
         >>> np.allclose(J_ana[0:2], 0)
         True
 
-        ..  doctest::
+        .. doctest::
             :hide:
 
             >>> assert J_ana.shape == (len(p), y.size)
@@ -2137,7 +2141,7 @@ class MoffatGauss(PSF):
         """
         if epsilon is None and not analytical:
             raise ValueError(f"If analytical=False, must give epsilon values for numerical differentiation.")
-        amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma, saturation = self.params.values.astype(float)
+        amplitude, x_c, y_c, gamma, alpha, eta_gauss, x_g, y_g, sigma, saturation = self.params.values.astype(float)
         J = super().jacobian(pixels, params, epsilon=epsilon, model_input=model_input, analytical=analytical)
         if not analytical:
             if model_input is None:
@@ -2158,10 +2162,10 @@ class MoffatGauss(PSF):
             if pixels.ndim == 1:
                 norm = evaluate_moffat1d_normalisation(gamma, alpha)
                 dnormda = evaluate_moffat1d_normalisation_dalpha(norm, alpha)
-                J[:-1] = evaluate_moffatgauss1d_jacobian(pixels, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm, dnormda, fixed=fixed)   # [:-1] assume saturation is fixed
+                J[:-1] = evaluate_moffatgauss1d_jacobian(pixels, amplitude, y_c, gamma, alpha, eta_gauss, y_g, sigma, norm, dnormda, fixed=fixed)   # [:-1] assume saturation is fixed
             else:
                 xx, yy = pixels
-                J[:-1] = evaluate_moffatgauss2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma, fixed=fixed)  # [:-1] assume saturation is fixed
+                J[:-1] = evaluate_moffatgauss2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma, alpha, eta_gauss, x_g, y_g, sigma, fixed=fixed)  # [:-1] assume saturation is fixed
         return J
 
 
@@ -2169,13 +2173,14 @@ class DoubleMoffat(PSF):
 
     def __init__(self, values=None, clip=False):
         PSF.__init__(self, clip=clip)
-        self.values_default = np.array([1, 0, 0, 3, 2, 0.005, 3, 1.5, 10]).astype(float)
+        self.values_default = np.array([1, 0, 0, 3, 2, 0.005, 0, 2, 3, 1.5, 10]).astype(float)
         if values is None:
             values = np.copy(self.values_default)
-        labels = ["amplitude", "x_c", "y_c", "gamma1", "alpha1", "eta", "gamma2", "alpha2", "saturation"]
-        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma_1$", r"$\alpha_1$", r"$\eta$", r"$\gamma_2$", r"$\alpha_2$", "saturation"]
+        labels = ["amplitude", "x_c", "y_c", "gamma1", "alpha1", "eta", "x_c2", "y_c2", "gamma2", "alpha2", "saturation"]
+        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma_1$", r"$\alpha_1$", r"$\eta$", r"$x_{c,2}$", r"$y_{c,2}$",
+                      r"$\gamma_2$", r"$\alpha_2$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (1.1, 10),
-                  (0, 1), (1, np.inf), (1.1, 10), (0, np.inf)]
+                  (-1, 1), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (1.1, 10), (0, np.inf)]
         self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
@@ -2183,7 +2188,7 @@ class DoubleMoffat(PSF):
             self.max_half_width = max_half_width
         self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
         self.params.bounds[3] = (1, self.max_half_width)
-        self.params.bounds[5] = (1, self.max_half_width)
+        self.params.bounds[7] = (1, self.max_half_width)
 
     def evaluate(self, pixels, values=None):
         r"""Evaluate the DoubleMoffat function.
@@ -2210,7 +2215,7 @@ class DoubleMoffat(PSF):
 
         Examples
         --------
-        >>> p = [2,20,30,4,2,2,5,1.5,20]
+        >>> p = [2,20,30,4,2,2,23,33,5,1.5,20]
         >>> psf = DoubleMoffat(p)
         >>> yy, xx = np.mgrid[:50, :60]
         >>> out = psf.evaluate(pixels=np.array([xx, yy]), values=p)
@@ -2220,7 +2225,7 @@ class DoubleMoffat(PSF):
             import matplotlib.pyplot as plt
             import numpy as np
             from spectractor.extractor.psf import DoubleMoffat
-            p = [2,20,30,4,2,2,5,1.5,20]
+            p = [2,20,30,4,2,2,23,33,5,1.5,20]
             psf = DoubleMoffat(p)
             yy, xx = np.mgrid[:50, :60]
             out = psf.evaluate(pixels=np.array([xx, yy]), values=p)
@@ -2233,10 +2238,10 @@ class DoubleMoffat(PSF):
         """
         if values is not None:
             self.params.values = np.asarray(values).astype(float)
-        amplitude, x_c, y_c, gamma1, alpha1, eta, gamma2, alpha2, saturation = self.params.values
+        amplitude, x_c, y_c, gamma1, alpha1, eta, x_c2, y_c2, gamma2, alpha2, saturation = self.params.values
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
-            out = evaluate_doublemoffat2d(x, y, amplitude, x_c, y_c, gamma1, alpha1, eta, gamma2, alpha2)
+            out = evaluate_doublemoffat2d(x, y, amplitude, x_c, y_c, gamma1, alpha1, eta, x_c2, y_c2, gamma2, alpha2)
             if self.clip:
                 out = np.clip(out, 0, saturation)
             return out
@@ -2245,7 +2250,7 @@ class DoubleMoffat(PSF):
             if alpha1 > 0.5 and alpha2 > 0.5:
                 norm1 = evaluate_moffat1d_normalisation(gamma1, alpha1)
                 norm2 = evaluate_moffat1d_normalisation(gamma2, alpha2)
-                out = evaluate_doublemoffat1d(y, amplitude, y_c, gamma1, alpha1, eta, gamma2, alpha2, norm1, norm2)
+                out = evaluate_doublemoffat1d(y, amplitude, y_c, gamma1, alpha1, eta, y_c2, gamma2, alpha2, norm1, norm2)
                 if self.clip:
                     out = np.clip(out, 0, saturation)
                 return out
@@ -2281,10 +2286,10 @@ class DoubleMoffat(PSF):
 
         Examples
         --------
-        >>> p = [2,20,30,4,2,0.5,3,3,20]
+        >>> p = [2,20,30,4,2,2,23,33,5,1.5,20]
         >>> epsilon = [0.001] * len(p)
         >>> psf = DoubleMoffat(p)
-        >>> psf.params.fixed = [True, True, False, False, False, False, False, False, True]  # fix amplitude, x_c, saturation
+        >>> psf.params.fixed = [True, True, False, False, False, False, False, False, False, False, True]  # fix amplitude, x_c, saturation
 
         2D case
 
@@ -2320,7 +2325,7 @@ class DoubleMoffat(PSF):
         """
         if epsilon is None and not analytical:
             raise ValueError(f"If analytical=False, must give epsilon values for numerical differentiation.")
-        amplitude, x_c, y_c, gamma1, alpha1, eta, gamma2, alpha2, saturation = self.params.values.astype(float)
+        amplitude, x_c, y_c, gamma1, alpha1, eta, x_c2, y_c2, gamma2, alpha2, saturation = self.params.values.astype(float)
         J = super().jacobian(pixels, params, epsilon=epsilon, model_input=model_input, analytical=analytical)
         if not analytical:
             if model_input is None:
@@ -2343,10 +2348,10 @@ class DoubleMoffat(PSF):
                 norm2 = evaluate_moffat1d_normalisation(gamma2, alpha2)
                 dnormda1 = evaluate_moffat1d_normalisation_dalpha(norm1, alpha1)
                 dnormda2 = evaluate_moffat1d_normalisation_dalpha(norm2, alpha2)
-                J[:-1] = evaluate_doublemoffat1d_jacobian(pixels, amplitude, y_c, gamma1, alpha1, eta, gamma2, alpha2, norm1, dnormda1, norm2, dnormda2, fixed=fixed)   # [:-1] assume saturation is fixed
+                J[:-1] = evaluate_doublemoffat1d_jacobian(pixels, amplitude, y_c, gamma1, alpha1, eta, y_c2, gamma2, alpha2, norm1, dnormda1, norm2, dnormda2, fixed=fixed)   # [:-1] assume saturation is fixed
             else:
                 xx, yy = pixels
-                J[:-1] = evaluate_doublemoffat2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma1, alpha1, eta, gamma2, alpha2, fixed=fixed)  # [:-1] assume saturation is fixed
+                J[:-1] = evaluate_doublemoffat2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma1, alpha1, eta, x_c2, y_c2, gamma2, alpha2, fixed=fixed)  # [:-1] assume saturation is fixed
         return J
 
 
