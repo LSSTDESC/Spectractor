@@ -421,10 +421,8 @@ class Image(object):
             raise AttributeError(f"Noise map must be in ADU units to be plotted and analyzed. "
                                  f"Currently self.units={self.units}.")
         data = np.copy(self.data)
-        min_noz = np.min(data[data > 0])
-        data[data <= 0] = min_noz
-        y = self.err.flatten() ** 2
-        x = data.flatten()
+        y = self.err[data > 0].flatten() ** 2
+        x = data[data > 0].flatten()
         fit, cov, model = fit_poly1d(x, y, order=1)
         gain = 1 / fit[0]
         read_out = np.sqrt(fit[1]) * gain
