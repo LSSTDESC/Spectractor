@@ -959,7 +959,7 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
             sub_image_y0 = target_pixcoords[1] - y0 + Dy
     elif parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "guess":
         Dx, Dy = widths
-        sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=target_pixcoords,
+        sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess,
                                                                             rotated=rotated, widths=(Dx, Dy))
         theX, theY = guess
         sub_image_x0 = theX - x0 + Dx
