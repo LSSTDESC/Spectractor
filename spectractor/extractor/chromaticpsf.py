@@ -1736,6 +1736,7 @@ class ChromaticPSF:
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
         >>> parameters.DEBUG = True
+        >>> parameters.VERBOSE = True
 
         Build a mock spectrogram with random Poisson noise using the full 2D PSF model:
 
@@ -1869,7 +1870,7 @@ class ChromaticPSF:
         self.cov_matrix = np.copy(w.amplitude_cov_matrix)
 
         # add background crop to y_c
-        for y0_index in self.y0_params:
+        for y0_index in w.y0_params:
             self.params.values[self.Nx + y0_index] += w.bgd_width
 
         # fill results
@@ -1912,7 +1913,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         for k, par in enumerate(params.labels):
             if "y_" in par and "_0" in par:
                 self.y0_params.append(k)
-                break
 
         # prepare the fit
         self.Ny, self.Nx = self.data.shape
@@ -2288,7 +2288,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # prepare the vectors
         poly_params = np.concatenate([np.ones(self.Nx), shape_params])
         for y0_index in self.y0_params:
-            self.poly_params[self.Nx + y0_index] -= self.bgd_width
+            poly_params[self.Nx + y0_index] -= self.bgd_width
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         profile_params[:self.Nx, 0] = 1
         profile_params[:self.Nx, 1] = np.arange(self.Nx)
