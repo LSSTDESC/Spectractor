@@ -1220,6 +1220,8 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
         star2D = psf.evaluate(pixels=np.array([X, Y]))
         plot_image_simple(ax1, data=sub_image_subtracted, scale="lin", title="", units=image.units,
                           target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
+        plt.axvline(avX, color='r', linestyle='-', lw=2, label="profile**4 guess")
+        plt.axhline(avY, color='r', linestyle='-', lw=2)
         ax1.legend(loc=1)
 
         ax1.text(0.05, 0.05, f'Data', color="white",
