@@ -222,9 +222,10 @@ class ChromaticPSF:
         >>> s = ChromaticPSF(psf, Nx=5, Ny=4, deg=1, saturation=20000)
         >>> params = s.generate_test_poly_params()
 
-        ..  doctest::
+        .. doctest::
             :hide:
-            >>> assert(np.all(np.isclose(params,[10, 50, 100, 150, 200, 0, 0, 0, 0, 5, 0, 2, 0, -0.4, 0, 1, 0, 20000])))
+
+            >>> assert(np.all(np.isclose(params,[10, 50, 100, 150, 200, 0, 0, 0, 0, 5, 0, 2, 0, 0.4, 0, 0, 0, 4, 0, 1, 0, 20000])))
 
         """
         if not isinstance(self.psf, MoffatGauss) and not isinstance(self.psf, Moffat):
@@ -241,7 +242,9 @@ class ChromaticPSF:
         params += [0.] * (self.degrees['gamma'] - 1) + [0, 5]  # gamma
         params += [0.] * (self.degrees['alpha'] - 1) + [0, 2]  # alpha
         if isinstance(self.psf, MoffatGauss):
-            params += [0.] * (self.degrees['eta_gauss'] - 1) + [0, -0.4]  # eta_gauss
+            params += [0.] * (self.degrees['eta_gauss'] - 1) + [0, 0.4]  # eta_gauss
+            params += [0.] * (self.degrees['x_g'] - 1) + [0, 0]  # x mean
+            params += [0.] * (self.degrees['y_g'] - 1) + [0, 4]  # y mean
             params += [0.] * (self.degrees['stddev'] - 1) + [0, 1]  # stddev
         params += [self.saturation]  # saturation
         poly_params = np.zeros_like(params)
@@ -1116,7 +1119,7 @@ class ChromaticPSF:
 
         ..  doctest::
             :hide:
-            >>> assert(np.all(np.isclose(profile_params[0], [10, 0, 50, 5, 2, -0.4, 1, 8e3])))
+            >>> assert(np.all(np.isclose(profile_params[0], [10, 0, 50, 5, 2, 0.4, 0, 53, 1, 8e3])))
 
         From the profile parameters to the polynomial parameters:
 
@@ -1143,9 +1146,9 @@ class ChromaticPSF:
             delta = 0
             if name != 'amplitude':
                 weights = np.copy(amplitude)[indices]
-                if name == 'x_c':
+                if 'x_' in name:
                     delta = self.x0
-                if name == 'y_c':
+                if 'y_' in name:
                     delta = self.y0
                 if parameters.PSF_POLY_TYPE == "legendre":
                     fit = np.polynomial.legendre.legfit(poly_x, profile_params[indices, k] - delta,
@@ -1255,16 +1258,16 @@ class ChromaticPSF:
 
         ..  doctest::
             :hide:
-            >>> assert np.allclose(profile_params[0], [10, 0, 50, 5, 2, -0.4, 1, 8e3], rtol=1e-3, atol=1e-3)
+            >>> assert np.allclose(profile_params[0], [10, 0, 50, 5, 2, 0.4, 0, 54, 1, 8e3], rtol=1e-3, atol=1e-3)
 
         From the profile parameters to the polynomial parameters:
 
-        >>> profile_params = s.from_profile_params_to_poly_params(profile_params)
+        >>> poly_params = s.from_profile_params_to_poly_params(profile_params)
 
         ..  doctest::
             :hide:
 
-            >>> assert np.allclose(profile_params, poly_params_test)
+            >>> assert np.allclose(poly_params, poly_params_test)
 
         From the polynomial parameters to the profile parameters without Moffat amplitudes:
 
@@ -1272,7 +1275,7 @@ class ChromaticPSF:
 
         ..  doctest::
             :hide:
-            >>> assert np.allclose(profile_params[0], [1, 0, 50, 5, 2, -0.4, 1, 8e3])
+            >>> assert np.allclose(profile_params[0], [1, 0, 50, 5, 2, 0.4, 0, 54, 1, 8e3])
 
         """
         length = len(self.table)
@@ -1299,9 +1302,9 @@ class ChromaticPSF:
                         elif parameters.PSF_POLY_TYPE == "polynomial":
                             profile_params[:, k] = np.polynomial.polynomial.polyval(poly_x, p)
                 shift += self.degrees[name] + 1
-                if name == 'x_c':
+                if 'x_' in name:
                     profile_params[:, k] += self.x0
-                if name == 'y_c':
+                if 'y_' in name:
                     profile_params[:, k] += self.y0
         if apply_bounds:
             for k, name in enumerate(self.psf.params.labels):
@@ -1546,6 +1549,8 @@ class ChromaticPSF:
             gamma True
             alpha True
             eta_gauss True
+            x_g True
+            y_g True
             stddev True
             saturation True
             >>> assert(not np.any(np.isclose(s.table['flux_sum'][3:6], np.zeros(s.Nx)[3:6], rtol=1e-3)))
@@ -1573,8 +1578,6 @@ class ChromaticPSF:
         # guess = [2 * np.nanmax(signal), middle, 0.5 * fwhm, 2, 0, 0.1 * fwhm, saturation]
         signal_sum = np.nanmax(signal)
         guess[0] = signal_sum
-        guess[1] = xmax_index
-        guess[2] = middle
         guess[-1] = saturation
         # bounds = [(0.1 * maxi, 10 * maxi), (middle - w, middle + w), (0.1, min(fwhm, Ny // 2)), (0.1, self.alpha_max),
         #           (-1, 0),
@@ -1584,8 +1587,13 @@ class ChromaticPSF:
         initial_bounds = np.copy(psf.params.bounds)
         bounds = np.copy(psf.params.bounds)
         bounds[0] = (0.1 * signal_sum, 2 * signal_sum)
-        bounds[2] = (middle - w, middle + w)
         bounds[-1] = (0, 2 * saturation)
+        for k, label in enumerate(psf.params.labels):
+            if "x_" in label:
+                guess[k] = xmax_index
+            if "y_" in label:
+                guess[k] = middle
+                bounds[k] = (middle - w, middle + w)
         # moffat_guess = [2 * np.nanmax(signal), middle, 0.5 * fwhm, 2]
         # moffat_bounds = [(0.1 * maxi, 10 * maxi), (middle - w, middle + w), (0.1, min(fwhm, Ny // 2)), (0.1, 10)]
         # fit = fit_moffat1d_outlier_removal(index, signal, sigma=sigma, niter=2,
@@ -1630,7 +1638,9 @@ class ChromaticPSF:
             # bounds[0] = (0.1 * np.nanstd(bgd), 2 * np.nanmax(y[middle - ws[0]:middle + ws[0]]))
             bounds[0] = (0.1 * signal_sum, 1.5 * signal_sum)
             guess[0] = signal_sum
-            guess[1] = x
+            for k, label in enumerate(psf.params.labels):
+                if "x_" in label:
+                    guess[k] = x
             # if guess[4] > -1:
             #    guess[0] = np.max(signal) / (1 + guess[4])
             # std = np.sqrt(np.nansum(pdf * (index - mean) ** 2))

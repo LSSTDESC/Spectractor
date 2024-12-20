@@ -1991,7 +1991,7 @@ class MoffatGauss(PSF):
 
     def __init__(self, values=None, clip=False):
         PSF.__init__(self, clip=clip)
-        self.values_default = np.array([1, 0, 0, 3, 2, 0.5, 0, 2, 1, 1]).astype(float)
+        self.values_default = np.array([1, 0, 0, 3, 2, 0.5, 0, 3, 2, 1]).astype(float)
         if values is None:
             values = np.copy(self.values_default)
         labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "x_g", "y_g", "stddev", "saturation"]
@@ -2005,6 +2005,7 @@ class MoffatGauss(PSF):
             self.max_half_width = max_half_width
         self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
         self.params.bounds[3] = (1, self.max_half_width)
+        self.params.bounds[7] = (-2 * self.max_half_width, 2 * self.max_half_width)
         self.params.bounds[8] = (1, self.max_half_width)
 
     def evaluate(self, pixels, values=None):
@@ -2188,7 +2189,8 @@ class DoubleMoffat(PSF):
             self.max_half_width = max_half_width
         self.params.bounds[2] = (-2 * self.max_half_width, 2 * self.max_half_width)
         self.params.bounds[3] = (1, self.max_half_width)
-        self.params.bounds[7] = (1, self.max_half_width)
+        self.params.bounds[7] = (-2 * self.max_half_width, 2 * self.max_half_width)
+        self.params.bounds[8] = (1, self.max_half_width)
 
     def evaluate(self, pixels, values=None):
         r"""Evaluate the DoubleMoffat function.
@@ -2627,7 +2629,9 @@ class PSFFitWorkspace(FitWorkspace):
             self.Nx = 1
             self.psf.apply_max_width_to_bounds(self.Ny)
             self.pixels = np.arange(self.Ny, dtype=int)
-            self.params.fixed[1] = True
+            for k, label in enumerate(self.params.labels):
+                if "x_" in label:
+                    self.params.fixed[k] = True
         else:
             raise ValueError(f"Data array must have dimension 1 or 2. Here pixels.ndim={data.ndim}.")
 
