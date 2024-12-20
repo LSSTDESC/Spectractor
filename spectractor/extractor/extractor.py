@@ -477,8 +477,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
             # Fill spectrogram trace as a function of the pixel column x
             self.psf_profile_params[order][:, 0] = self.params[f"A{order}"] * self.tr[k](self.lambdas)
-            self.psf_profile_params[order][:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0
-            self.psf_profile_params[order][:, 2] += dispersion_law.imag - self.bgd_width
+            for p, label in enumerate(self.spectrum.chromatic_psf.psf.params.labels):
+                if "x_" in label:
+                    self.psf_profile_params[order][:, p] = dispersion_law.real + self.spectrum.spectrogram_x0
+                if "y_" in label:
+                    self.psf_profile_params[order][:, p] += dispersion_law.imag - self.bgd_width
 
             # Matrix filling
             M_order = self.spectrum.chromatic_psf.build_sparse_M(self.pixels, self.psf_profile_params[order],

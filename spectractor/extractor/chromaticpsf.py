@@ -202,7 +202,9 @@ class ChromaticPSF:
     def set_polynomial_degrees(self, deg):
         self.deg = deg
         self.degrees = {key: deg for key in self.psf.params.labels}
-        self.degrees["x_c"] = max(self.degrees["x_c"], 1)
+        for key in self.psf.params.labels:
+            if "x_" in key:
+                self.degrees[key] = max(self.degrees[key], 1)
         self.degrees['saturation'] = 0
 
     def generate_test_poly_params(self):
@@ -1453,9 +1455,9 @@ class ChromaticPSF:
         for i, name in enumerate(self.psf.params.labels):
             coeffs = [self.params.values[k] for k in range(self.params.ndim) if name in self.params.labels[k]]
             delta = 0
-            if name == 'x_c':
+            if "x_" in name:
                 delta = self.x0
-            if name == 'y_c':
+            if "y_" in name:
                 delta = self.y0
             if parameters.PSF_POLY_TYPE == "legendre":
                 PSF_models.append(np.polynomial.polynomial.legval(rescale_x_to_legendre(all_pixels), coeffs) + delta)
@@ -1867,7 +1869,8 @@ class ChromaticPSF:
         self.cov_matrix = np.copy(w.amplitude_cov_matrix)
 
         # add background crop to y_c
-        self.params.values[w.Nx + w.y_c_0_index] += w.bgd_width
+        for y0_index in self.y0_params:
+            self.params.values[self.Nx + y0_index] += w.bgd_width
 
         # fill results
         self.psf.apply_max_width_to_bounds(max_half_width=w.Ny + 2 * w.bgd_width)
@@ -1895,7 +1898,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                                axis_names=list(np.copy(chromatic_psf.params.axis_names[length:])), fixed=None,
                                truth=truth, filename=file_name)
         for k, par in enumerate(params.labels):
-            if "x_c" in par or "saturation" in par:
+            if "x_" in par or "saturation" in par:
                 params.fixed[k] = True
         FitWorkspace.__init__(self, params, file_name=file_name, verbose=verbose, plot=plot, live_fit=live_fit)
         self.my_logger = set_logger(self.__class__.__name__)
@@ -1905,10 +1908,10 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.bgd_model_func = bgd_model_func
         self.analytical = analytical
         self.poly_params = np.copy(self.chromatic_psf.params.values)
-        self.y_c_0_index = -1
+        self.y0_params = []
         for k, par in enumerate(params.labels):
-            if par == "y_c_0":
-                self.y_c_0_index = k
+            if "y_" in par and "_0" in par:
+                self.y0_params.append(k)
                 break
 
         # prepare the fit
@@ -1946,8 +1949,8 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             yy, xx = np.mgrid[:self.Ny, :self.Nx]
             self.pixels = np.asarray([xx, yy])
 
-
-        self.poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
+        for y0_index in self.y0_params:
+            self.poly_params[self.Nx + y0_index] -= self.bgd_width
         self.profile_params = self.chromatic_psf.from_poly_params_to_profile_params(self.poly_params)
         self.data_before_mask = np.copy(self.data)
         self.mask_before_mask = list(np.copy(self.mask))
@@ -2284,7 +2287,8 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # linear regression for the amplitude parameters
         # prepare the vectors
         poly_params = np.concatenate([np.ones(self.Nx), shape_params])
-        poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
+        for y0_index in self.y0_params:
+            self.poly_params[self.Nx + y0_index] -= self.bgd_width
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         profile_params[:self.Nx, 0] = 1
         profile_params[:self.Nx, 1] = np.arange(self.Nx)
@@ -2358,7 +2362,8 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         if self.amplitude_priors_method == "fixed":
             self.model = self.chromatic_psf.evaluate(self.pixels, poly_params)
             # self.chromatic_psf.params.values is updated in evaluate(): reset to original values
-            self.chromatic_psf.params.values[self.Nx + self.y_c_0_index] += self.bgd_width
+            for y0_index in self.y0_params:
+                self.chromatic_psf.params.values[self.Nx + y0_index] += self.bgd_width
         self.poly_params = np.copy(poly_params)
         self.profile_params = np.copy(profile_params)
         self.model_err = np.zeros_like(self.model)
