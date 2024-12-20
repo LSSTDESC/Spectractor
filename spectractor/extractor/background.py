@@ -5,6 +5,7 @@ import matplotlib as mpl
 import os
 import copy
 
+import photutils.utils.exceptions
 from spectractor import parameters
 from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_removal, plot_image_simple
 
@@ -15,7 +16,8 @@ from photutils.segmentation import detect_threshold, detect_sources
 from scipy.signal import medfilt2d
 from scipy import ndimage
 from scipy.interpolate import RegularGridInterpolator
-
+import warnings
+warnings.filterwarnings("ignore", category=photutils.utils.exceptions.NoDetectionsWarning)
 
 def _from_bkgd_interp_to_func(bgd_model_func_interp):
     def bgd_model_func(x, y):
