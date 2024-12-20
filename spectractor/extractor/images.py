@@ -909,7 +909,7 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
 
-    if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "fit" or rotated:
+    if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "fit":
         if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
             if guess is None:
                 raise ValueError(f"Guess parameter must be set if WCS solution is not found.")
