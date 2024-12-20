@@ -85,7 +85,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         if not fit_angstrom_exponent:
             fixed[3] = True  # angstrom_exponent
         bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 1), (0, 3), (100, 700), (0, 20),
-                       (0.1, 20),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
+                       (0.5, 20),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
                   (-2, 2), (-np.inf, np.inf)]
         params = FitParameters(p, labels=["A1", "A2", "VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]",
                                           "reso [nm]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],
@@ -290,9 +290,15 @@ class SpectrumFitWorkspace(FitWorkspace):
         # main plot
         self.plot_spectrum_comparison_simple(ax3, title="", size=0.8)
         # zoom O2
-        self.plot_spectrum_comparison_simple(ax2, extent=[730, 800], title='Zoom $O_2$', size=0.8)
+        if np.max(self.spectrum.lambdas) > 800 and np.min(self.spectrum.lambdas) < 730:
+            self.plot_spectrum_comparison_simple(ax2, extent=[730, 800], title='Zoom $O_2$', size=0.8)
+        else:
+            ax2.remove()
         # zoom H2O
-        self.plot_spectrum_comparison_simple(ax1, extent=[870, 1000], title='Zoom $H_2 O$', size=0.8)
+        if np.max(self.spectrum.lambdas) > 1000 and np.min(self.spectrum.lambdas) < 870:
+            self.plot_spectrum_comparison_simple(ax1, extent=[870, 1000], title='Zoom $H_2 O$', size=0.8)
+        else:
+            ax1.remove()
         fig.tight_layout()
         if self.live_fit:  # pragma: no cover
             plt.draw()
@@ -387,10 +393,9 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
 
         fit_workspace.simulation.fast_sim = False
         fixed = copy.copy(fit_workspace.params.fixed)
-        #fit_workspace.params.fixed = [True] * len(fit_workspace.params.values)
-        #fit_workspace.params.fixed[0] = False
-        #run_minimisation(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-3, ftol=100 / fit_workspace.data.size,
-        #                 verbose=False)
+        fit_workspace.params.fixed[6] = True
+        run_minimisation(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-3, ftol=100 / fit_workspace.data.size,
+                         verbose=False)
         fit_workspace.params.fixed = fixed
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-6,
                                         ftol=1 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False)
