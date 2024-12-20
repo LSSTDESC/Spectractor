@@ -1893,6 +1893,7 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
 
     """
     with_adr = int(with_adr)
+    spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
     if spectrum.units != "ADU/s":  # go back in ADU/s to remove previous lambda*dlambda normalisation
         spectrum.convert_from_flam_to_ADUrate()
     distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis()
