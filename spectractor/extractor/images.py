@@ -1184,7 +1184,7 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
     # fit a 2D star profile close to this position
     psf = Moffat(clip=True)
     total_flux = np.sum(sub_image_subtracted)
-    psf.params.values[:3] = [total_flux, avX, avY]
+    psf.params.values[:5] = [total_flux, avX, avY, np.mean([sigX, sigY]), 3]
     psf.params.values[-1] = image.saturation
     if image.target_star2D is not None:
         psf.params.values = image.target_star2D.params.values
