@@ -1568,7 +1568,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
                         test = spec_smooth[idx]
         # remove weak lines
         if spec_smooth[peak_index] < 5e-2 * np.max(spec_smooth):
-            print("excude", line.label, np.mean(spec_smooth[index]), np.max(spec_smooth))
             continue
         # search for first local minima around the local maximum
         # or for first local maxima around the local minimum
@@ -1852,7 +1851,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
         global_chisq /= len(lambda_shifts)
         shift = np.average(np.abs(lambda_shifts) ** 2, weights=np.array(snrs) ** 2)
         # if guess values on tabulated lines have not moved: penalize the chisq
-        print("chisq", global_chisq+shift, global_chisq, shift)
         global_chisq += shift
         # lines.my_logger.debug(f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}'
         #                      f'\n\tTotal chisq: {global_chisq:.3f} with shift {shift:.3f}pix')
@@ -1983,7 +1981,6 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
             if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
                 fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'D2CCD_x0_fit.pdf'))
     start = np.array([D, pixel_shift])
-    print("start", start, D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR)
 
     # now minimize around the global minimum found previously
     res = optimize.minimize(shift_minimizer, start, args=(), method='L-BFGS-B',
@@ -1999,7 +1996,6 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
     # m.limits = ((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2))
     # m.migrad()
     # D, pixel_shift = np.array(m.values[:])
-    print(res)
     D, pixel_shift = res.x
     spectrum.disperser.D = D
     x0 = [x0[0] + pixel_shift, x0[1]]
