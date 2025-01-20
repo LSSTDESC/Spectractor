@@ -1841,7 +1841,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             if line.use_for_calibration:
                 # wavelength shift between tabulate and observed lines
                 lambda_shifts.append(peak_pos - line.wavelength)
-                print("used for calib", line.label, peak_pos - line.wavelength)
                 snrs.append(snr)
     if ax is not None:
         lines.plot_detected_lines(ax)
@@ -1933,7 +1932,6 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
         spectrum.convert_from_ADUrate_to_flam()
         chisq = detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
                              fwhm_func=fwhm_func, ax=None, calibration_lines_only=True)
-        print("shift_minimize", params, chisq+(shift / parameters.PIXSHIFT_PRIOR) ** 2, chisq, (shift / parameters.PIXSHIFT_PRIOR) ** 2,"\n")
         chisq += (shift / parameters.PIXSHIFT_PRIOR) ** 2
         spectrum.convert_from_flam_to_ADUrate()
         return chisq
