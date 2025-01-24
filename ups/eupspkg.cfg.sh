@@ -1,4 +1,4 @@
 build() {
    default_build
-   nosetests
+   pytest --log-cli-level=INFO tests
 }
