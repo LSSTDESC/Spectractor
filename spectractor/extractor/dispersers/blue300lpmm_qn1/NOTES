@@ -1,1 +1,3 @@
 Blue quad notch filter
+- ratio_order_2over1.txt: fake data
+- transmission.txt: adapted from ShiftedT.dat file on confluence https://rubinobs.atlassian.net/wiki/spaces/LTS/pages/50075815/AuxTel+Filters and multiplied by Edmund 300lpmm blazed grating transmission curve from their spreadsheet; added an arbitrary 1% uncertainty

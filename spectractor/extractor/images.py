@@ -431,9 +431,9 @@ class Image(object):
         if not np.isclose(gain, np.nanmean(self.gain), rtol=1e-2):
             self.my_logger.warning(f"\n\tFitted gain seems to be different than input gain. "
                                    f"Fit={gain} but average of self.gain is {np.nanmean(self.gain)}.")
-        if not np.isclose(read_out / parameters.CCD_REBIN, np.nanmean(self.read_out_noise), rtol=1e-2):
+        if not np.isclose(read_out, np.nanmean(self.read_out_noise), rtol=1e-1):
             self.my_logger.warning(f"\n\tFitted read out noise seems to be different than input readout noise. "
-                                   f"Fit={read_out / parameters.CCD_REBIN} but average of self.read_out_noise is "
+                                   f"Fit={read_out} but average of self.read_out_noise is "
                                    f"{np.nanmean(self.read_out_noise)}.")
         return fit, x, y, model
 
