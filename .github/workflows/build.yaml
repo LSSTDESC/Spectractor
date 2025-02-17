@@ -14,11 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: conda-incubator/setup-miniconda@v2
+      # - uses: conda-incubator/setup-miniconda@v2
+      - uses: mamba-org/setup-micromamba@v2
         with:
           python-version: "3.11"
-          miniforge-variant: Mambaforge
-          miniforge-version: latest
+          #miniforge-variant: Mambaforge
+          #miniforge-version: latest
           show-channel-urls: true
           activate-environment: test
 
