@@ -12,14 +12,12 @@ jobs:
   build_and_test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      # - uses: conda-incubator/setup-miniconda@v2
-      - uses: mamba-org/setup-micromamba@v2
+      - uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: "3.11"
-          #miniforge-variant: Mambaforge
-          #miniforge-version: latest
+          channels: conda-forge,defaults
           show-channel-urls: true
           activate-environment: test
 
@@ -27,11 +25,11 @@ jobs:
         # Might be quicker to install rubin-env plus any necessary additions.
         shell: bash -l {0}
         run: |
-          mamba install -y  "numpy>1.15" scipy "matplotlib>3.1" pandas llvmlite numba "astropy>=3.2" "photutils>=1.7" astroquery coloredlogs scikit-image>=0.20 h5py emcee tqdm mpi4py schwimmbad "iminuit>=2" "coverage>=3.6" configparser coveralls deprecated pyyaml "pytest==8.0.0" pytest-cov rubin-libradtran "getCalspec>=2.0.0"
+          conda install -y  "numpy>1.15" scipy "matplotlib>3.1" pandas llvmlite numba "astropy>=3.2" "photutils>=1.7" astroquery coloredlogs scikit-image>=0.20 h5py emcee tqdm mpi4py schwimmbad "iminuit>=2" "coverage>=3.6" configparser coveralls deprecated pyyaml pytest pytest-cov rubin-libradtran "getCalspec>=2.0.0"
           # python -c "from getCalspec.rebuild import rebuild_tables; rebuild_tables()"
-          pip install lsst.utils
+          pip install lsst-utils
           pip install git+https://github.com/LSSTDESC/getObsAtmo.git@main
-          mamba install astrometry
+          conda install astrometry
 
       - name: Download test data
         shell: bash -l {0}
