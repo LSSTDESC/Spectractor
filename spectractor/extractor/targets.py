@@ -334,7 +334,7 @@ class Star(Target):
                 self.redshift = 0
             date_reference="J2000"
 
-        self.get_radec_position_after_pm(table_coordinates, 
+        self.get_radec_position_after_pm(self.simbad_table, 
                                          date_obs="J2000", 
                                          date_reference = date_reference)
         self.load_spectra()
