@@ -1,3 +1,5 @@
+import importlib.metadata
+import packaging.version
 from astropy.coordinates import SkyCoord, Distance
 import astropy.units as u
 from astropy.time import Time
