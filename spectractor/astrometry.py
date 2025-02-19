@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 from astropy.io import fits, ascii
 import astropy.units as u
 from astropy.table import Table
-from astropy.table.column import MaskedColumn
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, Distance
 
@@ -103,7 +102,7 @@ def load_gaia_catalog(coord, radius=5 * u.arcmin, gaia_mag_g_limit=23):
     job = Gaia.cone_search_async(coord, radius=radius, verbose=False, columns=['ra', 'dec', 'pmra', 'pmdec', 'ref_epoch',
                                                                                'parallax', 'phot_g_mean_mag'])
     my_logger.debug(f"\n\t{job}")
-    gaia_catalog = MaskedColumn(job.get_results())
+    gaia_catalog = job.get_results()
     my_logger.debug(f"\n\t{gaia_catalog}")
     gaia_catalog = gaia_catalog[gaia_catalog["phot_g_mean_mag"]<gaia_mag_g_limit]
     gaia_catalog.fill_value = 0
