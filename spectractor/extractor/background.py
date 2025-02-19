@@ -275,7 +275,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     bkg = Background2D(data, (parameters.PIXWIDTH_BOXSIZE, parameters.PIXWIDTH_BOXSIZE),
                        filter_size=(filter_size, filter_size),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
-                       mask=mask)
+                       mask=mask, exclude_percentile=80)
     # reset at zero the edges
     bkg.background[data == 0] = 0
     bgd_model_func_interp = RegularGridInterpolator((np.arange(Nx), np.arange(Ny)), bkg.background.T, method='linear',
