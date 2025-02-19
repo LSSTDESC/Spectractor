@@ -1327,7 +1327,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
                 if ip == jp or jp not in ipar:
                     continue
                 inner = np.abs(J_vectors[ip] @  J_vectors[jp])
-                if np.abs(inner - J_norms[ip] * J_norms[jp]) < 1e-8 * inner:
+                if inner != 0 and np.abs(inner - J_norms[ip] * J_norms[jp]) < 1e-8 * inner:
                     ipar = np.delete(ipar, list(ipar).index(jp))
                     fit_workspace.params.fixed[jp] = True
                     my_logger.warning(
