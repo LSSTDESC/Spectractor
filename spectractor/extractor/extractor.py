@@ -1351,7 +1351,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
             bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws, mask_signal_region=True)
 
         # Propagate background uncertainties
-        err = np.sqrt(err * err + bgd_rms * bgd_rms)
+        # err = np.sqrt(err * err + bgd_rms * bgd_rms)
 
     # Fit the transverse profile
     my_logger.info('\n\t  ======================= Fit the transverse profile =============================')
@@ -1471,7 +1471,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
                    f"RMS={np.nanmean(bgd_rms):.3f} {image.units}.")
 
         # Propagate background uncertainties
-        spectrum.spectrogram_err = np.sqrt(spectrum.spectrogram_err * spectrum.spectrogram_err + bgd_rms * bgd_rms)
+        # spectrum.spectrogram_err = np.sqrt(spectrum.spectrogram_err * spectrum.spectrogram_err + bgd_rms * bgd_rms)
         spectrum.spectrogram_bgd = bgd
         spectrum.spectrogram_bgd_rms = bgd_rms
 
