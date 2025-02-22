@@ -12,7 +12,7 @@ from scipy import sparse
 
 from astropy.table import Table
 
-from spectractor.tools import (rescale_x_to_legendre, plot_image_simple, compute_fwhm)
+from spectractor.tools import (rescale_x_to_legendre, plot_image_simple, compute_fwhm, cholesky_solve)
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.psf import PSF, PSFFitWorkspace, MoffatGauss, Moffat
 from spectractor import parameters
@@ -2297,14 +2297,8 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             if self.amplitude_priors_method != "psf1d":
                 if self.amplitude_priors_method == "keep":
                     amplitude_params = np.copy(self.amplitude_params)
-                    cov_matrix = np.copy(self.amplitude_cov_matrix)
                 else:
-                    # try:
-                    #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
-                    #     cov_matrix = L.T @ L
-                    # except np.linalg.LinAlgError:
-                    cov_matrix = np.linalg.inv(M_dot_W_dot_M.toarray())
-                    amplitude_params = cov_matrix @ (M.T @ W_dot_data)
+                    amplitude_params = cholesky_solve(M_dot_W_dot_M.toarray(), M.T @ W_dot_data)
                     if self.amplitude_priors_method == "positive":
                         amplitude_params[amplitude_params < 0] = 0
                     elif self.amplitude_priors_method == "smooth":
@@ -2325,25 +2319,14 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                         pass
             else:
                 M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
-                # try:
-                #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
-                #     cov_matrix = L.T @ L
-                # except np.linalg.LinAlgError:
-                cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-                amplitude_params = cov_matrix @ (M.T @ W_dot_data + np.float32(self.reg) * self.Q_dot_A0)
+                amplitude_params = cholesky_solve(M_dot_W_dot_M_plus_Q, M.T @ W_dot_data + np.float32(self.reg) * self.Q_dot_A0)
             amplitude_params = np.asarray(amplitude_params).reshape(-1)
             self.M = M
             self.M_dot_W_dot_M = M_dot_W_dot_M
             self.model = M @ amplitude_params
         else:
             amplitude_params = np.copy(self.amplitude_priors)
-            err2 = np.copy(amplitude_params)
-            err2[err2 <= 0] = np.min(np.abs(err2[err2 > 0]))
-            cov_matrix = np.diag(err2)
         self.amplitude_params = np.copy(amplitude_params)
-        # TODO: propagate and marginalize over the shape parameter uncertainties ?
-        self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
-        self.amplitude_cov_matrix = np.copy(cov_matrix)
         poly_params[:self.Nx] = amplitude_params
 
         if self.amplitude_priors_method == "fixed":
@@ -2354,6 +2337,154 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.profile_params = np.copy(profile_params)
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
+
+    def amplitude_covariance(self):
+        r"""
+        Compute the covariance matrix for the amplitude parameters.
+
+        The error matrix on the :math:`\hat{\mathbf{A}}` coefficient is simply
+        :math:`(\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}`.
+
+        Examples
+        --------
+
+        Set the parameters:
+
+        >>> from spectractor.tools import plot_covariance_matrix
+        >>> parameters.PIXDIST_BACKGROUND = 40
+        >>> parameters.PIXWIDTH_BACKGROUND = 10
+        >>> parameters.PIXWIDTH_SIGNAL = 30
+
+        Build a mock spectrogram without random Poisson noise:
+
+        >>> psf = Moffat(clip=False)
+        >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=100000)
+        >>> params = s0.generate_test_poly_params()
+        >>> params[:s0.Nx] *= 10
+        >>> s0.params.values = params
+        >>> saturation = params[-1]
+        >>> data = s0.evaluate(s0.set_pixels(mode="2D"), params)
+        >>> bgd = 10*np.ones_like(data)
+        >>> data += bgd
+        >>> data_errors = np.sqrt(data+1)
+
+        Extract the background:
+
+        >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+
+        Estimate the first guess values:
+
+        >>> s = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=saturation)
+        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
+        >>> s.plot_summary(truth=s0)
+
+        1D case.
+
+        Simulate the data with fixed amplitude priors:
+
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "1D", bgd_model_func=bgd_model_func,
+        ... amplitude_priors_method="fixed", verbose=True)
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> cov = w.amplitude_covariance()
+        >>> plot_covariance_matrix(cov)
+
+        .. doctest::
+            :hide:
+
+            >>> assert mod is not None
+
+        Fit the amplitude of data without any prior:
+
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "1D", bgd_model_func=bgd_model_func, verbose=True,
+        ... amplitude_priors_method="noprior")
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> cov = w.amplitude_covariance()
+        >>> plot_covariance_matrix(cov)
+
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+
+        Fit the amplitude of data smoothing the result with a window of size 10 pixels:
+
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "1D", bgd_model_func=bgd_model_func, verbose=True,
+        ... amplitude_priors_method="smooth")
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> cov = w.amplitude_covariance()
+        >>> plot_covariance_matrix(cov)
+
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+
+        Fit the amplitude of data using the transverse PSF1D fit as a prior and with a
+        Tikhonov regularisation parameter set by parameters.PSF_FIT_REG_PARAM:
+
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "1D", bgd_model_func=bgd_model_func, verbose=True,
+        ... amplitude_priors_method="psf1d")
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> cov = w.amplitude_covariance()
+        >>> plot_covariance_matrix(cov)
+
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+
+        2D case
+
+        Simulate the data with fixed amplitude priors:
+
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "2D", bgd_model_func=bgd_model_func,
+        ... amplitude_priors_method="fixed", verbose=True)
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> cov = w.amplitude_covariance()
+        >>> plot_covariance_matrix(cov)
+
+        .. doctest::
+            :hide:
+
+            >>> assert mod is not None
+
+        Simulate the data with a Tikhonov prior on amplitude parameters:
+
+        >>> parameters.PSF_FIT_REG_PARAM = 0.002
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "2D", bgd_model_func=bgd_model_func,
+        ... amplitude_priors_method="psf1d", verbose=True)
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> cov = w.amplitude_covariance()
+        >>> plot_covariance_matrix(cov)
+
+        .. doctest::
+            :hide:
+
+            >>> assert mod is not None
+
+        """
+        if self.amplitude_priors_method != "fixed":
+            if self.amplitude_priors_method != "psf1d":
+                if self.amplitude_priors_method == "keep":
+                    cov_matrix = np.copy(self.amplitude_cov_matrix)
+                else:
+                    cov_matrix = np.linalg.inv(self.M_dot_W_dot_M.toarray())
+            else:
+                M_dot_W_dot_M_plus_Q = self.M_dot_W_dot_M + self.reg * self.Q
+                cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
+        else:
+            err2 = np.copy(self.amplitude_priors)
+            err2[err2 <= 0] = np.min(np.abs(err2[err2 > 0]))
+            cov_matrix = np.diag(err2)
+        # TODO: propagate and marginalize over the shape parameter uncertainties ?
+        self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
+        self.amplitude_cov_matrix = np.copy(cov_matrix)
+        return self.amplitude_cov_matrix
+
 
     def amplitude_derivatives(self):
         r"""
@@ -2519,6 +2650,9 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                                                       boundaries=self.boundaries, dtype="float32")
         self.amplitude_priors_method = method
         return J
+
+    def __post_fit__(self):
+        self.amplitude_covariance()
 
 
 if __name__ == "__main__":

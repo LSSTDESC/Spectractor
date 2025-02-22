@@ -16,7 +16,8 @@ from spectractor.extractor.spectrum import Spectrum, calibrate_spectrum
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
-from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple, mask_cosmics
+from spectractor.tools import (ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple,
+                               mask_cosmics, cholesky_solve)
 from spectractor.fit.fitter import (run_minimisation, run_minimisation_sigma_clipping, write_fitparameter_json,
                                     RegFitWorkspace, FitWorkspace, FitParameters)
 
@@ -509,14 +510,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             if self.amplitude_priors_method != "spectrum":
                 if self.amplitude_priors_method == "keep":
                     amplitude_params = np.copy(self.amplitude_params)
-                    cov_matrix = np.copy(self.amplitude_cov_matrix)
                 else:
-                    # try:  # slower
-                    #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
-                    #     cov_matrix = L.T @ L
-                    # except np.linalg.LinAlgError:
-                    cov_matrix = np.linalg.inv(M_dot_W_dot_M.toarray())
-                    amplitude_params = cov_matrix @ (M.T @ W_dot_data)
+                    amplitude_params = cholesky_solve(M_dot_W_dot_M.toarray(), M.T @ W_dot_data)
                     if self.amplitude_priors_method == "positive":
                         amplitude_params[amplitude_params < 0] = 0
                     elif self.amplitude_priors_method == "smooth":
@@ -537,26 +532,16 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                         pass
             else:
                 M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + np.float32(self.reg) * self.Q
-                # try:  # slower
-                #     L = sparse.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
-                #     cov_matrix = L.T @ L
-                # except np.linalg.LinAlgError:
-                cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)  # M_dot_W_dot_M_plus_Q is not so sparse
-                amplitude_params = cov_matrix @ (M.T @ W_dot_data + self.reg * self.Q_dot_A0)
+                amplitude_params = cholesky_solve(M_dot_W_dot_M_plus_Q, M.T @ W_dot_data + np.float32(self.reg) * self.Q_dot_A0)
             self.M_dot_W_dot_M = M_dot_W_dot_M
             amplitude_params = np.asarray(amplitude_params).reshape(-1)
         else:
             amplitude_params = np.copy(self.amplitude_priors)
-            err2 = np.copy(amplitude_params)
-            err2[err2 <= 0] = np.min(np.abs(err2[err2 > 0]))
-            cov_matrix = np.diag(err2)
 
         # Save results
         self.M = M
         self.psf_poly_params = np.copy(poly_params[0])
         self.amplitude_params = np.copy(amplitude_params)
-        self.amplitude_params_err = np.array([np.sqrt(np.abs(cov_matrix[x, x])) for x in range(self.Nx)])
-        self.amplitude_cov_matrix = np.copy(cov_matrix)
 
         # Compute the model
         self.model = M @ amplitude_params
@@ -566,6 +551,70 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.model_err = np.zeros_like(self.model)
 
         return self.pixels, self.model, self.model_err
+
+    def amplitude_covariance(self):
+        r"""
+        Compute the covariance matrix for the amplitude parameters.
+
+        The error matrix on the :math:`\hat{\mathbf{A}}` coefficient is simply
+        :math:`(\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}`.
+
+        See Also
+        --------
+        ChromaticPSF2DFitWorkspace.simulate
+
+        Examples
+        --------
+
+        Load data:
+
+        >>> from spectractor.tools import plot_covariance_matrix
+        >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
+        >>> spec.plot_spectrogram()
+
+        Simulate the data with fixed amplitude priors:
+
+        .. doctest::
+
+            >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="fixed", verbose=True)
+            >>> y, mod, mod_err = w.simulate(*w.params.values)
+            >>> cov = w.amplitude_covariance()
+            >>> plot_covariance_matrix(cov)
+
+        .. doctest::
+            :hide:
+
+            >>> assert mod is not None
+
+        Simulate the data with a Tikhonov prior on amplitude parameters:
+
+        .. doctest::
+
+            >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
+            >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="spectrum", verbose=True)
+            >>> y, mod, mod_err = w.simulate(*w.params.values)
+            >>> cov = w.amplitude_covariance()
+            >>> plot_covariance_matrix(cov)
+
+        """
+        if self.amplitude_priors_method != "fixed":
+            if self.amplitude_priors_method != "spectrum":
+                if self.amplitude_priors_method == "keep":
+                    cov_matrix = np.copy(self.amplitude_cov_matrix)
+                else:
+                    cov_matrix = np.linalg.inv(self.M_dot_W_dot_M.toarray())
+            else:
+                M_dot_W_dot_M_plus_Q = self.M_dot_W_dot_M + self.reg * self.Q
+                cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
+        else:
+            err2 = np.copy(self.amplitude_priors)
+            err2[err2 <= 0] = np.min(np.abs(err2[err2 > 0]))
+            cov_matrix = np.diag(err2)
+
+        # TODO: propagate and marginalize over the shape parameter uncertainties ?
+        self.amplitude_params_err = np.array([np.sqrt(np.abs(cov_matrix[x, x])) for x in range(self.Nx)])
+        self.amplitude_cov_matrix = np.copy(cov_matrix)
+        return self.amplitude_cov_matrix
 
     def jacobian(self, params, epsilon, model_input=None):
         if model_input is not None:
@@ -665,6 +714,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         dcov_dtheta = [-self.amplitude_cov_matrix @ (dMWM_rQA_dtheta[ip] @ self.amplitude_cov_matrix) for ip in range(nparams)]
         dA_dtheta = [self.amplitude_cov_matrix @ dMWD_dtheta[ip] + dcov_dtheta[ip] @ MWD for ip in range(nparams)]
         return dA_dtheta
+
+    def __post_fit__(self):
+        self.amplitude_covariance()
 
     def plot_spectrogram_comparison_simple(self, ax, title='', extent=None, dispersion=False):  # pragma: no cover
         """Method to plot a spectrogram issued from data and compare it with simulations.

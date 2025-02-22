@@ -1203,6 +1203,11 @@ class FitWorkspace:
                 H[ip, jp] = (modelplus + modelmoins - 2 * model) / (np.asarray(epsilon) ** 2)
         return H
 
+    def __post_fit__(self):
+        """Method executed at the end of a minimisation process.
+        """
+        pass
+
     def plot_gradient_descent(self):
         fig, ax = plt.subplots(2, 1, figsize=(10, 6), sharex="all")
         iterations = np.arange(self.params_table.shape[0])
@@ -1584,8 +1589,6 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tMinimize: total computation time: {time.time() - start}s")
-            if parameters.DEBUG:
-                fit_workspace.plot_fit()
     elif method == 'basinhopping':
         start = time.time()
         minimizer_kwargs = dict(method=minimizer_method, bounds=bounds)
@@ -1594,8 +1597,6 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
-            if parameters.DEBUG:
-                fit_workspace.plot_fit()
     elif method == "least_squares":  # pragma: no cover
         fit_workspace.my_logger.warning("least_squares might not work, use with caution... "
                                         "or repair carefully the function weighted_residuals()")
@@ -1608,8 +1609,6 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         if verbose:
             my_logger.debug(f"\n\t{p}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
-            if parameters.DEBUG:
-                fit_workspace.plot_fit()
     elif method == "lm":  # pragma: no cover
         if epsilon is None:
             epsilon = 1e-4 * guess
@@ -1626,8 +1625,6 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         if verbose:
             my_logger.debug(f"\n\t{x}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
-            if parameters.DEBUG:
-                fit_workspace.plot_fit()
     elif method == "newton":
         if epsilon is None:
             epsilon = 1e-4 * guess
@@ -1641,6 +1638,9 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         if fit_workspace.filename != "":
             write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params)
             fit_workspace.save_gradient_descent()
+    fit_workspace.__post_fit__()
+    if verbose and parameters.DEBUG:
+        fit_workspace.plot_fit()
 
 
 def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ftol=1e-4,
