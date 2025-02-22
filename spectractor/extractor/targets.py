@@ -23,11 +23,17 @@ else:
 
 from getCalspec import getCalspec
 
+# Astroquery versions change the Simbad API.
+_astroquery_version = packaging.version.parse(importlib.metadata.version("astroquery"))
+if _astroquery_version < packaging.version.parse("0.4.8"):
+    _USE_NEW_SIMBAD = False
+else:
+    _USE_NEW_SIMBAD = True
+
 try:
     from gaiaspec import getGaia
 except ModuleNotFoundError:
     getGaia = None
-
 
 
 def load_target(label, verbose=False):
@@ -283,7 +289,7 @@ class Star(Target):
             # package data, get source info from simbadQuerier
             gaia_sources = getGaia.get_gaia_sources()
             source = gaia_sources[gaia_sources == self.label]
-            table_coordinates = [{"PMRA": source["pmra"].iloc[0],
+            self.simbad_table = [{"PMRA": source["pmra"].iloc[0],
                                   "PMDEC": source["pmdec"].iloc[0],
                                   "PLX_VALUE": source["parallax"].iloc[0],}]
 

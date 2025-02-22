@@ -1572,6 +1572,9 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
                     if spec_smooth[idx] < test:
                         peak_index = idx
                         test = spec_smooth[idx]
+        # remove weak lines
+        if spec_smooth[peak_index] < 5e-2 * np.max(spec_smooth):
+            continue
         # search for first local minima around the local maximum
         # or for first local maxima around the local minimum
         # around +/- 3*peak_width
@@ -1599,6 +1602,10 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
         # to fit for background around the peak
         index = list(np.arange(max(0, index_inf - bgd_width),
                                min(len(lambdas), index_sup + bgd_width), 1).astype(int))
+        # exclude pixels very weak compared to the median signal in this zone
+        mask = spec_smooth[index] > 5e-2 * np.median(spec_smooth[index])
+        index = list(np.array(index)[mask])
+        
         # skip if data is masked with NaN
         if np.any(np.isnan(spec_smooth[index])):
             continue
@@ -1775,7 +1782,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
         noise_level = np.std(spec[index] - best_fit_model)
         # otherwise mean of error bars of bgd lateral bands
         if sigma is not None:
-            chisq = np.sum((best_fit_model - spec[index]) ** 2 / (sigma * sigma))
+            chisq = np.sum((best_fit_model - spec[index]) ** 2) #/ (spec[index]**2)
         else:
             chisq = np.sum((best_fit_model - spec[index]) ** 2)
         chisq /= len(index)
@@ -1982,7 +1989,7 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
     # now minimize around the global minimum found previously
     res = optimize.minimize(shift_minimizer, start, args=(), method='L-BFGS-B',
                             options={'maxiter': 200, 'ftol': 1e-3},
-                            bounds=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
+                            bounds=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-pixel_shift_prior, pixel_shift_prior)))
     # error = [parameters.DISTANCE2CCD_ERR, pixel_shift_step]
     # fix = [False, False]
     # m = Minuit(shift_minimizer, start)

@@ -1659,7 +1659,8 @@ class ChromaticPSF:
                 if not np.any(np.isnan(best_fit[0])):
                     w.live_fit = True
                     w.plot_fit()
-            self.fitted_pixels[x] = True
+            if not np.any(np.isnan(best_fit)):
+                self.fitted_pixels[x] = True
         # interpolate the skipped pixels with splines
         all_pixels = np.arange(Nx)
         # xp = np.array(sorted(set(list(pixel_range))))

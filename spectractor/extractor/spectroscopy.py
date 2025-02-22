@@ -501,10 +501,15 @@ class Lines:
 # Hydrogen lines
 HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.02, 0.02], use_for_calibration=True)
 HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
-HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=False)
-HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=False)
-HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.02, 0.02], use_for_calibration=False)
-HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON]
+HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=True)
+HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=True)
+HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.02, 0.02], use_for_calibration=True)
+H8 = Line(388.9, atmospheric=False, label='$H8$', label_pos=[-0.02, 0.02], use_for_calibration=True)
+H9 = Line(383.5, atmospheric=False, label='$H9$', label_pos=[-0.02, 0.02], use_for_calibration=False)
+H10 = Line(379.8, atmospheric=False, label='$H10$', label_pos=[-0.02, 0.02], use_for_calibration=False)
+H11 = Line(377.1, atmospheric=False, label='$H11$', label_pos=[-0.02, 0.02], use_for_calibration=False)
+H12 = Line(375.0, atmospheric=False, label='$H12$', label_pos=[-0.02, 0.02], use_for_calibration=False)
+HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON, H8, H9, H10, H11, H12]
 
 # Stellar lines (Fraunhofer lines) https://en.wikipedia.org/wiki/Fraunhofer_lines
 FE1 = Line(382.044, atmospheric=False, label=r'$Fe_{I}$', label_pos=[-0.016, 0.02])

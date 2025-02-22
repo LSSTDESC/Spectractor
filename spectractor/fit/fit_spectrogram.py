@@ -319,7 +319,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Parameters
         ----------
         ax: Axes
-            Axes instance of shape (4, 2).
+            Axes instance of shape (3, 2).
         title: str, optional
             Title for the simulation plot (default: '').
         extent: array_like, optional
@@ -379,13 +379,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
-            ax[3, 1].remove()
-            ax[3, 0].plot(self.lambdas[sub], np.nansum(data, axis=0)[sub], label='Data')
-            ax[3, 0].plot(self.lambdas[sub], np.nansum(model, axis=0)[sub], label='Model')
-            ax[3, 0].set_ylabel('Cross spectrum')
-            ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
-            ax[3, 0].legend(fontsize=7)
-            ax[3, 0].grid(True)
 
     def simulate(self, *params):
         """Interface method to simulate a spectrogram.
@@ -503,8 +496,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
             fit_workspace.plot_fit()
 
         """
-        gs_kw = dict(width_ratios=[3, 0.01, 1, 0.01, 1, 0.15], height_ratios=[1, 1, 1, 1])
-        fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(10, 8), gridspec_kw=gs_kw)
+        gs_kw = dict(width_ratios=[3, 0.01, 1, 0.01, 1, 0.15], height_ratios=[1, 1, 1])
+        fig, ax = plt.subplots(nrows=3, ncols=6, figsize=(10, 8), gridspec_kw=gs_kw)
 
         # A1, A2, aerosols, ozone, pwv, D, shift_x, shift_y, shift_t, B,  *psf = self.p
         # plt.suptitle(f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f}, '
@@ -512,13 +505,15 @@ class SpectrogramFitWorkspace(FitWorkspace):
         # main plot
         self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=True)
         # zoom O2
-        self.plot_spectrogram_comparison_simple(ax[:, 2:4], extent=[730, 800], title='Zoom $O_2$', dispersion=True)
+        if np.max(self.spectrum.lambdas) > 800 and np.min(self.spectrum.lambdas) < 730:
+            self.plot_spectrogram_comparison_simple(ax[:, 2:4], extent=[730, 800], title='Zoom $O_2$', dispersion=True)
         # zoom H2O
-        self.plot_spectrogram_comparison_simple(ax[:, 4:6], extent=[870, 1000], title='Zoom $H_2 O$', dispersion=True)
+        if np.max(self.spectrum.lambdas) > 1000 and np.min(self.spectrum.lambdas) < 870:
+            self.plot_spectrogram_comparison_simple(ax[:, 4:6], extent=[870, 1000], title='Zoom $H_2 O$', dispersion=True)
         for i in range(3):  # clear middle colorbars
             for j in range(2):
                 plt.delaxes(ax[i, 2*j+1])
-        for i in range(4):  # clear middle y axis labels
+        for i in range(3):  # clear middle y axis labels
             for j in range(1, 3):
                 ax[i, 2*j].set_ylabel("")
         fig.tight_layout()
