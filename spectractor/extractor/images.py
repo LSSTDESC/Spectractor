@@ -1063,7 +1063,7 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     Dx, Dy = widths
     if rotated:
         sub_image = np.copy(image.data_rotated[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
-        sub_errors = np.copy(image.err[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
+        sub_errors = np.copy(image.err_rotated[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
     else:
         sub_image = np.copy(image.data[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
         sub_errors = np.copy(image.err[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
