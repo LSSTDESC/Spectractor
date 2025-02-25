@@ -30,9 +30,9 @@ def test_atmosphere():
                        ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
     atmospheric_grid = a.compute()
     assert np.sum(atmospheric_grid) > 0
-    assert np.all(np.isclose(a.atmgrid[0, a.index_atm_data:], parameters.LAMBDAS))
-    assert not np.any(np.isclose(a.atmgrid[1, a.index_atm_data:], np.zeros_like(parameters.LAMBDAS), rtol=1e-6))
-    assert a.atmgrid.shape == (3, a.index_atm_data + len(parameters.LAMBDAS))
+    assert np.all(np.isclose(a.atmgrid[0, a.index_atm_data:], a.lambdas))
+    assert not np.any(np.isclose(a.atmgrid[1, a.index_atm_data:], np.zeros_like(a.lambdas), rtol=1e-6))
+    assert a.atmgrid.shape == (3, a.index_atm_data + len(a.lambdas))
     a.save_file(a.image_filename.replace('.fits', '_atmsim.fits'))
     assert os.path.isfile('tests/data/reduc_20170605_028_atmsim.fits')
     a.load_file(a.image_filename.replace('.fits', '_atmsim.fits'))
@@ -63,7 +63,7 @@ def test_simulator():
         atmosphere = AtmosphereGrid(atmgrid_filename="./tests/data/reduc_20170530_134_atmsim.fits")
         spectrum_simulation = SpectrumSimulation(spectrum, atmosphere=atmosphere, fast_sim=True)
         spectrum_simulation.simulate(A1=1, A2=1, ozone=300, pwv=5, aerosols=0.05, angstrom_exponent=None,
-                                     reso=0., D=56, shift_x=0., B=0.)
+                                     reso=0., D=56, shift_x=0.)
 
         assert np.sum(spectrum_simulation.data) > 0
         assert np.sum(spectrum_simulation.data) < 1e-10

@@ -219,6 +219,24 @@ class FitParameters:
                 out *= getattr(self, key) == getattr(other, key)
         return out
 
+    def __repr__(self):
+        """Print the best fitting parameters on screen.
+        Labels are from self.labels.
+
+        Examples
+        --------
+        >>> parameters.VERBOSE = True
+        >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params.cov = np.array([[1, -0.5], [-0.5, 4]])
+        >>> params
+        x: 1.0 (fixed)
+        y: 2 +1 -1 bounds=[-inf, inf]
+        z: 3.0 (fixed)
+        t: 4 +2 -2 bounds=[-inf, inf]
+
+        """
+        return self.print_parameters_summary()
+
     def get_index(self, label):
         """Get parameter index given its label.
 
@@ -401,7 +419,7 @@ class FitParameters:
         return np.array(np.where(np.array(self.fixed).astype(int) == 1)[0])
 
     def print_parameters_summary(self):
-        """Print the best fitting parameters on screen.
+        """Build a string with the best fitting parameters to display on screen.
         Labels are from self.labels.
 
         Returns
@@ -424,11 +442,14 @@ class FitParameters:
                 txt += "%s: %s +%s -%s" % formatting_numbers(self.values[ip], np.sqrt(np.abs(self.cov[icov, icov])),
                                                              np.sqrt(np.abs(self.cov[icov, icov])),
                                                              label=self.labels[ip])
-                txt += f" bounds={self.bounds[ip]}\n\t"
+                txt += f" bounds={self.bounds[ip]}"
                 icov += 1
             else:
-                txt += f"{self.labels[ip]}: {self.values[ip]} (fixed)\n\t"
+                txt += f"{self.labels[ip]}: {self.values[ip]} (fixed)"
+            if ip != self.ndim-1:
+                txt += "\n"
         return txt
+
 
     def get_parameter(self, key):
         """Return a FitParameter instance. key argument can be the parameter label or its index value.
@@ -666,6 +687,7 @@ class FitWorkspace:
         self.err = None
         self.data_cov = None
         self.W = None
+        self.W_before_mask = None
         self.x = None
         self.outliers = []
         self.mask = []
@@ -686,22 +708,29 @@ class FitWorkspace:
         Examples
         --------
         >>> w = FitWorkspace()
-        >>> w.data = np.array([np.array([1,2,3]), np.array([1,2,3,4])], dtype=object)
+        >>> w.data = np.array([1,2,3,4,5,6])
+        >>> w.mask = [2, 4]
         >>> w.outliers = [2, 6]
         >>> w.get_bad_indices()
-        [array([2]), array([3])]
+        array([2, 4, 6])
+        >>> w.data = np.array([np.array([1,2,3]), np.array([1,2,3,4])], dtype=object)
+        >>> w.mask = [2, 4]
+        >>> w.outliers = [2, 6]
+        >>> w.get_bad_indices()
+        [array([2]), array([1, 3])]
         """
-        bad_indices = np.asarray(self.outliers, dtype=int)
+        bad_indices = np.unique(np.concatenate([self.outliers, self.mask])).astype(int)
         if self.data.dtype == object:
-            if len(self.outliers) > 0:
+            if len(self.outliers) > 0 or len(self.mask) > 0:
                 bad_indices = []
+                bads = np.unique(np.concatenate([self.outliers, self.mask])).astype(int)
                 start_index = 0
                 for k in range(self.data.shape[0]):
                     mask = np.zeros(self.data[k].size, dtype=bool)
-                    outliers = np.asarray(self.outliers)[np.logical_and(np.asarray(self.outliers) > start_index,
-                                                                        np.asarray(self.outliers) < start_index +
+                    bad = np.asarray(bads)[np.logical_and(np.asarray(bads) > start_index,
+                                                                        np.asarray(bads) < start_index +
                                                                         self.data[k].size)]
-                    mask[outliers - start_index] = True
+                    mask[bad - start_index] = True
                     bad_indices.append(np.arange(self.data[k].size)[mask])
                     start_index += self.data[k].size
             else:
@@ -831,7 +860,8 @@ class FitWorkspace:
 
     def prepare_weight_matrices(self):
         r"""Compute weight matrix :math:`\mathbf{W}` `self.W` as the inverse of data covariance matrix `self.data_cov`.
-        Cancel weights of data outliers given by `self.outliers`.
+        Cancel weights of data outliers given by `self.outliers` or masked data given by `self.mask`.
+        It uses `self.W_before_mask` to reset the null weights at each computation.
 
         Examples
         --------
@@ -865,8 +895,8 @@ class FitWorkspace:
 
         Use sparse matrix:
 
-        >>> w.W = scipy.sparse.diags(np.ones(3))
-        >>> w.W.toarray()
+        >>> w.W_before_mask = scipy.sparse.diags(np.ones(3))
+        >>> w.W_before_mask.toarray()
         array([[1., 0., 0.],
                [0., 1., 0.],
                [0., 0., 1.]])
@@ -878,29 +908,39 @@ class FitWorkspace:
                [0., 1., 0.],
                [0., 0., 0.]])
 
+        Add mask but no outliers on same matrix:
+
+        >>> w.outliers = []
+        >>> w.mask = np.array([1])
+        >>> w.prepare_weight_matrices()
+        >>> w.W.toarray()
+        array([[1., 0., 0.],
+               [0., 0., 0.],
+               [0., 0., 1.]])
 
         """
         # Prepare covariance matrix for data
         if self.data_cov is None:
             self.data_cov = np.asarray(self.err.flatten() ** 2)
         # Prepare inverse covariance matrix for data
-        if self.W is None:
+        if self.W_before_mask is None:
             if self.data_cov.ndim == 1 and self.data_cov.dtype != object:
-                self.W = 1 / self.data_cov
+                self.W_before_mask = 1 / self.data_cov
             elif self.data_cov.ndim == 2 and self.data_cov.dtype != object:
-                self.W = np.linalg.inv(self.data_cov)
+                self.W_before_mask = np.linalg.inv(self.data_cov)
             elif self.data_cov.dtype is object:
                 if self.data_cov[0].ndim == 1:
-                    self.W = np.array([1 / self.data_cov[k] for k in range(self.data_cov.shape[0])])
+                    self.W_before_mask = np.array([1 / self.data_cov[k] for k in range(self.data_cov.shape[0])])
                 else:
-                    self.W = []
+                    self.W_before_mask = []
                     for k in range(len(self.data_cov)):
                         L = np.linalg.inv(np.linalg.cholesky(self.data_cov[k]))
-                        self.W[k] = L.T @ L
-                    self.W = np.asarray(self.W)
-        if len(self.outliers) > 0:
+                        self.W_before_mask[k] = L.T @ L
+                    self.W_before_mask = np.asarray(self.W_before_mask)
+        self.W = self.W_before_mask.copy()
+        if len(self.outliers) > 0 or len(self.mask) > 0:
             bad_indices = self.get_bad_indices()
-            if not scipy.sparse.issparse(self.W):
+            if not scipy.sparse.issparse(self.W_before_mask):
                 if self.W.ndim == 1 and self.W.dtype != object:
                     self.W[bad_indices] = 0
                 elif self.W.ndim == 2 and self.W.dtype != object:
@@ -921,11 +961,15 @@ class FitWorkspace:
                         f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
             else:
                 format = self.W.getformat()
-                W = self.W.tocsr()
-                W[:, bad_indices] = 0
-                W[bad_indices, :] = 0
-                W.eliminate_zeros()
-                self.W = W.asformat(format=format)
+                if format == 'dia':
+                    self.W.data[0, bad_indices] = 0
+                else:
+                    W = self.W.tolil()
+                    W[:, bad_indices] = 0
+                    W[bad_indices, :] = 0
+                    W = self.W.asformat(format='csr')
+                    W.eliminate_zeros()
+                    self.W = W.asformat(format=format)
 
     def compute_W_with_model_error(self, model_err):
         """Propagate model uncertainties to weight matrix W.
@@ -1006,13 +1050,13 @@ class FitWorkspace:
                 elif self.W.ndim == 2 and self.W.dtype != object:
                     cov = self.data_cov + np.diag(model_err * model_err)
                     self.W = np.linalg.inv(cov)
-                # needs to reapply the mask of outliers
+                # needs to reapply the mask of outliers and masked data
                 self.W[zeros] = 0
             else:
                 cov = self.data_cov + np.diag(model_err * model_err)
                 L = np.linalg.inv(np.linalg.cholesky(cov))
                 W = L.T @ L
-                # needs to reapply the mask of outliers
+                # needs to reapply the mask of outliers and masked data
                 rows, cols = self.W.nonzero()
                 self.W = scipy.sparse.csr_matrix((W[rows, cols], (rows, cols)), dtype=self.W.dtype, shape=self.W.shape)
         return self.W
@@ -1283,11 +1327,11 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
                 if ip == jp or jp not in ipar:
                     continue
                 inner = np.abs(J_vectors[ip] @  J_vectors[jp])
-                if np.abs(inner - J_norms[ip] * J_norms[jp]) < 1e-8 * inner:
+                if inner != 0 and np.abs(inner - J_norms[ip] * J_norms[jp]) < 1e-8 * inner:
                     ipar = np.delete(ipar, list(ipar).index(jp))
                     fit_workspace.params.fixed[jp] = True
                     my_logger.warning(
-                        f"\n\tStep {i}: {fit_workspace.params.labels[ip]} is degenerated with {fit_workspace.params.labels[jp]}; "
+                        f"\n\tStep {i}: {fit_workspace.params.labels[jp]} is degenerated with {fit_workspace.params.labels[ip]}; "
                         f"parameter {fit_workspace.params.labels[jp]} is fixed at its last known current value ({tmp_params[jp]}).")
                     continue
         # remove fixed and degenerated parameters; then transpose
@@ -1519,7 +1563,7 @@ def run_gradient_descent(fit_workspace, epsilon, xtol, ftol, niter, verbose=Fals
     fit_workspace.params_table = np.concatenate([fit_workspace.params_table, tmp_params_table])
     fit_workspace.costs = np.concatenate([fit_workspace.costs, tmp_costs])
     if verbose or fit_workspace.verbose:
-        fit_workspace.my_logger.info(f"\n\t{fit_workspace.params.print_parameters_summary()}")
+        fit_workspace.my_logger.info(f"\n{fit_workspace.params.print_parameters_summary()}")
     if parameters.DEBUG and (verbose or fit_workspace.verbose):
         fit_workspace.plot_gradient_descent()
         if len(fit_workspace.params.get_free_parameters()) > 1:
@@ -1531,7 +1575,7 @@ def run_simple_newton_minimisation(fit_workspace, epsilon, xtol=1e-8, ftol=1e-8,
                                                                                               epsilon, niter=niter,
                                                                                               xtol=xtol, ftol=ftol)
     if verbose or fit_workspace.verbose:
-        fit_workspace.my_logger.info(f"\n\t{fit_workspace.params.print_parameters_summary()}")
+        fit_workspace.my_logger.info(f"\n{fit_workspace.params.print_parameters_summary()}")
     if parameters.DEBUG and (verbose or fit_workspace.verbose):
         fit_workspace.plot_gradient_descent()
         if len(fit_workspace.params.get_free_parameters()) > 1:
@@ -1633,12 +1677,14 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
             data = np.concatenate(fit_workspace.data).ravel()  # [indices_no_nan]
             model = np.concatenate(fit_workspace.model).ravel()  # [indices_no_nan]
             err = np.concatenate(fit_workspace.err).ravel()  # [indices_no_nan]
+            model_err = np.concatenate(fit_workspace.model_err).ravel()  # [indices_no_nan]
         else:
             # indices_no_nan = ~np.isnan(fit_workspace.data.flatten())
             data = fit_workspace.data.flatten()  # [indices_no_nan]
             model = fit_workspace.model.flatten()  # [indices_no_nan]
             err = fit_workspace.err.flatten()  # [indices_no_nan]
-        residuals = np.abs(data - model) / err
+            model_err = fit_workspace.model_err.flatten()  # [indices_no_nan]
+        residuals = np.abs(data - model) / np.sqrt(err**2 + model_err**2)
         outliers = residuals > sigma_clip
         outliers = [i for i in range(data.size) if outliers[i]]
         outliers.sort()

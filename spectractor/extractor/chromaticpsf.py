@@ -224,7 +224,7 @@ class ChromaticPSF:
 
         ..  doctest::
             :hide:
-            >>> assert(np.all(np.isclose(params,[10, 50, 100, 150, 200, 0, 0, 0, 0, 5, 0, 2, 0, -0.4, -0.4,1,0,20000])))
+            >>> assert(np.all(np.isclose(params,[10, 50, 100, 150, 200, 0, 0, 0, 0, 5, 0, 2, 0, -0.4, 0, 1, 0, 20000])))
 
         """
         if not isinstance(self.psf, MoffatGauss) and not isinstance(self.psf, Moffat):
@@ -241,7 +241,7 @@ class ChromaticPSF:
         params += [0.] * (self.degrees['gamma'] - 1) + [0, 5]  # gamma
         params += [0.] * (self.degrees['alpha'] - 1) + [0, 2]  # alpha
         if isinstance(self.psf, MoffatGauss):
-            params += [0.] * (self.degrees['eta_gauss'] - 1) + [-0.4, -0.4]  # eta_gauss
+            params += [0.] * (self.degrees['eta_gauss'] - 1) + [0, -0.4]  # eta_gauss
             params += [0.] * (self.degrees['stddev'] - 1) + [0, 1]  # stddev
         params += [self.saturation]  # saturation
         poly_params = np.zeros_like(params)
@@ -252,7 +252,12 @@ class ChromaticPSF:
                 continue
             else:
                 shift = self.degrees[name] + 1
-                c = np.polynomial.legendre.poly2leg(params[index + shift:index:-1])
+                if parameters.PSF_POLY_TYPE == "legendre":
+                    c = np.polynomial.legendre.poly2leg(params[index + shift:index:-1])
+                elif parameters.PSF_POLY_TYPE == "polynomial":
+                    c = np.asarray(params[index + shift:index:-1])
+                else:
+                    raise ValueError(f"Unknown polynomial type {parameters.PSF_POLY_TYPE=}.")
                 coeffs = np.zeros(shift)
                 coeffs[:c.size] = c
                 poly_params[index + 1:index + shift + 1] = coeffs
@@ -613,7 +618,7 @@ class ChromaticPSF:
         return psf_cube_masked
 
     @staticmethod
-    def get_boundaries(psf_cube_masked):
+    def set_rectangular_boundaries(psf_cube_masked):
         """Compute the ChromaticPSF computation boundaries, as a dictionnary of integers giving
         the `"xmin"`, `"xmax"`, `"ymin"` and `"ymax"` edges where to compute the PSF for each wavelength.
         True regions are rectangular after this operation. The `psf_cube_masked` cube is updated accordingly and returned.
@@ -639,7 +644,7 @@ class ChromaticPSF:
         >>> profile_params[:, 1] = np.arange(s.Nx)
         >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
-        >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
+        >>> boundaries, psf_cube_masked = s.set_rectangular_boundaries(psf_cube_masked)
         >>> boundaries["xmin"].shape
         (100,)
         >>> psf_cube_masked.shape
@@ -678,14 +683,13 @@ class ChromaticPSF:
             psf_cube_masked[k, ymin:ymax, xmin:xmax] = True
         return boundaries, psf_cube_masked
 
-    @staticmethod
-    def get_sparse_indices(psf_cube_masked):
-        """Methods that returns the indices to build sparse matrices from `psf_cube_masked`.
+    def get_sparse_indices(self, boundaries):
+        """Methods that returns the indices to build sparse matrices from rectangular `boundaries`.
 
         Parameters
         ----------
-        psf_cube_masked: np.ndarray
-            Cube of boolean values where `psf_cube` cube is positive, eventually convolved.
+        boundaries: dict
+            The dictionnary of PSF edges per wavelength.
 
         Returns
         -------
@@ -702,14 +706,20 @@ class ChromaticPSF:
         >>> profile_params[:, 1] = np.arange(s.Nx)
         >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
-        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
-        >>> M_sparse_indices.shape
-        (72000,)
-        >>> len(psf_cube_sparse_indices)
-        100
+        >>> boundaries, psf_cube_masked = s.set_rectangular_boundaries(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(boundaries)
+        >>> assert M_sparse_indices.shape == np.sum(psf_cube_masked)
+        >>> assert len(psf_cube_sparse_indices) == s.Nx
         """
-        wl_size = psf_cube_masked.shape[0]
-        psf_cube_sparse_indices = [np.where(psf_cube_masked[k].ravel() > 0)[0] for k in range(wl_size)]
+        wl_size = self.Nx  # assuming that the number of cube layers is the number of pixel columns
+        psf_cube_sparse_indices = []
+        for k in range(wl_size):
+            xmin, xmax = boundaries["xmin"][k], boundaries["xmax"][k]
+            if xmin == -1:
+                psf_cube_sparse_indices.append([])
+            else:
+                ymin, ymax = boundaries["ymin"][k], boundaries["ymax"][k]
+                psf_cube_sparse_indices.append(np.concatenate([np.arange(xmin,xmax) + k * wl_size for k in range(ymin, ymax)]))
         M_sparse_indices = np.concatenate(psf_cube_sparse_indices)
         return psf_cube_sparse_indices, M_sparse_indices
 
@@ -751,8 +761,8 @@ class ChromaticPSF:
 
         >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
-        >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
-        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
+        >>> boundaries, psf_cube_masked = s.set_rectangular_boundaries(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(boundaries)
         >>> M = s.build_sparse_M(s.set_pixels(mode="2D"), profile_params, M_sparse_indices, boundaries, dtype="float32")
         >>> M.shape
         (2000, 100)
@@ -770,8 +780,8 @@ class ChromaticPSF:
 
         >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="1D"), profile_params)
         >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
-        >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
-        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
+        >>> boundaries, psf_cube_masked = s.set_rectangular_boundaries(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(boundaries)
         >>> M = s.build_sparse_M(s.set_pixels(mode="1D"), profile_params, M_sparse_indices, boundaries, dtype="float32")
         >>> M.shape
         (2000, 100)
@@ -849,8 +859,8 @@ class ChromaticPSF:
         >>> profile_params[:, 1] = np.arange(s.Nx)  # PSF x_c positions
         >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
-        >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
-        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
+        >>> boundaries, psf_cube_masked = s.set_rectangular_boundaries(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(boundaries)
         >>> s.params.fixed[s.Nx:s.Nx+s.deg+1] = [True] * (s.deg+1)  # fix all x_c parameters
         >>> J = s.build_psf_jacobian(s.set_pixels(mode="2D"), profile_params, psf_cube_sparse_indices, boundaries, dtype="float32")
         >>> J.shape
@@ -879,8 +889,8 @@ class ChromaticPSF:
         if Nx != profile_params.shape[0]:
             raise ValueError(f"Number of pixels along x axis must be same as profile_params table length. "
                              f"Got {Nx=} and {profile_params.shape}.")
-        leg_pixels = np.linspace(-1, 1, Nx)
-        legs = np.zeros((self.n_poly_params-Nx, Nx), dtype=dtype)
+        poly_x = np.linspace(-1, 1, Nx)
+        polys = np.zeros((self.n_poly_params-Nx, Nx), dtype=dtype)
         ip = 0
         repeats = []
         for ipsf, label in enumerate(self.psf.params.labels):
@@ -889,7 +899,10 @@ class ChromaticPSF:
             repeats.append(nparams)
             for k in range(nparams):
                 coeffs = np.eye(1, nparams, k)[0]
-                legs[ip] = np.polynomial.legendre.legval(leg_pixels, coeffs).astype(dtype)
+                if parameters.PSF_POLY_TYPE == "legendre":
+                    polys[ip] = np.polynomial.legendre.legval(poly_x, coeffs).astype(dtype)
+                elif parameters.PSF_POLY_TYPE == "polynomial":
+                    polys[ip] = np.polynomial.polynomial.polyval(poly_x, coeffs).astype(dtype)
                 ip += 1
         for ip, label in enumerate(self.psf.params.labels):
             if "amplitude" in label:  # skip computation of ChromaticPSF jacobian for amplitude parameters
@@ -905,7 +918,7 @@ class ChromaticPSF:
             else:
                 Jpsf = self.psf.jacobian(pixels[boundaries["ymin"][x]:boundaries["ymax"][x]], profile_params[x, :], analytical=True)
 
-            J[:, psf_cube_sparse_indices[x]] += np.repeat(Jpsf[1:], repeats, axis=0) * legs[:, x, None]  # Jpsf[1:] excludes amplitude
+            J[:, psf_cube_sparse_indices[x]] += np.repeat(Jpsf[1:], repeats, axis=0) * polys[:, x, None]  # Jpsf[1:] excludes amplitude
         return J
 
     def build_sparse_dM(self, pixels, profile_params, M_sparse_indices, boundaries, dtype="float32"):
@@ -940,8 +953,8 @@ class ChromaticPSF:
         >>> profile_params[:, 1] = np.arange(s.Nx)  # PSF x_c positions
         >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
-        >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
-        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
+        >>> boundaries, psf_cube_masked = s.set_rectangular_boundaries(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(boundaries)
         >>> s.params.fixed[s.Nx:s.Nx+s.deg+1] = [True] * (s.deg+1)  # fix all x_c parameters
         >>> dM = s.build_sparse_dM(s.set_pixels(mode="2D"), profile_params, M_sparse_indices, boundaries, dtype="float32")
         >>> len(dM), dM[0].shape
@@ -971,8 +984,8 @@ class ChromaticPSF:
         if Nx != profile_params.shape[0]:
             raise ValueError(f"Number of pixels along x axis must be same as profile_params table length. "
                              f"Got {Nx=} and {profile_params.shape}.")
-        leg_pixels = np.linspace(-1, 1, Nx)
-        legs = np.zeros((self.n_poly_params-Nx, Nx), dtype=dtype)
+        poly_x = np.linspace(-1, 1, Nx)
+        polys = np.zeros((self.n_poly_params-Nx, Nx), dtype=dtype)
         ip = 0
         repeats = []
         for ipsf, label in enumerate(self.psf.params.labels):
@@ -982,7 +995,10 @@ class ChromaticPSF:
             for k in range(nparams):
                 # psf_index.append(ipsf)
                 coeffs = np.eye(1, nparams, k)[0]
-                legs[ip] = np.polynomial.legendre.legval(leg_pixels, coeffs).astype(dtype)
+                if parameters.PSF_POLY_TYPE == "legendre":
+                    polys[ip] = np.polynomial.legendre.legval(poly_x, coeffs).astype(dtype)
+                elif parameters.PSF_POLY_TYPE == "polynomial":
+                    polys[ip] = np.polynomial.polynomial.polyval(poly_x, coeffs).astype(dtype)
                 ip += 1
         sparse_J = np.zeros((self.n_poly_params - self.Nx, M_sparse_indices.size), dtype=dtype)
         indptr = np.zeros(Nx+1, dtype=int)
@@ -996,7 +1012,7 @@ class ChromaticPSF:
             indptr[x+1] = (boundaries["xmax"][x]-boundaries["xmin"][x])*(boundaries["ymax"][x]-boundaries["ymin"][x]) + indptr[x]
             if boundaries["xmin"][x] < 0:
                 continue
-            sparse_J[:, indptr[x]:indptr[x+1]] += np.repeat(Jpsf[1:], repeats, axis=0) * legs[:, x, None]
+            sparse_J[:, indptr[x]:indptr[x + 1]] += np.repeat(Jpsf[1:], repeats, axis=0) * polys[:, x, None]
         dM = [sparse.csr_matrix((sparse_J[ip], M_sparse_indices, indptr), shape=(len(profile_params), pixels[0].size), dtype=dtype).T for ip in range(sparse_J.shape[0])]
         return dM
 
@@ -1065,7 +1081,8 @@ class ChromaticPSF:
     def from_profile_params_to_poly_params(self, profile_params, indices=None):
         """
         Transform the profile_params array into a set of parameters for the chromatic PSF parameterisation.
-        Fit Legendre polynomial functions across the pixels for each PSF parameters.
+        Fit polynomial functions across the pixels for each PSF parameters.
+        Type of the polynomial function is set by parameters.PSF_POLY_TYPE.
         The order of the polynomial functions is given by the self.degrees array.
 
         Parameters
@@ -1099,8 +1116,7 @@ class ChromaticPSF:
 
         ..  doctest::
             :hide:
-
-            >>> assert(np.all(np.isclose(profile_params[0], [10, 0, 50, 5, 2, 0, 1, 8e3])))
+            >>> assert(np.all(np.isclose(profile_params[0], [10, 0, 50, 5, 2, -0.4, 1, 8e3])))
 
         From the profile parameters to the polynomial parameters:
 
@@ -1122,8 +1138,7 @@ class ChromaticPSF:
         if amplitude is None:
             self.my_logger.warning('\n\tAmplitude array not initialized. '
                                    'Polynomial fit for shape parameters will be unweighted.')
-            
-        pixels = np.linspace(-1, 1, len(self.table))[indices]
+        poly_x = np.linspace(-1, 1, len(self.table))[indices]
         for k, name in enumerate(self.psf.params.labels):
             delta = 0
             if name != 'amplitude':
@@ -1132,8 +1147,12 @@ class ChromaticPSF:
                     delta = self.x0
                 if name == 'y_c':
                     delta = self.y0
-                fit = np.polynomial.legendre.legfit(pixels, profile_params[indices, k] - delta,
-                                                    deg=self.degrees[name], w=weights)
+                if parameters.PSF_POLY_TYPE == "legendre":
+                    fit = np.polynomial.legendre.legfit(poly_x, profile_params[indices, k] - delta,
+                                                        deg=self.degrees[name], w=weights)
+                elif parameters.PSF_POLY_TYPE == "polynomial":
+                    fit = np.polynomial.polynomial.polyfit(poly_x, profile_params[indices, k] - delta,
+                                                           deg=self.degrees[name], w=weights)
                 poly_params = np.concatenate([poly_params, fit])
         return poly_params
 
@@ -1236,8 +1255,7 @@ class ChromaticPSF:
 
         ..  doctest::
             :hide:
-
-            >>> assert np.allclose(profile_params[0], [10, 0, 50, 5, 2, -5e-3, 1, 8e3], rtol=1e-3, atol=1e-3)
+            >>> assert np.allclose(profile_params[0], [10, 0, 50, 5, 2, -0.4, 1, 8e3], rtol=1e-3, atol=1e-3)
 
         From the profile parameters to the polynomial parameters:
 
@@ -1254,12 +1272,11 @@ class ChromaticPSF:
 
         ..  doctest::
             :hide:
-
-            >>> assert np.allclose(profile_params[0], [1, 0, 50, 5, 2, 0, 1, 8e3])
+            >>> assert np.allclose(profile_params[0], [1, 0, 50, 5, 2, -0.4, 1, 8e3])
 
         """
         length = len(self.table)
-        pixels = np.linspace(-1, 1, length)
+        poly_x = np.linspace(-1, 1, length)
         profile_params = np.zeros((length, len(self.psf.params.labels)))
         shift = 0
         for k, name in enumerate(self.psf.params.labels):
@@ -1270,14 +1287,17 @@ class ChromaticPSF:
                     profile_params[:, k] = np.ones(length)
             else:
                 if len(poly_params) > length:
-                    profile_params[:, k] = \
-                        np.polynomial.legendre.legval(pixels,
-                                                      poly_params[
-                                                      length + shift:length + shift + self.degrees[name] + 1])
+                    if parameters.PSF_POLY_TYPE == "legendre":
+                        profile_params[:, k] = np.polynomial.legendre.legval(poly_x, poly_params[length + shift:length + shift + self.degrees[name] + 1])
+                    elif parameters.PSF_POLY_TYPE == "polynomial":
+                        profile_params[:, k] = np.polynomial.polynomial.polyval(poly_x, poly_params[length + shift:length + shift + self.degrees[name] + 1])
                 else:
                     p = poly_params[shift:shift + self.degrees[name] + 1]
                     if len(p) > 0:  # to avoid saturation parameters in case not set
-                        profile_params[:, k] = np.polynomial.legendre.legval(pixels, p)
+                        if parameters.PSF_POLY_TYPE == "legendre":
+                            profile_params[:, k] = np.polynomial.legendre.legval(poly_x, p)
+                        elif parameters.PSF_POLY_TYPE == "polynomial":
+                            profile_params[:, k] = np.polynomial.polynomial.polyval(poly_x, p)
                 shift += self.degrees[name] + 1
                 if name == 'x_c':
                     profile_params[:, k] += self.x0
@@ -1337,17 +1357,31 @@ class ChromaticPSF:
     def set_bounds(self):
         """
         This function returns an array of bounds for PSF polynomial parameters (no amplitude ones).
-        It is very touchy, change the values with caution !
 
         Returns
         -------
         bounds: list
             2D array containing the pair of bounds for each polynomial parameters.
 
+        Examples
+        ________
+        >>> psf = MoffatGauss()
+        >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=4, saturation=8000)
+        >>> s.set_bounds()   # doctest: +ELLIPSIS
+        [array([-inf,  inf]), array([-inf,  inf]), ...
+
         """
         bounds = [[], []]
         for k, name in enumerate(self.psf.params.labels):
-            tmp_bounds = [[-np.inf] * (1 + self.degrees[name]), [np.inf] * (1 + self.degrees[name])]
+            if parameters.PSF_POLY_TYPE == "legendre":
+                tmp_bounds = [[-np.inf] * (1 + self.degrees[name]), [np.inf] * (1 + self.degrees[name])]
+            elif parameters.PSF_POLY_TYPE == "polynomial":
+                tmp_bounds = [[self.psf.params.bounds[k][0]] + [-np.inf] * (self.degrees[name]),
+                              [self.psf.params.bounds[k][1]] + [np.inf] * (self.degrees[name])]
+                # tmp_bounds = [[self.psf.params.bounds[k][0]] + [-0.5 * 2 * (self.psf.params.bounds[k][1] - self.psf.params.bounds[k][0]) for deg in range(1, self.degrees[name] + 1)],
+                #              [self.psf.params.bounds[k][1]] + [0.5 * 2 * (self.psf.params.bounds[k][1] - self.psf.params.bounds[k][0]) for deg in range(1, self.degrees[name] + 1)]]
+            else:
+                raise ValueError(f"Unknown polynomial type {parameters.PSF_POLY_TYPE=}.")
             if name == "saturation":
                 tmp_bounds = [[0], [2 * self.saturation]]
             elif name == "amplitude":
@@ -1417,14 +1451,16 @@ class ChromaticPSF:
             PSF_truth[:, 1] = np.arange(self.Nx)  # replace x_c
         all_pixels = np.arange(self.profile_params.shape[0])
         for i, name in enumerate(self.psf.params.labels):
-            legs = [self.params.values[k] for k in range(self.params.ndim) if name in self.params.labels[k]]
-            pval = np.polynomial.legendre.leg2poly(legs)[::-1]
+            coeffs = [self.params.values[k] for k in range(self.params.ndim) if name in self.params.labels[k]]
             delta = 0
             if name == 'x_c':
                 delta = self.x0
             if name == 'y_c':
                 delta = self.y0
-            PSF_models.append(np.polyval(pval, rescale_x_to_legendre(all_pixels)) + delta)
+            if parameters.PSF_POLY_TYPE == "legendre":
+                PSF_models.append(np.polynomial.polynomial.legval(rescale_x_to_legendre(all_pixels), coeffs) + delta)
+            elif parameters.PSF_POLY_TYPE == "polynomial":
+                PSF_models.append(np.polynomial.polynomial.polyval(rescale_x_to_legendre(all_pixels), coeffs) + delta)
         for i, name in enumerate(self.psf.params.labels):
             p = ax.plot(all_pixels, self.profile_params[:, i], marker='+', linestyle='none')
             ax.plot(all_pixels[self.fitted_pixels], self.profile_params[self.fitted_pixels, i], label=name,
@@ -1444,7 +1480,7 @@ class ChromaticPSF:
             plt.show()
 
     def fit_transverse_PSF1D_profile(self, data, err, w, ws, pixel_step=1, bgd_model_func=None, saturation=None,
-                                     live_fit=False, sigma_clip=5):
+                                     live_fit=False, sigma_clip=5, mask=None):
         """
         Fit the transverse profile of a 2D data image with a PSF profile.
         Loop is done on the x-axis direction.
@@ -1489,6 +1525,7 @@ class ChromaticPSF:
         >>> bgd += 1000*np.exp(-((xx-20)**2+(yy-10)**2)/(2*2))
         >>> data += bgd
         >>> data_errors = np.sqrt(data+1)
+        >>> mask = bgd > np.median(bgd)
 
         Extract the background:
 
@@ -1497,8 +1534,8 @@ class ChromaticPSF:
         Fit the transverse profile:
 
         >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=4, saturation=saturation)
-        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=5,
-        ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False, sigma_clip=5)
+        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=5, mask=mask,
+        ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False, sigma_clip=5,)
         >>> s.plot_summary(truth=s0)
 
         ..  doctest::
@@ -1609,6 +1646,8 @@ class ChromaticPSF:
             psf.params.bounds = bounds
             w = PSFFitWorkspace(psf, signal, data_errors=err[:, x], bgd_model_func=None,
                                 live_fit=False, verbose=False, jacobian_analytical=True)
+            if mask is not None:
+                w.mask = list(np.where(mask[:, x])[0])
             try:
                 run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma_clip, niter_clip=1, verbose=False)
             except:
@@ -1648,21 +1687,24 @@ class ChromaticPSF:
         # keep only brightest transverse profiles
         selected_pixels = self.profile_params[:, 0] > 0.1 * np.max(self.profile_params[:, 0])
         # then keep only profiles with first shape parameter (index=3) are not too deviant from its median value
-        selected_pixels = selected_pixels & (np.abs(self.profile_params[:, 3]) < 5 * np.median(self.profile_params[:, 3]))
+        for k in range(3, self.profile_params.shape[1]):
+            selected_pixels = selected_pixels & (np.abs(self.profile_params[:, k]) < 5 * np.median(self.profile_params[:, k]))
         self.params.values = self.from_profile_params_to_poly_params(self.profile_params, indices=selected_pixels)
         self.from_profile_params_to_shape_params(self.profile_params)
         self.cov_matrix = np.diag(1 / np.array(self.table['flux_err']) ** 2)
         psf.params.bounds = initial_bounds
 
-    def fit_chromatic_psf(self, data, bgd_model_func=None, data_errors=None, mode="1D", analytical=True,
+    def fit_chromatic_psf(self, data, mask=None, bgd_model_func=None, data_errors=None, mode="1D", analytical=True,
                           amplitude_priors_method="noprior", verbose=False, live_fit=False):
         """
         Fit a chromatic PSF model on 2D data.
 
         Parameters
         ----------
-        data: array_like
+        data: np.array
             2D array containing the image data.
+        mask: np.array, optional
+            2D array containing the masked pixels.
         bgd_model_func: callable, optional
             A 2D function to model the extracted background (default: None -> null background)
         data_errors: np.array
@@ -1702,6 +1744,8 @@ class ChromaticPSF:
         >>> data += bgd
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(np.abs(data+1))
+        >>> mask = np.zeros_like(data).astype(bool)
+        >>> mask[10:30,20:22] = True
 
         Extract the background:
 
@@ -1723,7 +1767,7 @@ class ChromaticPSF:
         Fit the data using the transverse 1D PSF model only:
 
         >>> w = s.fit_chromatic_psf(data, mode="1D", data_errors=data_errors, bgd_model_func=bgd_model_func,
-        ... amplitude_priors_method="noprior", verbose=True)
+        ... amplitude_priors_method="noprior", verbose=True, mask=mask)
         >>> s.plot_summary(truth=s0)
         >>> amplitude_residuals.append([s0.params.values[:s0.Nx], w.amplitude_params-s0.params.values[:s0.Nx],
         ... w.amplitude_params_err])
@@ -1740,7 +1784,7 @@ class ChromaticPSF:
 
         >>> parameters.PSF_FIT_REG_PARAM = 0.002
         >>> w = s.fit_chromatic_psf(data, mode="2D", data_errors=data_errors, bgd_model_func=bgd_model_func,
-        ... amplitude_priors_method="psf1d", verbose=True, analytical=True)
+        ... amplitude_priors_method="psf1d", verbose=True, analytical=True, mask=mask)
         >>> s.plot_summary(truth=s0)
         >>> amplitude_residuals.append([s0.params.values[:s0.Nx], w.amplitude_params-s0.params.values[:s0.Nx],
         ... w.amplitude_params_err])
@@ -1765,13 +1809,13 @@ class ChromaticPSF:
 
         """
         if mode == "1D":
-            w = ChromaticPSFFitWorkspace(self, data, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
+            w = ChromaticPSFFitWorkspace(self, data, mask=mask, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
                                         amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                         live_fit=live_fit, analytical=analytical)
             run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, with_line_search=True)
         elif mode == "2D":
             # first shot to set the mask
-            w = ChromaticPSFFitWorkspace(self, data, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
+            w = ChromaticPSFFitWorkspace(self, data, mask=mask, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
                                          amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                          live_fit=live_fit, analytical=analytical)
             # first, fit the transverse position
@@ -1840,7 +1884,7 @@ class ChromaticPSF:
 
 class ChromaticPSFFitWorkspace(FitWorkspace):
 
-    def __init__(self, chromatic_psf, data, data_errors, mode, bgd_model_func=None, file_name="", analytical=True,
+    def __init__(self, chromatic_psf, data, data_errors, mode, bgd_model_func=None, mask=None, file_name="", analytical=True,
                  amplitude_priors_method="noprior", verbose=False, plot=False, live_fit=False, truth=None):
         if mode not in ["1D", "2D"]:
             raise ValueError(f"mode argument must be '1D' or '2D'. Got {mode=}.")
@@ -1890,6 +1934,10 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.data = self.data.astype("float32").ravel()
         self.err = self.err.astype("float32").ravel()
         self.pixels = np.arange(self.data.shape[0])
+        if mask is not None:
+            self.mask = list(np.where(mask[self.bgd_width:-self.bgd_width, :].astype(bool).ravel())[0])
+        else:
+            self.mask = []
 
         if mode == "1D":
             self.pixels = np.arange(self.Ny)
@@ -1901,6 +1949,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
         self.profile_params = self.chromatic_psf.from_poly_params_to_profile_params(self.poly_params)
         self.data_before_mask = np.copy(self.data)
+        self.mask_before_mask = list(np.copy(self.mask))
         self.boundaries = None
         self.psf_cube_sparse_indices = None
         self.psf_cube_masked = None
@@ -1915,8 +1964,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # (which is not exactly true in rotated images)
         self.data_cov = sparse.diags(self.err * self.err, dtype="float32", format="dia")
         self.W = sparse.diags(1 / (self.err * self.err), dtype="float32", format="dia")
-        self.sqrtW = self.W.sqrt()
-        # create a mask
         self.W_before_mask = self.W.copy()
 
         # design matrix
@@ -1933,7 +1980,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.amplitude_priors_method = amplitude_priors_method
         self.fwhm_priors = np.copy(self.chromatic_psf.table['fwhm'])
         self.reg = parameters.PSF_FIT_REG_PARAM
-        self.trace_r = self.Nx / np.min(self.fwhm_priors)  # spectrophotometric uncertainty principle
+        self.trace_r = self.Nx / np.median(self.fwhm_priors)  # spectrophotometric uncertainty principle
         self.Q = np.zeros((self.Nx, self.Nx))
         self.Q_dot_A0 = np.zeros(self.Nx)
         if amplitude_priors_method not in self.amplitude_priors_list:
@@ -2035,14 +2082,23 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                                                                        fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
                                                                        fwhmy_clip=parameters.PSF_FWHM_CLIP)
         self.psf_cube_masked = self.chromatic_psf.convolve_psf_cube_masked(psf_cube_masked)
-        self.boundaries, self.psf_cube_masked = self.chromatic_psf.get_boundaries(self.psf_cube_masked)
-        self.psf_cube_sparse_indices, self.M_sparse_indices = self.chromatic_psf.get_sparse_indices(self.psf_cube_masked)
-        mask = np.sum(self.psf_cube_masked.reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
+        self.boundaries, self.psf_cube_masked = self.chromatic_psf.set_rectangular_boundaries(self.psf_cube_masked)
+        self.psf_cube_sparse_indices, self.M_sparse_indices = self.chromatic_psf.get_sparse_indices(self.boundaries)
+        # mask = np.sum(self.psf_cube_masked.reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
+        # cumulate the boolean values as int
+        weight_mask = np.sum(self.psf_cube_masked, axis=0)
+        # look for indices with maximum weight per column (all sheets of the psf cube have contributed)
+        res = np.max(weight_mask, axis=0)[np.newaxis,:] * np.ones((weight_mask.shape[0],1))
+        # keep only the pixels where all psf_cube sheets have contributed per column
+        mask = (weight_mask != res).ravel()
+        self.mask = list(self.mask_before_mask) + list(np.where(mask)[0])
+        self.mask = list(set(self.mask))
         W = np.copy(self.W_before_mask.data.ravel())
-        W[mask] = 0
+        self.mask = list(np.copy(self.mask_before_mask))
+        self.mask += list(np.where(mask)[0])
+        self.mask = list(set(self.mask))
+        W[self.mask] = 0
         self.W = sparse.diags(W, dtype="float32", format="dia")
-        self.sqrtW = self.W.sqrt()
-        self.mask = list(np.where(mask)[0])
 
     def simulate(self, *shape_params):
         r"""
@@ -2237,7 +2293,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             M = self.chromatic_psf.build_sparse_M(self.pixels, profile_params, dtype="float32",
                                                   M_sparse_indices=self.M_sparse_indices, boundaries=self.boundaries)
 
-            M_dot_W = M.T @ self.sqrtW
+            M_dot_W = M.T @ self.W.sqrt()
             W_dot_data = self.W @ self.data
             # Compute the minimizing amplitudes
             if sparse_dot_mkl is None:
