@@ -85,13 +85,13 @@ class Grid:
 
     def getTotal(self):
         if len(self.axes[-1].axis) > 1:
-            self.total = np.trapz(y=self.grid, x=self.axes[-1].axis, axis=self.rangedim[-1])
+            self.total = np.trapezoid(y=self.grid, x=self.axes[-1].axis, axis=self.rangedim[-1])
         else:
             self.total = np.sum(self.grid)
         if self.dim > 1:
             for i in reversed(self.rangedim[:-1]):
                 if len(self.axes[i].axis) > 1:
-                    self.total = np.trapz(y=self.total, x=self.axes[i].axis, axis=i)
+                    self.total = np.trapezoid(y=self.total, x=self.axes[i].axis, axis=i)
                 else:
                     self.total = np.sum(self.total, axis=i)
         return self.total
@@ -106,7 +106,7 @@ class Grid:
 
     def marginalizeAlongAxis(self, axis_index):
         # return(np.sum(self.grid,axis=axis_index))
-        return np.trapz(self.grid, self.axes[axis_index].axis, axis=axis_index)
+        return np.trapezoid(self.grid, self.axes[axis_index].axis, axis=axis_index)
 
 
 class PDF(Grid):
@@ -174,7 +174,7 @@ class PDF(Grid):
         xprod = np.zeros_like(self.grid)
         for xindex, x in enumerate(self.axe.axis):
             xprod[xindex] = x * self.grid[xindex]
-        self.mean = np.trapz(xprod, x=self.axe.axis)
+        self.mean = np.trapezoid(xprod, x=self.axe.axis)
         # cumprob = np.cumsum(self.grid)
         cumprob = np.zeros_like(self.grid)
         cumprob[0] = self.grid[0]
@@ -226,7 +226,7 @@ class PDF(Grid):
         xxprod = np.zeros_like(self.grid)
         for xindex, x in enumerate(self.axe.axis):
             xxprod[xindex] = self.grid[xindex] * (x - self.mean) ** 2
-        self.variance = np.trapz(xxprod, self.axe.axis)
+        self.variance = np.trapezoid(xxprod, self.axe.axis)
         txt = "%s: %s +%s -%s (std: %s)" % formatting_numbers(self.mean, self.error_high, self.error_low,
                                                                 std=np.sqrt(self.variance), label=self.label)
         self.title = '$%s^{+%s}_{-%s}$' % formatting_numbers(self.mean, self.error_high, self.error_low)
@@ -254,9 +254,9 @@ class Contours(Grid):
 
     def covariance(self):
         self.normalize()
-        pdf = np.trapz(y=self.grid, x=self.axes[1].axis, axis=1)
+        pdf = np.trapezoid(y=self.grid, x=self.axes[1].axis, axis=1)
         self.pdfs[0].fill(pdf)
-        pdf = np.trapz(y=self.grid, x=self.axes[0].axis, axis=0)
+        pdf = np.trapezoid(y=self.grid, x=self.axes[0].axis, axis=0)
         self.pdfs[1].fill(pdf)
         if self.pdfs[0].max_pdf is None:
             self.pdfs[0].stats(verbose=False)
@@ -270,7 +270,7 @@ class Contours(Grid):
         for xindex, x in enumerate(self.axes[0].axis):
             for yindex, y in enumerate(self.axes[1].axis):
                 xyprod[xindex][yindex] = (x - self.pdfs[0].mean) * (y - self.pdfs[1].mean) * self.grid[xindex][yindex]
-        self.cov = np.trapz(np.trapz(y=xyprod, x=self.axes[1].axis, axis=1), self.axes[0].axis, axis=0)
+        self.cov = np.trapezoid(np.trapezoid(y=xyprod, x=self.axes[1].axis, axis=1), self.axes[0].axis, axis=0)
         self.rho = self.cov / (np.sqrt(self.pdfs[0].variance * self.pdfs[1].variance))
         return self.cov
 
@@ -395,12 +395,12 @@ class Likelihood(Grid):
                         if len(self.axes[axes[-1]].axis) == 1:
                             pdf = np.sum(self.grid, axis=axes[-1])
                         else:
-                            pdf = np.trapz(y=self.grid, x=self.axes[axes[-1]].axis, axis=axes[-1])
+                            pdf = np.trapezoid(y=self.grid, x=self.axes[axes[-1]].axis, axis=axes[-1])
                         for axe in reversed(axes[:-1]):
                             if len(self.axes[axe].axis) == 1:
                                 pdf = np.sum(pdf, axis=axe)
                             else:
-                                pdf = np.trapz(y=pdf, x=self.axes[axe].axis, axis=axe)
+                                pdf = np.trapezoid(y=pdf, x=self.axes[axe].axis, axis=axe)
                         self.pdfs[i].fill(pdf)
                     else:
                         self.pdfs[i].fill(self.grid)
@@ -410,13 +410,13 @@ class Likelihood(Grid):
                             if len(self.axes[axes[-1]].axis) == 1:
                                 self.contours[i][j].grid = np.sum(self.grid, axis=axes[-1])
                             else:
-                                self.contours[i][j].grid = np.trapz(y=self.grid, x=self.axes[axes[-1]].axis,
+                                self.contours[i][j].grid = np.trapezoid(y=self.grid, x=self.axes[axes[-1]].axis,
                                                                     axis=axes[-1])
                             for axe in reversed(axes[:-1]):
                                 if len(self.axes[axe].axis) == 1:
                                     self.contours[i][j].grid = np.sum(self.contours[i][j].grid, axis=axe)
                                 else:
-                                    self.contours[i][j].grid = np.trapz(y=self.contours[i][j].grid,
+                                    self.contours[i][j].grid = np.trapezoid(y=self.contours[i][j].grid,
                                                                         x=self.axes[axe].axis, axis=axe)
                             if i < j:
                                 self.contours[i][j].grid = self.contours[i][j].grid.T
