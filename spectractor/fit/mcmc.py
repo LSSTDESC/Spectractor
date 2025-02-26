@@ -963,5 +963,5 @@ def run_emcee(mcmc_fit_workspace, ln=lnprob):
             p0 = sampler.get_last_sample()
         for _ in sampler.sample(p0, iterations=max(0, nsamples - backend.iteration), progress=True, store=True):
             continue
-    mcmc_fit_workspace.chains = sampler.chain
-    mcmc_fit_workspace.lnprobs = sampler.lnprobability
+    mcmc_fit_workspace.chains = sampler.get_chain()
+    mcmc_fit_workspace.lnprobs = sampler.get_log_prob()
