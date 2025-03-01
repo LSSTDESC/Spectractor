@@ -651,7 +651,7 @@ def read_fitparameter_json(json_filename):
 
 class FitWorkspace:
 
-    def __init__(self, params, data, x=None, err=None, data_cov=None, epsilon=None,
+    def __init__(self, params, data, err=None, data_cov=None, epsilon=None,
                  file_name="", verbose=False, plot=False, live_fit=False, truth=None):
         """Generic class to create a fit workspace with parameters, bounds and general fitting methods.
 
@@ -661,8 +661,6 @@ class FitWorkspace:
             The parameters to fit to data.
         data: np.ndarray
             Data array to fit with simulate() method.
-        x: np.ndarray, optional
-            Abscissa values of data (default: None).
         err: np.ndarray, optional
             Uncertainty array for data (default: None).
         data_cov: np.ndarray, optional
@@ -697,7 +695,6 @@ class FitWorkspace:
         self.verbose = verbose
         self.plot = plot
         self.live_fit = live_fit
-        self.x = x
         self.data = data
         if (err is None and data_cov is None) or (err is not None and data_cov is not None):
             raise ValueError("Either err or data_cov must be specified.")
@@ -1646,7 +1643,8 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
             return fit_workspace.jacobian(params, model_input=None).T
 
         start = time.time()
-        result = optimize.curve_fit(model, fit_workspace.x, fit_workspace.data, jac=Dfun,
+        dummy_x = np.arange(len(fit_workspace.data))
+        result = optimize.curve_fit(model, dummy_x, fit_workspace.data, jac=Dfun,
                                     p0=fit_workspace.params.values, sigma=fit_workspace.err,
                                     bounds=list(np.array(bounds).T), absolute_sigma=True)
         fit_workspace.params.values = result[0]
