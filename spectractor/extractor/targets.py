@@ -4,6 +4,7 @@ from astropy.coordinates import SkyCoord, Distance
 import astropy.units as u
 from astropy.time import Time
 from astroquery.simbad import SimbadClass
+from pyvo import DALServiceError
 
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
@@ -314,7 +315,11 @@ class Star(Target):
             if getCalspec.is_calspec(self.label):
                 calspec = getCalspec.Calspec(self.label)
                 astroquery_label = calspec.Astroquery_Name
-            self.simbad_table = simbadQuerier.query_object(astroquery_label)
+            try:
+                self.simbad_table = simbadQuerier.query_object(astroquery_label)
+            except (ProxyError, DALServiceError) as err:
+                self.my_logger.warning(f"Simbad proxy error: {err}")
+                self.simbad_table = None
 
             if self.simbad_table is not None:
                 if self.verbose or True:
@@ -325,12 +330,10 @@ class Star(Target):
                     self.radec_position = SkyCoord(
                         self.simbad_table[ra_key][0] + ' ' + self.simbad_table[dec_key][0], unit=(u.hourangle, u.deg)
                     )
+                if not np.ma.is_masked(self.simbad_table[redshift_key]):
+                    self.redshift = float(self.simbad_table[redshift_key])
             else:
-                raise RuntimeError(f"Target {self.label} not found in Simbad")
-            if not np.ma.is_masked(self.simbad_table[redshift_key]):
-                self.redshift = float(self.simbad_table[redshift_key])
-            else:
-                self.redshift = 0
+                self.my_logger.warning(f"Target {self.label} not found by Simbad")
             date_reference="J2000"
 
         self.get_radec_position_after_pm(self.simbad_table, 
