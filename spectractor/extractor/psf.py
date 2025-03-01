@@ -2558,7 +2558,8 @@ class PSFFitWorkspace(FitWorkspace):
         """
         params = copy.deepcopy(psf.params)
         params.fixed[-1] = True  # saturation
-        FitWorkspace.__init__(self, params, file_name=file_name, verbose=verbose, plot=plot,
+        FitWorkspace.__init__(self, params,
+                              file_name=file_name, verbose=verbose, plot=plot,
                               live_fit=live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         if data.shape != data_errors.shape:

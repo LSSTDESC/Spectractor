@@ -651,7 +651,7 @@ def read_fitparameter_json(json_filename):
 
 class FitWorkspace:
 
-    def __init__(self, params, x, data, err=None, data_cov=None, epsilon=None,
+    def __init__(self, params, data, x=None, err=None, data_cov=None, epsilon=None,
                  file_name="", verbose=False, plot=False, live_fit=False, truth=None):
         """Generic class to create a fit workspace with parameters, bounds and general fitting methods.
 
@@ -659,10 +659,10 @@ class FitWorkspace:
         ----------
         params: FitParameters
             The parameters to fit to data.
-        x: np.ndarray
-            Abscissa values of data.
         data: np.ndarray
             Data array to fit with simulate() method.
+        x: np.ndarray, optional
+            Abscissa values of data (default: None).
         err: np.ndarray, optional
             Uncertainty array for data (default: None).
         data_cov: np.ndarray, optional
