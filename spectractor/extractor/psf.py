@@ -2680,7 +2680,7 @@ class PSFFitWorkspace(FitWorkspace):
             ax[0].errorbar(self.pixels, data, yerr=self.err, fmt='ro', label="Data")
             if len(self.outliers) > 0:
                 ax[0].errorbar(self.outliers, data[self.outliers], yerr=self.err[self.outliers], fmt='go',
-                               label=rf"Outliers ({self.sigma_clip}$\sigma$)")
+                               label=rf"Outliers")
             if self.bgd_model_func is not None:
                 ax[0].plot(self.pixels, self.bgd_model_func(self.pixels), 'b--', label="fitted bgd")
             if self.guess is not None:

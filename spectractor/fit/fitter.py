@@ -690,7 +690,6 @@ class FitWorkspace:
         self.x = None
         self.outliers = []
         self.mask = []
-        self.sigma_clip = 5
         self.model = None
         self.model_err = None
         self.model_noconv = None
@@ -1646,7 +1645,6 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
 def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ftol=1e-4,
                                     niter=50, sigma_clip=5.0, niter_clip=3, verbose=False, with_line_search=True):
     my_logger = set_logger(__name__)
-    fit_workspace.sigma_clip = sigma_clip
     for step in range(niter_clip):
         if verbose:
             my_logger.info(f"\n\tSigma-clipping step {step}/{niter_clip} (sigma={sigma_clip})")
