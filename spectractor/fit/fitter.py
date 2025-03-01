@@ -651,16 +651,16 @@ def read_fitparameter_json(json_filename):
 
 class FitWorkspace:
 
-    def __init__(self, params, data, err=None, data_cov=None, epsilon=None,
+    def __init__(self, params=None, data=None, err=None, data_cov=None, epsilon=None,
                  file_name="", verbose=False, plot=False, live_fit=False, truth=None):
         """Generic class to create a fit workspace with parameters, bounds and general fitting methods.
 
         Parameters
         ----------
-        params: FitParameters
-            The parameters to fit to data.
-        data: np.ndarray
-            Data array to fit with simulate() method.
+        params: FitParameters, optional
+            The parameters to fit to data (default: None).
+        data: np.ndarray, optional
+            Data array to fit with simulate() method (default: None).
         err: np.ndarray, optional
             Uncertainty array for data (default: None).
         data_cov: np.ndarray, optional
@@ -681,7 +681,7 @@ class FitWorkspace:
         Examples
         --------
         >>> params = FitParameters(values=[1, 1, 1, 1, 1])
-        >>> w = FitWorkspace(params)
+        >>> w = FitWorkspace(params, data=None)
         >>> w.params.ndim
         5
         """
@@ -696,7 +696,9 @@ class FitWorkspace:
         self.plot = plot
         self.live_fit = live_fit
         self.data = data
-        if (err is None and data_cov is None) or (err is not None and data_cov is not None):
+        self.data_cov = data_cov
+        self.err = err
+        if (err is not None and data_cov is not None):
             raise ValueError("Either err or data_cov must be specified.")
         if err is not None:
             self.err = err
@@ -707,7 +709,8 @@ class FitWorkspace:
         self.outliers = []
         self.mask = []
         self.W = None
-        self.prepare_weight_matrices()
+        if self.data_cov is not None or self.err is not None:
+            self.prepare_weight_matrices()
         self.model = None
         self.model_err = None
         self.model_noconv = None
@@ -1740,10 +1743,8 @@ class RegFitWorkspace(FitWorkspace):
         params = FitParameters(np.asarray([np.log10(opt_reg)]), labels=["log10_reg"],
                                axis_names=[r"$\log_{10} r$"], fixed=None,
                                bounds=[(-20, np.log10(w.amplitude_priors.size) + 2)])
-        FitWorkspace.__init__(self, params, epsilon=[1e-1], verbose=verbose, live_fit=live_fit)
-        self.x = np.array([0])
-        self.data = np.array([0])
-        self.err = np.array([1])
+        FitWorkspace.__init__(self, params, data=np.array([0]), err=np.array([1]),
+                              epsilon=[1e-1], verbose=verbose, live_fit=live_fit)
         self.w = w
         self.opt_reg = opt_reg
         self.resolution = np.zeros_like((self.w.amplitude_params.size, self.w.amplitude_params.size))

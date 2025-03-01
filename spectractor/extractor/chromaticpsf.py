@@ -1888,11 +1888,10 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         for k, par in enumerate(params.labels):
             if "x_c" in par or "saturation" in par:
                 params.fixed[k] = True
-        FitWorkspace.__init__(self, params, file_name=file_name, verbose=verbose, plot=plot, live_fit=live_fit)
+        FitWorkspace.__init__(self, params, data=data, err=data_errors,
+                              file_name=file_name, verbose=verbose, plot=plot, live_fit=live_fit)
         self.my_logger = set_logger(self.__class__.__name__)
         self.chromatic_psf = chromatic_psf
-        self.data = data
-        self.err = data_errors
         self.bgd_model_func = bgd_model_func
         self.analytical = analytical
         self.poly_params = np.copy(self.chromatic_psf.params.values)
@@ -2588,7 +2587,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         dA_dtheta = [self.amplitude_cov_matrix @ dMWD_dtheta[ip] + dcov_dtheta[ip] @ MWD for ip in range(nparams)]
         return dA_dtheta
 
-    def jacobian(self, params, epsilon, model_input=None):
+    def jacobian(self, params, model_input=None):
         r"""Generic function to compute the Jacobian matrix of a model, linear parameters being fixed (see Notes),
         with analytical or numerical derivatives. Analytical derivatives are performed if `self.analytical` is True.
         Let's write :math:`\theta` the non-linear model parameters. If the model is written as:
@@ -2626,8 +2625,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         ----------
         params: array_like
             The array of model parameters.
-        epsilon: array_like
-            The array of small steps to compute the partial derivatives of the model.
         model_input: array_like, optional
             A model input as a list with (x, model, model_err) to avoid an additional call to simulate().
 

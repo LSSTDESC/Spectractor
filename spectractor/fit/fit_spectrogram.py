@@ -141,7 +141,11 @@ class SpectrogramFitWorkspace(FitWorkspace):
         params.fixed[params.get_index("B")] = True  # B
         params.fixed[params.get_index("P [hPa]")] = False  # pressure for ADR
 
-        FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=self.filename)
+        if self.spectrum.spectrogram_Ny > 2 * parameters.PIXDIST_BACKGROUND:
+            self.crop_spectrogram()
+        FitWorkspace.__init__(self, params, data=self.spectrum.spectrogram_data.flatten(),
+                              err=self.spectrum.spectrogram_err.flatten(), epsilon=1e-4,
+                              verbose=verbose, plot=plot, live_fit=live_fit, file_name=self.filename)
         self.my_logger = set_logger(self.__class__.__name__)
         if atmgrid_file_name == "":
             self.atmosphere = Atmosphere(self.spectrum.airmass, self.spectrum.pressure, self.spectrum.temperature)
@@ -156,12 +160,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.params.bounds[self.params.get_index("PWV [mm]")] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
             self.params.fixed[self.params.get_index("angstrom_exp")] = True  # angstrom exponent
             self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
-        if self.spectrum.spectrogram_Ny > 2 * parameters.PIXDIST_BACKGROUND:
-            self.crop_spectrogram()
         self.lambdas = self.spectrum.lambdas
         self.Ny, self.Nx = self.spectrum.spectrogram_data.shape
-        self.data = self.spectrum.spectrogram_data.flatten()
-        self.err = self.spectrum.spectrogram_err.flatten()
         self.bgd = self.spectrum.spectrogram_bgd.flatten()
         if self.spectrum.spectrogram_flat is not None:
             self.flat = self.spectrum.spectrogram_flat.flatten()
@@ -220,8 +220,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.spectrum.chromatic_psf.y0 -= bgd_width
         self.spectrum.spectrogram_Ny, self.spectrum.spectrogram_Nx = self.spectrum.spectrogram_data.shape
         self.spectrum.chromatic_psf.table["y_c"] -= bgd_width
-        self.my_logger.debug(f'\n\tSize of the spectrogram region after cropping: '
-                             f'({self.spectrum.spectrogram_Nx},{self.spectrum.spectrogram_Ny})')
 
     def set_mask(self, params=None):
         """
@@ -423,7 +421,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.model *= self.flat
         return self.lambdas, self.model, self.model_err
 
-    def jacobian(self, params, epsilon, model_input=None):
+    def jacobian(self, params, model_input=None):
         start = time.time()
         if model_input is not None:
             lambdas, model, model_err = model_input
@@ -447,13 +445,13 @@ class SpectrogramFitWorkspace(FitWorkspace):
             if ip >= self.psf_params_start_index[0]:
                 continue
             tmp_p = np.copy(params)
-            if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
-                epsilon[ip] = - epsilon[ip]
-            tmp_p[ip] += epsilon[ip]
+            if tmp_p[ip] + self.epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + self.epsilon[ip] > self.params.bounds[ip][1]:
+                self.epsilon[ip] = - self.epsilon[ip]
+            tmp_p[ip] += self.epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
             if self.spectrogram_simulation.fix_atm_sim is False:
                 self.spectrogram_simulation.atmosphere_sim = atmosphere
-            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+            J[ip] = (tmp_model.flatten() - model) / self.epsilon[ip]
         self.spectrogram_simulation.fix_atm_sim = True
         self.spectrogram_simulation.fix_psf_cube = False
         for k, order in enumerate(self.diffraction_orders):
@@ -584,8 +582,6 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         # params_table = np.array([guess])
         start = time.time()
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
-        epsilon = 1e-4 * guess
-        epsilon[epsilon == 0] = 1e-4
         fixed_default = np.copy(fit_workspace.params.fixed)
 
         # fit_workspace.simulation.fast_sim = True
@@ -612,7 +608,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         # fit_workspace.params.fixed[fit_workspace.params.get_index(r"A1")] = False  # A1
         fit_workspace.params.fixed[fit_workspace.params.get_index(r"shift_y [pix]")] = False  # shift y
         fit_workspace.params.fixed[fit_workspace.params.get_index(r"angle [deg]")] = False  # angle
-        run_minimisation(fit_workspace, "newton", epsilon, xtol=1e-2, ftol=0.01, with_line_search=False)
+        run_minimisation(fit_workspace, "newton", xtol=1e-2, ftol=0.01, with_line_search=False)
         fit_workspace.params.fixed = fixed_default
 
         fit_workspace.spectrogram_simulation.fast_sim = False
@@ -622,7 +618,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
         #                                            fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
         #                                            niter=40)
-        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon,  xtol=1e-6,
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
                                         ftol=1 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=verbose,
                                         with_line_search=True)
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")

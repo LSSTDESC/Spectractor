@@ -132,10 +132,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         params.fixed[params.get_index("T [Celsius]")] = True  # temperature
         params.fixed[params.get_index("z")] = True  # airmass
 
-        FitWorkspace.__init__(self, params, spectrum.filename, verbose, plot, live_fit, truth=truth)
-        self.spectrum = spectrum
-
         # crop data to fit faster
+        self.spectrum = spectrum
         self.lambdas = self.spectrum.lambdas
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
         if spectrum.spectrogram_data.shape[0] < 2 * self.bgd_width:
@@ -145,8 +143,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.Ny, self.Nx = spectrum.spectrogram_data[rows, :].shape
         yy, xx = np.mgrid[:self.Ny, :self.Nx]
         self.pixels = np.asarray([xx, yy], dtype=int)
-        self.data = spectrum.spectrogram_data[rows, :].flatten()
-        self.err = spectrum.spectrogram_err[rows, :].flatten()
+
+        FitWorkspace.__init__(self, params, epsilon=1e-4,
+                              data=spectrum.spectrogram_data[rows, :].flatten(),
+                              err=spectrum.spectrogram_err[rows, :].flatten(),
+                              file_name=spectrum.filename, verbose=verbose, plot=plot, live_fit=live_fit, truth=truth)
+
         self.bgd = spectrum.spectrogram_bgd[rows, :].flatten()
         if spectrum.spectrogram_flat is not None:
             self.flat = spectrum.spectrogram_flat[rows, :].flatten()
@@ -616,7 +618,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.amplitude_cov_matrix = np.copy(cov_matrix)
         return self.amplitude_cov_matrix
 
-    def jacobian(self, params, epsilon, model_input=None):
+    def jacobian(self, params, model_input=None):
         if model_input is not None:
             lambdas, model, model_err = model_input
         else:
@@ -630,11 +632,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             if ip >= self.psf_params_start_index[0]:
                 continue
             tmp_p = np.copy(params)
-            if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
-                epsilon[ip] = - epsilon[ip]
-            tmp_p[ip] += epsilon[ip]
+            if tmp_p[ip] + self.epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + self.epsilon[ip] > self.params.bounds[ip][1]:
+                self.epsilon[ip] = - self.epsilon[ip]
+            tmp_p[ip] += self.epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            J[ip] = (tmp_model - model) / epsilon[ip]
+            J[ip] = (tmp_model - model) / self.epsilon[ip]
         self.amplitude_priors_method = method
         for k, order in enumerate(self.diffraction_orders):
             if self.psf_profile_params[order] is None:
@@ -866,8 +868,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
     def adjust_spectrogram_position_parameters(self):
         # fit the spectrogram trace
-        epsilon = 1e-4 * self.params.values
-        epsilon[epsilon == 0] = 1e-4
         fixed_default = np.copy(self.params.fixed)
         self.params.fixed = [True] * len(self.params.values)
         strategy = copy.copy(self.amplitude_priors_method)
@@ -876,7 +876,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.params.fixed[self.params.get_index(r"A1")] = False  # A1
         self.params.fixed[self.params.get_index(r"shift_y [pix]")] = False  # shift y
         self.params.fixed[self.params.get_index(r"angle [deg]")] = False  # angle
-        run_minimisation(self, "newton", epsilon, xtol=1e-2, ftol=0.01, with_line_search=False)  # 1000 / self.data.size)
+        run_minimisation(self, "newton", xtol=1e-2, ftol=0.01, with_line_search=False)  # 1000 / self.data.size)
         self.params.fixed = fixed_default
         self.set_mask(params=self.params.values, fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
         # refix A1=1 and let amplitude parameters free
@@ -930,8 +930,6 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.plot_fit()
         start = time.time()
         my_logger.info(f"\tStart guess:\n\t" + '\n\t'.join([f'{w.params.labels[k]}: {w.params.values[k]} (fixed={w.params.fixed[k]})' for k in range(w.params.ndim)]))
-        epsilon = 1e-4 * w.params.values
-        epsilon[epsilon == 0] = 1e-4
 
         run_minimisation(w, method=method, xtol=1e-3, ftol=1e-2, with_line_search=False)  # 1000 / (w.data.size - len(w.mask)))
         if parameters.DEBUG and parameters.DISPLAY:
@@ -983,7 +981,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
                        f"with sigma={parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP}.")
         for i in range(niter):
             w.set_mask(params=w.params.values, fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
-            run_minimisation_sigma_clipping(w, "newton", epsilon, xtol=1e-5,
+            run_minimisation_sigma_clipping(w, "newton", xtol=1e-5,
                                             ftol=1e-3, niter_clip=3,  # ftol=100 / (w.data.size - len(w.mask))
                                             sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP, verbose=True,
                                             with_line_search=False)
