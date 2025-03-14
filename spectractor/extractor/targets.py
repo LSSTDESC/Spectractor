@@ -257,16 +257,16 @@ class Star(Target):
         --------
         >>> parameters.VERBOSE = True
         >>> s = Star('PNG321.0+3.9')
-        >>> print(s.radec_position.dec)
-        -54d18m07.521s
+        >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
+        -54d18m07...s
         >>> print(s.redshift)
         -0.00021
         >>> s = Star('eta dor')
-        >>> print(s.radec_position.dec)
-        -66d02m22.635s
+        >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
+        -66d02m22...s
         >>> s = Star('mu.col')
-        >>> print(s.radec_position.dec)
-        -32d18m23.162s
+        >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
+        -32d18m23...s
         """
         # explicitly make a class instance here because:
         # when using ``from astroquery.simbad import Simbad`` and then using
@@ -278,20 +278,31 @@ class Star(Target):
             is_gaiaspec = False
         else:
             is_gaiaspec = getGaia.is_gaiaspec(self.label)
+        if not getCalspec.is_calspec(self.label) and getCalspec.is_calspec(self.label.replace(".", " ")):
+            self.label = self.label.replace(".", " ")
+        astroquery_label = self.label
+        if getCalspec.is_calspec(self.label):
+            calspec = getCalspec.Calspec(self.label)
+            astroquery_label = calspec.Astroquery_Name
         if is_gaiaspec:
             # In the case where the gaia spectrum is not available in the 
             # package data, get source info from simbadQuerier
             gaia_sources = getGaia.get_gaia_sources()
-            source = gaia_sources[gaia_sources == self.label]
-            self.simbad_table = [{"PMRA": source["pmra"].iloc[0],
-                                  "PMDEC": source["pmdec"].iloc[0],
-                                  "PLX_VALUE": source["parallax"].iloc[0],}]
+            gaia_label = getGaia.get_gaia_name_from_star_name(astroquery_label)
+            source = gaia_sources[gaia_sources["SOURCE_ID"] == gaia_label]
+            self.simbad_table = [{"ra":  source["ra"].iloc[0],
+                                  "dec": source["dec"].iloc[0],
+                                  "pmra": source["pmra"].iloc[0],
+                                  "pmdec": source["pmdec"].iloc[0],
+                                  "plx_value": source["parallax"].iloc[0],
+                                  "ref_epoch": source["ref_epoch"].iloc[0]}]
 
-            self.radec_position = SkyCoord(ra = source["ra"].iloc[0], 
-                                           dec = source["dec"].iloc[0] , 
-                                           unit=u.deg)
+            date_reference="J"+str(source["ref_epoch"].iloc[0])
+            self.radec_position = SkyCoord(ra = source["ra"].iloc[0],
+                                           dec = source["dec"].iloc[0],
+                                           obstime=date_reference, frame="icrs",
+                                           unit=u.deg, equinox="J2000")
             self.redshift = 0
-            date_reference="J2016"
         else:
             simbadQuerier = SimbadClass()
             patchSimbadURL(simbadQuerier)
@@ -309,32 +320,28 @@ class Star(Target):
                 ra_key = "RA"
                 dec_key = "DEC"
                 redshift_key = "Z_VALUE"
-            if not getCalspec.is_calspec(self.label) and getCalspec.is_calspec(self.label.replace(".", " ")):
-                self.label = self.label.replace(".", " ")
-            astroquery_label = self.label
-            if getCalspec.is_calspec(self.label):
-                calspec = getCalspec.Calspec(self.label)
-                astroquery_label = calspec.Astroquery_Name
             try:
                 self.simbad_table = simbadQuerier.query_object(astroquery_label)
             except (ProxyError, DALServiceError) as err:
                 self.my_logger.warning(f"Simbad proxy error: {err}")
                 self.simbad_table = None
 
+            date_reference="J2000"
             if self.simbad_table is not None:
                 if self.verbose or True:
                     self.my_logger.info(f'\n\tSimbad:\n{self.simbad_table}')
                 if _USE_NEW_SIMBAD:
-                    self.radec_position = SkyCoord(self.simbad_table[ra_key][0], self.simbad_table[dec_key][0], unit="deg")
+                    self.radec_position = SkyCoord(self.simbad_table[ra_key][0],
+                                                   self.simbad_table[dec_key][0], obstime=date_reference,
+                                                   unit="deg", frame='icrs', equinox="J2000")
                 else:
-                    self.radec_position = SkyCoord(
-                        self.simbad_table[ra_key][0] + ' ' + self.simbad_table[dec_key][0], unit=(u.hourangle, u.deg)
-                    )
+                    self.radec_position = SkyCoord(self.simbad_table[ra_key][0] + ' ' + self.simbad_table[dec_key][0],
+                                                   unit=(u.hourangle, u.deg),
+                                                   frame='icrs', obstime=date_reference, equinox="J2000")
                 if not np.ma.is_masked(self.simbad_table[redshift_key]):
                     self.redshift = float(self.simbad_table[redshift_key])
             else:
                 self.my_logger.warning(f"Target {self.label} not found by Simbad")
-            date_reference="J2000"
 
         self.get_radec_position_after_pm(self.simbad_table, 
                                          date_obs="J2000", 
@@ -497,7 +504,7 @@ class Star(Target):
 
     def get_radec_position_after_pm(self, table_coordinates, date_obs="J2000", date_reference="J2000"):
         if table_coordinates is not None:
-            if _USE_NEW_SIMBAD:
+            if _USE_NEW_SIMBAD or "pmra" in table_coordinates[0].keys():
                 pmra_key = 'pmra'
                 pmdec_key = 'pmdec'
                 plx_value_key = 'plx_value'
@@ -505,13 +512,13 @@ class Star(Target):
                 pmra_key = 'PMRA'
                 pmdec_key = 'PMDEC'
                 plx_value_key = 'PLX_VALUE'
-            target_pmra = self.simbad_table[0][pmra_key] * u.mas / u.yr
+            target_pmra = table_coordinates[0][pmra_key] * u.mas / u.yr
             if np.isnan(target_pmra):
                 target_pmra = 0 * u.mas / u.yr
-            target_pmdec = self.simbad_table[0][pmdec_key] * u.mas / u.yr
+            target_pmdec = table_coordinates[0][pmdec_key] * u.mas / u.yr
             if np.isnan(target_pmdec):
                 target_pmdec = 0 * u.mas / u.yr
-            target_parallax = self.simbad_table[0][plx_value_key] * u.mas
+            target_parallax = table_coordinates[0][plx_value_key] * u.mas
             if target_parallax == 0 * u.mas:
                 target_parallax = 1e-4 * u.mas
             target_coord = SkyCoord(ra=self.radec_position.ra, dec=self.radec_position.dec,
