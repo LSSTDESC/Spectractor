@@ -528,7 +528,7 @@ class Star(Target):
 
     def get_radec_position_after_pm(self, table_coordinates, date_obs="J2000", date_reference="J2000"):
         if table_coordinates is not None:
-            if _USE_NEW_SIMBAD or "pmra" in table_coordinates[0].keys():
+            if "pmra" in table_coordinates[0].keys():
                 pmra_key = 'pmra'
                 pmdec_key = 'pmdec'
                 plx_value_key = 'plx_value'
