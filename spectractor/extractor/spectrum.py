@@ -1566,9 +1566,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
                     if spec_smooth[idx] < test:
                         peak_index = idx
                         test = spec_smooth[idx]
-        # remove weak lines
-        if spec_smooth[peak_index] < 5e-2 * np.max(spec_smooth):
-            continue
         # search for first local minima around the local maximum
         # or for first local maxima around the local minimum
         # around +/- 3*peak_width
@@ -1596,9 +1593,14 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
         # to fit for background around the peak
         index = list(np.arange(max(0, index_inf - bgd_width),
                                min(len(lambdas), index_sup + bgd_width), 1).astype(int))
+        
         # exclude pixels very weak compared to the median signal in this zone
+        # if most pixels are excluded, temove the line from the fit
         mask = spec_smooth[index] > 5e-2 * np.median(spec_smooth[index])
-        index = list(np.array(index)[mask])
+        if np.sum(mask) > peak_width:
+            index = list(np.array(index)[mask])
+        else:
+            continue
         
         # skip if data is masked with NaN
         if np.any(np.isnan(spec_smooth[index])):
