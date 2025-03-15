@@ -821,15 +821,15 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         strategy = copy.copy(self.amplitude_priors_method)
         self.amplitude_priors_method = "fixed"
         # let A1 free to help finding the spectrogram trace, with amplitude fixed to prior
-        self.params.fixed[self.params.get_index(r"A1")] = False  # A1
+        self.params.fixed[self.params.get_index(f"A{self.diffraction_orders[0]}")] = False  # A1
         self.params.fixed[self.params.get_index(r"shift_y [pix]")] = False  # shift y
         self.params.fixed[self.params.get_index(r"angle [deg]")] = False  # angle
-        run_minimisation(self, "newton", epsilon, xtol=1e-2, ftol=0.01, with_line_search=False)  # 1000 / self.data.size)
+        run_minimisation(self, "newton", epsilon, xtol=1e-3, ftol=0.001, with_line_search=False)  # 1000 / self.data.size)
         self.params.fixed = fixed_default
         self.set_mask(params=self.params.values, fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
         # refix A1=1 and let amplitude parameters free
         self.amplitude_priors_method = strategy
-        self.params.values[self.params.get_index(r"A1")] = 1
+        self.params.values[self.params.get_index(f"A{self.diffraction_orders[0]}")] = 1
 
 
 def run_ffm_minimisation(w, method="newton", niter=2):
@@ -1297,7 +1297,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     Ny, Nx = data.shape
     y0 = int(image.target_pixcoords_rotated[1])
     right_edge = image.data_rotated.shape[1]
-    ymax = min(Ny, y0 + ws[1])
     ymin = max(0, y0 - ws[1])
     ymax = min(Ny, y0 + ws[1])
 
