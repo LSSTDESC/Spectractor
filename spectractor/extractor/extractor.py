@@ -1316,6 +1316,10 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
                                                           order=spectrum.order)
         xmin = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MIN)))
         xmax = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MAX)))
+    # remove last pixel column of rotated image if it is full of nan values in signal region
+    while np.all(data[max(0, y0 - ws[0]):min(Ny, y0 + ws[0]), xmax]==0) or np.all(np.isnan(data[max(0, y0 - ws[0]):min(Ny, y0 + ws[0]), xmax])):
+        image.my_logger.debug(f"Last data column is invalid (full of nan or zeros). Subtract 1 to {xmax=}->{xmax-1}")
+        xmax -= 1
 
     # Create spectrogram
     data = data[ymin:ymax, xmin:xmax]
