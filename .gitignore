@@ -28,4 +28,4 @@ config.log
 tests/.tests/
 *__pycache__/
 *.pickle
-
+*.cache/*
