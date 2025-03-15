@@ -1299,6 +1299,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     right_edge = image.data_rotated.shape[1]
     ymax = min(Ny, y0 + ws[1])
     ymin = max(0, y0 - ws[1])
+    ymax = min(Ny, y0 + ws[1])
 
     # Roughly estimates the wavelengths and set start 0 nm before parameters.LAMBDA_MIN
     # and end 0 nm after parameters.LAMBDA_MAX
@@ -1351,7 +1352,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
             bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws, mask_signal_region=True)
 
         # Propagate background uncertainties
-        err = np.sqrt(err * err + bgd_rms * bgd_rms)
+        # err = np.sqrt(err * err + bgd_rms * bgd_rms)
 
     # Fit the transverse profile
     my_logger.info('\n\t  ======================= Fit the transverse profile =============================')
@@ -1466,12 +1467,14 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
             data /= spectrum.spectrogram_flat
         bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, spectrum.spectrogram_err,
                                                                                      ws=ws, Dy_disp_axis=s.table['y_c'])
+        # bgd_model_func = extract_spectrogram_background_fit1D(data, spectrum.spectrogram_err, deg=5, ws=ws, pixel_step=1, sigma=5)
         bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
+        # bgd_rms = np.zeros_like(bgd)
         my_logger.info(f"\n\tBackground statistics: mean={np.nanmean(bgd):.3f} {image.units}, "
                    f"RMS={np.nanmean(bgd_rms):.3f} {image.units}.")
 
         # Propagate background uncertainties
-        spectrum.spectrogram_err = np.sqrt(spectrum.spectrogram_err * spectrum.spectrogram_err + bgd_rms * bgd_rms)
+        # spectrum.spectrogram_err = np.sqrt(spectrum.spectrogram_err * spectrum.spectrogram_err + bgd_rms * bgd_rms)
         spectrum.spectrogram_bgd = bgd
         spectrum.spectrogram_bgd_rms = bgd_rms
 
