@@ -10,19 +10,22 @@ from spectractor import parameters  # noqa: E402
 
 class LineFitWorkspace(FitWorkspace):
 
-    def __init__(self, x, y, yerr, file_name="", verbose=0, plot=False, live_fit=False, truth=None):
+    def __init__(self, x, y, yerr, file_name="", epsilon=None, verbose=0, plot=False, live_fit=False, truth=None):
         params = FitParameters(np.array([1, 1]), labels=["a", "b"], axis_names=["$a$", "$b$"],
                                bounds=[[-100, 100], [-100, 100]], truth=truth, filename=file_name)
-        FitWorkspace.__init__(self, params, file_name, verbose, plot, live_fit)
+        FitWorkspace.__init__(self, params, x=x, data=y, err=yerr, epsilon=epsilon,
+                              file_name=file_name, verbose=verbose, plot=plot, live_fit=live_fit)
         self.my_logger = set_logger(self.__class__.__name__)
-        self.x = x
-        self.data = y
-        self.err = yerr
 
-    def simulate(self, a, b):
+    def simulate(self, *params):
+        a, b = params
         self.model = a * self.x + b
         self.model_err = np.zeros_like(self.x)
         return self.x, self.model, self.model_err
+
+    def jacobian(self, params, model_input=None):
+        a, b = params
+        return np.array([self.x, np.ones_like(self.x)])
 
 
 def test_fitworkspace(seed=42):
@@ -42,18 +45,35 @@ def test_fitworkspace(seed=42):
 
     # Do the fits
     file_name = "./outputs/test_linefitworkspace.txt"
-    w = LineFitWorkspace(x, y, yerr, file_name, truth=truth, verbose=True)
+    w = LineFitWorkspace(x, y, yerr, file_name=file_name, epsilon=None, truth=truth, verbose=True)
+    w.my_logger.info(f"Test minimize method...")
     run_minimisation(w, method="minimize")
+    w.my_logger.info(f"\n{w.params}")
     assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
+    w.my_logger.info(f"Test bainhopping method...")
     w.params.values = np.array([1, 1])
     run_minimisation(w, method="basinhopping")
+    w.my_logger.info(f"\n{w.params}")
     assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
-    # w.p = np.array([4, -0.5])
-    # run_minimisation(w, method="least_squares")
-    # w.my_logger.warning(f"{w.p} {w.ndim} {sigma} {truth}")
-    # assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    w.my_logger.info(f"Test curve_fit method...")
+    w.params.values = np.array([1, 1])
+    run_minimisation(w, method="curve_fit")
+    w.my_logger.info(f"\n{w.params}")
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
+    w.my_logger.info(f"Test Levenberg-Marquardt method...")
+    w.params.values = np.array([1, 1])
+    run_minimisation(w, method="lm")
+    w.my_logger.info(f"\n{w.params}")
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
+    w.my_logger.info(f"Test least_squares method...")
+    w.params.values = np.array([1, 1])
+    run_minimisation(w, method="least_squares")
+    w.my_logger.info(f"\n{w.params}")
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
+    w.my_logger.info(f"Test Newton-Raphson method...")
     w.params.values = np.array([1, 1])
     run_minimisation(w, method="newton", with_line_search=True)
+    w.my_logger.info(f"\n{w.params}")
     assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
 
 

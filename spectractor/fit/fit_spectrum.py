@@ -92,7 +92,12 @@ class SpectrumFitWorkspace(FitWorkspace):
                                axis_names=["$A_1$", "$A_2$", "VAOD", r'$\"a$', "ozone [db]", "PWV [mm]",
                                            "reso [nm]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"],
                                bounds=bounds, fixed=fixed, truth=truth, filename=spectrum.filename)
-        FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=spectrum.filename)
+        epsilon = 1e-4 * p
+        epsilon[epsilon == 0] = 1e-4
+        epsilon[-1] = 0.001 * np.max(self.spectrum.data)
+
+        FitWorkspace.__init__(self, params, data=self.spectrum.data, data_cov = self.spectrum.cov_matrix, epsilon=epsilon,
+                              verbose=verbose, plot=plot, live_fit=live_fit, file_name=spectrum.filename)
         if atmgrid_file_name == "":
             self.atmosphere = Atmosphere(self.spectrum.airmass, self.spectrum.pressure, self.spectrum.temperature)
             if self.atmosphere.emulator is not None:
@@ -109,9 +114,6 @@ class SpectrumFitWorkspace(FitWorkspace):
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
         self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
         self.lambdas = self.spectrum.lambdas
-        self.data = self.spectrum.data
-        self.err = self.spectrum.err
-        self.data_cov = self.spectrum.cov_matrix
         self.fit_angstrom_exponent = fit_angstrom_exponent
         self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
         self.simulation = SpectrumSimulation(self.spectrum, atmosphere=self.atmosphere, fast_sim=True, with_adr=True)
@@ -381,9 +383,6 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
 
         # params_table = np.array([guess])
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
-        epsilon = 1e-4 * guess
-        epsilon[epsilon == 0] = 1e-4
-        epsilon[-1] = 0.001 * np.max(fit_workspace.data)
 
         # fit_workspace.simulation.fast_sim = True
         # fit_workspace.simulation.fix_psf_cube = False
@@ -394,10 +393,10 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
         fit_workspace.simulation.fast_sim = False
         fixed = copy.copy(fit_workspace.params.fixed)
         fit_workspace.params.fixed[6] = True
-        run_minimisation(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-3, ftol=100 / fit_workspace.data.size,
+        run_minimisation(fit_workspace, method="newton", xtol=1e-3, ftol=100 / fit_workspace.data.size,
                          verbose=False)
         fit_workspace.params.fixed = fixed
-        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-6,
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
                                         ftol=1 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False)
 
         fit_workspace.params.plot_correlation_matrix()

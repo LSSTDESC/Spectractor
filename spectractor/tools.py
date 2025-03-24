@@ -21,6 +21,7 @@ from scipy.signal import fftconvolve
 from scipy.ndimage import maximum_filter, generate_binary_structure, binary_erosion
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
+from scipy.linalg import cho_factor, cho_solve
 
 from skimage.feature import hessian_matrix
 from spectractor.config import set_logger
@@ -1569,6 +1570,36 @@ def mask_cosmics(data, maxiter=3, sigma_clip=5, border_mode='mirror', convolve_k
     return final_crmask.astype(bool)
 
 
+def cholesky_solve(A, B):
+    """Solve the system A @ X = B using Cholesky factorisation.
+
+    Parameters
+    ----------
+    A: np.ndarray
+        Matrix
+    B: np.ndarray
+        Vector
+
+    Returns
+    -------
+    X: np.ndarray
+        Solution
+
+    Examples
+    --------
+    >>> N = 1000
+    >>> A = np.tri(N).T @ np.tri(N)
+    >>> B = np.arange(N)
+    >>> cov_matrix = np.linalg.inv(A)
+    >>> X = cov_matrix @ B
+    >>> X2 = cholesky_solve(A, B)
+    >>> assert np.all(np.abs(X - X2)<1e-10)
+    """
+    c, low = cho_factor(A)
+    X = cho_solve((c, low), B)
+    return X
+
+
 def formatting_numbers(value, error_high, error_low, std=None, label=None):
     """Format a physical value and its uncertainties. Round the uncertainties
     to the first significant digit, and do the same for the physical value.
@@ -2552,10 +2583,10 @@ def compute_correlation_matrix(cov):
     return rho
 
 
-def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):  # pragma: no cover
+def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None, vmin=-1, vmax=1):  # pragma: no cover
     if ipar is None:
         ipar = np.arange(rho.shape[0]).astype(int)
-    im = plt.imshow(rho[ipar[:, None], ipar], interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
+    im = plt.imshow(rho[ipar[:, None], ipar], interpolation="nearest", cmap='bwr', vmin=vmin, vmax=vmax)
     ax.set_title("Correlation matrix")
     if axis_names is not None:
         names = [axis_names[ip] for ip in ipar]
@@ -2564,6 +2595,15 @@ def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):  # prag
     cbar = plt.colorbar(im)
     cbar.ax.tick_params(labelsize=15)
     plt.gcf().tight_layout()
+
+
+def plot_covariance_matrix(cov):
+    fig = plt.figure(figsize=(7, 5))
+    rho = compute_correlation_matrix(cov)
+    plot_correlation_matrix_simple(plt.gca(), rho)
+    plt.gca().set_title(r"Correlation matrix $\mathbf{\rho}$")
+    fig.tight_layout()
+    plt.show()
 
 
 def resolution_operator(cov, Q, reg):

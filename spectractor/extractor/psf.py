@@ -2468,7 +2468,7 @@ class Order0(PSF):
         Examples
         --------
         >>> from spectractor.extractor.images import Image, find_target
-        >>> im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9")
+        >>> im = Image('tests/data/reduc_20170530_134.fits', target_label="HD111980")
         >>> im.plot_image()
         >>> guess = [820, 580]
         >>> parameters.VERBOSE = True
@@ -2558,15 +2558,14 @@ class PSFFitWorkspace(FitWorkspace):
         """
         params = copy.deepcopy(psf.params)
         params.fixed[-1] = True  # saturation
-        FitWorkspace.__init__(self, params, file_name=file_name, verbose=verbose, plot=plot,
+        FitWorkspace.__init__(self, params, data=data, err=data_errors, epsilon=1e-4,
+                              file_name=file_name, verbose=verbose, plot=plot,
                               live_fit=live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         if data.shape != data_errors.shape:
             raise ValueError(f"Data and uncertainty arrays must have the same shapes. "
                              f"Here data.shape={data.shape} and data_errors.shape={data_errors.shape}.")
         self.psf = psf
-        self.data = data
-        self.err = data_errors
         self.bgd_model_func = bgd_model_func
         self.saturation = self.psf.params.values[-1]
         self.guess = np.copy(self.psf.params.values)
@@ -2680,7 +2679,7 @@ class PSFFitWorkspace(FitWorkspace):
             ax[0].errorbar(self.pixels, data, yerr=self.err, fmt='ro', label="Data")
             if len(self.outliers) > 0:
                 ax[0].errorbar(self.outliers, data[self.outliers], yerr=self.err[self.outliers], fmt='go',
-                               label=rf"Outliers ({self.sigma_clip}$\sigma$)")
+                               label=rf"Outliers")
             if self.bgd_model_func is not None:
                 ax[0].plot(self.pixels, self.bgd_model_func(self.pixels), 'b--', label="fitted bgd")
             if self.guess is not None:
@@ -2775,7 +2774,7 @@ class PSFFitWorkspace(FitWorkspace):
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
 
-    def jacobian(self, params, epsilon, model_input=None):
+    def jacobian(self, params, model_input=None):
         """Compute the Jacobian matrix of a PSF model, with analytical derivatives if they exist,
         numerical derivatives otherwise.
 
@@ -2783,8 +2782,6 @@ class PSFFitWorkspace(FitWorkspace):
         ----------
         params: array_like
             The array of model parameters.
-        epsilon: array_like
-            The array of small steps to compute the partial derivatives of the model.
         model_input: array_like, optional
             A model input as a list with (x, model, model_err) to avoid an additional call to simulate().
 
@@ -2796,7 +2793,7 @@ class PSFFitWorkspace(FitWorkspace):
         """
         if model_input is None:
             model_input = self.simulate(params)
-        return self.psf.jacobian(self.pixels, params=params, epsilon=epsilon, model_input=model_input,
+        return self.psf.jacobian(self.pixels, params=params, epsilon=self.epsilon, model_input=model_input,
                                  analytical=self.jacobian_analytical)
 
 def load_PSF(psf_type=parameters.PSF_TYPE, target=None, clip=False):

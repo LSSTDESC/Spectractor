@@ -12,6 +12,7 @@ from spectractor import parameters
 from spectractor.config import set_logger, load_config
 from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
+from spectractor.extractor.spectroscopy import Line
 from spectractor.extractor.psf import Moffat
 from spectractor.simulation.adr import hadec2zdpar
 from spectractor.simulation.throughput import TelescopeTransmission
@@ -204,6 +205,25 @@ class Image(object):
         if self.target_label != "":
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
             self.header['REDSHIFT'] = self.target.redshift
+
+        if self.disperser_label == "blue300lpmm_qn1":
+            QN1_1 = Line(396, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 1st band left edge
+            QN1_2 = Line(413.5, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 1st band right edge
+            QN1_3 = Line(405, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[1, 20], use_for_calibration=False) # QN 1st band center
+            QN2_1 = Line(481, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 2nd band left edge
+            QN2_2 = Line(494, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 2nd band right edge
+            QN2_3 = Line(487, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[1, 20], use_for_calibration=False) # QN 2nd band center
+            QN3_1 = Line(524, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 3rd band left edge
+            QN3_2 = Line(539, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 3rd band right edge
+            QN3_3 = Line(531, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[1, 20], use_for_calibration=False) # QN 3rd band center
+            QN4_1 = Line(620, atmospheric=True, label=r'$QN4$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 4th band left edge
+            QN = [QN1_1, QN1_2, QN2_1, QN2_2, QN3_1, QN3_2, QN4_1]  # QN1_3, QN2_3, QN3_3, 
+            print(len(self.target.lines.lines))
+            for l in QN:
+                self.target.lines.lines.append(l)
+            self.target.lines.sort_lines()
+            print(len(self.target.lines.lines))
+            
 
     def rebin(self):
         """Rebin the image and reset some related parameters.

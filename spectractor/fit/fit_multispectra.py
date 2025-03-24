@@ -183,7 +183,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         params = FitParameters(p, labels=labels, axis_names=axis_names, fixed=fixed, bounds=bounds)
         self.atm_params_indices = [0, 1, 2, 3]
         self.fit_angstrom_exponent = fit_angstrom_exponent
-        FitWorkspace.__init__(self, params, output_file_name, verbose, plot, live_fit)
+        FitWorkspace.__init__(self, params, file_name=output_file_name, verbose=verbose, plot=plot, live_fit=live_fit)
         self.my_logger = set_logger(self.__class__.__name__)
         self.output_file_name = output_file_name
         self.bin_widths = bin_width

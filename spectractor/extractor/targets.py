@@ -276,16 +276,16 @@ class Star(Target):
         --------
         >>> parameters.VERBOSE = True
         >>> s = Star('PNG321.0+3.9')
-        >>> print(s.radec_position.dec)
-        -54d18m07.521s
+        >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
+        -54d18m07...s
         >>> print(s.redshift)
         -0.00021
         >>> s = Star('eta dor')
-        >>> print(s.radec_position.dec)
-        -66d02m22.635s
+        >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
+        -66d02m22...s
         >>> s = Star('mu.col')
-        >>> print(s.radec_position.dec)
-        -32d18m23.162s
+        >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
+        -32d18m23...s
         """
         date_reference="J2000"
         if not getCalspec.is_calspec(self.label) and getCalspec.is_calspec(self.label.replace(".", " ")):

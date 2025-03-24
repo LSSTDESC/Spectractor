@@ -1386,17 +1386,14 @@ class MultigaussAndBgdFitWorkspace(FitWorkspace):
             labels += [f"A_{ngauss}", f"x0_{ngauss}", f"sigma_{ngauss}"]
 
         params = FitParameters(values=guess,labels=labels,bounds=bounds,truth=truth)
-        FitWorkspace.__init__(self, params, file_name=file_name, verbose=verbose, plot=plot,
+        FitWorkspace.__init__(self, params, data=data, x=x, err=err, file_name=file_name, verbose=verbose, plot=plot,
                               live_fit=live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         if data.shape != err.shape:
             raise ValueError(f"Data and uncertainty arrays must have the same shapes. "
                              f"Here data.shape={data.shape} and data_errors.shape={err.shape}.")
-        self.x = x
         self.x_norm = rescale_x_to_legendre(x)
         self.xs = np.array([self.x_norm, x])
-        self.data = data
-        self.err = err
 
     def simulate(self, *p):
         self.model = multigauss_and_bgd(self.xs, *p)
