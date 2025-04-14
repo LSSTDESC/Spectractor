@@ -338,8 +338,8 @@ class Star(Target):
                     self.radec_position = SkyCoord(self.simbad_table[ra_key][0] + ' ' + self.simbad_table[dec_key][0],
                                                    unit=(u.hourangle, u.deg),
                                                    frame='icrs', obstime=date_reference, equinox="J2000")
-                if not np.ma.is_masked(self.simbad_table[redshift_key]):
-                    self.redshift = float(self.simbad_table[redshift_key])
+                if not np.ma.is_masked(self.simbad_table[redshift_key][0]):
+                    self.redshift = float(self.simbad_table[redshift_key][0])
             else:
                 self.my_logger.warning(f"Target {self.label} not found by Simbad")
 
@@ -504,7 +504,7 @@ class Star(Target):
 
     def get_radec_position_after_pm(self, table_coordinates, date_obs="J2000", date_reference="J2000"):
         if table_coordinates is not None:
-            if _USE_NEW_SIMBAD or "pmra" in table_coordinates[0].keys():
+            if "pmra" in table_coordinates[0].keys():
                 pmra_key = 'pmra'
                 pmdec_key = 'pmdec'
                 plx_value_key = 'plx_value'
