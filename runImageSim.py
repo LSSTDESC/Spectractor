@@ -28,8 +28,8 @@ if __name__ == "__main__":
         parameters.DEBUG = True
         parameters.VERBOSE = True
 
-    file_names = ['CTIODataJune2017_reduced_RG715_v2/data_30may17/reduc_20170530_134.fits']
-    spectrum_file_name = 'outputs/reduc_20170530_134_spectrum.fits'
+    file_names = ['tests/data/reduc_20170530_134.fits']
+    spectrum_file_name = 'tests/data/reduc_20170530_134_spectrum.fits'
     # guess = [720, 670]
     # hologramme HoloAmAg
     # psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
