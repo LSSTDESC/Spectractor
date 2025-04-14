@@ -19,26 +19,24 @@ logging.getLogger("numba").setLevel(logging.ERROR)
 logging.getLogger("h5py").setLevel(logging.ERROR)
 
 
-def from_config_to_dict(config):
+def from_config_to_dict(path):
     """Convert config file keywords into dictionnary.
 
     Parameters
     ----------
-    config: ConfigParser
-        The ConfigParser instance to convert
+    path: str
+        The path to the config file.
 
     Examples
     --------
-
-    >>> config = configparser.ConfigParser()
     >>> mypath = os.path.dirname(__file__)
-    >>> config.read(os.path.join(mypath, "../config/", "default.ini"))  # doctest: +ELLIPSIS
-    ['/.../config/default.ini']
-    >>> out = from_config_to_dict(config)
+    >>> out = from_config_to_dict(os.path.join(mypath, "../config/", "default.ini"))
     >>> assert type(out) == dict
 
     """
     # List all contents
+    config = configparser.ConfigParser()
+    config.read(path)
     out = {}
     for section in config.sections():
         out[section] = {}
@@ -59,27 +57,24 @@ def from_config_to_dict(config):
     return out
 
 
-def from_config_to_parameters(config):
+def from_config_to_parameters(path):
     """Convert config file keywords into spectractor.parameters parameters.
 
     Parameters
     ----------
-    config: ConfigParser
-        The ConfigParser instance to convert
+    path: str
+        The path to the config file.
 
     Examples
     --------
 
-    >>> config = configparser.ConfigParser()
     >>> mypath = os.path.dirname(__file__)
-    >>> config.read(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini"))  # doctest: +ELLIPSIS
-    ['/.../config/default.ini']
-    >>> from_config_to_parameters(config)
+    >>> from_config_to_parameters(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini"))
     >>> assert parameters.OBS_NAME == "DEFAULT"
 
     """
     # List all contents
-    d = from_config_to_dict(config)
+    d = from_config_to_dict(path)
     for section in d.keys():
         for options in d[section].keys():
             setattr(parameters, options.upper(), d[section][options])
@@ -118,9 +113,7 @@ def load_config(config_filename, rebin=True):
     if not os.path.isfile(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini")):
         raise FileNotFoundError('Config file default.ini does not exist.')
     # Load the configuration file
-    config = configparser.ConfigParser()
-    config.read(os.path.join(parameters.CONFIG_DIR, "default.ini"))
-    from_config_to_parameters(config)
+    from_config_to_parameters(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini"))
 
     if not os.path.isfile(config_filename):
         if not os.path.isfile(os.path.join(mypath, parameters.CONFIG_DIR, config_filename)):
@@ -129,9 +122,7 @@ def load_config(config_filename, rebin=True):
             config_filename = os.path.join(mypath, parameters.CONFIG_DIR, config_filename)
     # Load the configuration file
     my_logger.info(f"\n\tLoading {config_filename} with {parameters.VERBOSE=}...")
-    config = configparser.ConfigParser()
-    config.read(config_filename)
-    from_config_to_parameters(config)
+    from_config_to_parameters(config_filename)
 
     # Derive other parameters
     update_derived_parameters()
@@ -167,6 +158,9 @@ def load_config(config_filename, rebin=True):
     # verbosity
     if parameters.VERBOSE or parameters.DEBUG:
         txt = ""
+        # default.ini should be the config file with the most parameters
+        config = configparser.ConfigParser()
+        config.read(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini"))
         for section in config.sections():
             txt += f"Section: {section}\n"
             for options in config.options(section):
