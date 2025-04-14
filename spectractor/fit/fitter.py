@@ -1615,6 +1615,7 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tMinimize: total computation time: {time.time() - start}s")
+
     elif method == 'basinhopping':
         start = time.time()
         minimizer_kwargs = dict(method=minimizer_method, bounds=bounds)
@@ -1623,6 +1624,7 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
+
     elif method == "least_squares":  # pragma: no cover
         fit_workspace.my_logger.warning("least_squares might not work, use with caution... "
                                         "or repair carefully the function weighted_residuals()")
@@ -1647,8 +1649,9 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
 
         start = time.time()
         dummy_x = np.arange(len(fit_workspace.data))
-        result = optimize.curve_fit(model, dummy_x, fit_workspace.data, jac=Dfun,
+        result = optimize.curve_fit(model, dummy_x, fit_workspace.data, jac=Dfun, x_scale='jac',
                                     p0=fit_workspace.params.values, sigma=fit_workspace.err,
+                                    verbose=0, xtol=xtol, ftol=ftol,
                                     bounds=list(np.array(bounds).T), absolute_sigma=True)
         fit_workspace.params.values = result[0]
         fit_workspace.params.cov = result[1]
@@ -1659,7 +1662,6 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
                 fit_workspace.plot_fit()
 
     elif method == "lm":  # pragma: no cover
-
         start = time.time()
         x, cov, infodict, mesg, ier = optimize.leastsq(fit_workspace.weighted_residuals, guess,
                                                        ftol=ftol, xtol=xtol, full_output=True)
@@ -1668,6 +1670,7 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
         if verbose:
             my_logger.debug(f"\n\t{x}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
+
     elif method == "newton":
         start = time.time()
         run_gradient_descent(fit_workspace, xtol=xtol, ftol=ftol, niter=niter, verbose=verbose,
