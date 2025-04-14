@@ -1,7 +1,6 @@
 import configparser
 import os
 import shutil
-import re
 
 import astropy.units.quantity
 import numpy as np
@@ -10,6 +9,8 @@ import astropy.units as units
 from astropy import constants as const
 
 from spectractor import parameters
+from spectractor.tools import from_config_to_dict
+
 if not parameters.CALLING_CODE:
     import coloredlogs
 
@@ -38,21 +39,10 @@ def from_config_to_parameters(config):
 
     """
     # List all contents
-    for section in config.sections():
-        for options in config.options(section):
-            value = config.get(section, options)
-            if re.match(r"[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?", value):
-                if ' ' in value:
-                    value = str(value)
-                elif '.' in value or 'e' in value:
-                    value = float(value)
-                else:
-                    value = int(value)
-            elif value == 'True' or value == 'False':
-                value = config.getboolean(section, options)
-            else:
-                value = str(value)
-            setattr(parameters, options.upper(), value)
+    d = from_config_to_dict(config)
+    for section in d.keys():
+        for options in d[section].keys():
+            setattr(parameters, options.upper(), d[section][options])
 
 
 def load_config(config_filename, rebin=True):
