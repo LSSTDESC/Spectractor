@@ -1,5 +1,6 @@
 import configparser
 import os
+import re
 import shutil
 
 import astropy.units.quantity
@@ -9,7 +10,6 @@ import astropy.units as units
 from astropy import constants as const
 
 from spectractor import parameters
-from spectractor.tools import from_config_to_dict
 
 if not parameters.CALLING_CODE:
     import coloredlogs
@@ -17,6 +17,46 @@ if not parameters.CALLING_CODE:
 logging.getLogger("matplotlib").setLevel(logging.ERROR)
 logging.getLogger("numba").setLevel(logging.ERROR)
 logging.getLogger("h5py").setLevel(logging.ERROR)
+
+
+def from_config_to_dict(config):
+    """Convert config file keywords into dictionnary.
+
+    Parameters
+    ----------
+    config: ConfigParser
+        The ConfigParser instance to convert
+
+    Examples
+    --------
+
+    >>> config = configparser.ConfigParser()
+    >>> mypath = os.path.dirname(__file__)
+    >>> config.read(os.path.join(mypath, "../config/", "default.ini"))  # doctest: +ELLIPSIS
+    ['/.../config/default.ini']
+    >>> out = from_config_to_dict(config)
+    >>> assert type(out) == dict
+
+    """
+    # List all contents
+    out = {}
+    for section in config.sections():
+        out[section] = {}
+        for options in config.options(section):
+            value = config.get(section, options)
+            if re.match(r"[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?", value):
+                if ' ' in value:
+                    value = str(value)
+                elif '.' in value or 'e' in value:
+                    value = float(value)
+                else:
+                    value = int(value)
+            elif value == 'True' or value == 'False':
+                value = config.getboolean(section, options)
+            else:
+                value = str(value)
+            out[section][options] = value
+    return out
 
 
 def from_config_to_parameters(config):

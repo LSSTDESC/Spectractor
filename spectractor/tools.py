@@ -1,7 +1,4 @@
 import os
-import re
-import configparser
-
 import copy
 import shutil
 from photutils.detection import IRAFStarFinder
@@ -2801,46 +2798,6 @@ class NumpyArrayEncoder(json.JSONEncoder):
             return float(obj)
         else:
             return super().default(obj)
-
-
-def from_config_to_dict(config):
-    """Convert config file keywords into dictionnary.
-
-    Parameters
-    ----------
-    config: ConfigParser
-        The ConfigParser instance to convert
-
-    Examples
-    --------
-
-    >>> config = configparser.ConfigParser()
-    >>> mypath = os.path.dirname(__file__)
-    >>> config.read(os.path.join(mypath, "../config/", "default.ini"))  # doctest: +ELLIPSIS
-    ['/.../config/default.ini']
-    >>> out = from_config_to_dict(config)
-    >>> assert type(out) == dict
-
-    """
-    # List all contents
-    out = {}
-    for section in config.sections():
-        out[section] = {}
-        for options in config.options(section):
-            value = config.get(section, options)
-            if re.match(r"[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?", value):
-                if ' ' in value:
-                    value = str(value)
-                elif '.' in value or 'e' in value:
-                    value = float(value)
-                else:
-                    value = int(value)
-            elif value == 'True' or value == 'False':
-                value = config.getboolean(section, options)
-            else:
-                value = str(value)
-            out[section][options] = value
-    return out
 
 
 if __name__ == "__main__":
