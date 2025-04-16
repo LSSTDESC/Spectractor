@@ -169,7 +169,7 @@ def test_ctio_fullchain():
                                f"\n\t\tspectrum.header['BKGD_LEV']={spectrum.header['BKGD_LEV'] * parameters.CCD_REBIN**2:.5g} "
                                f"vs {np.mean(spectrum.spectrogram_bgd):.5g}"
                                f"\n\t\tspectrum.header['D2CCD_T']={spectrum.header['D2CCD_T']:.5g} "
-                               f"vs {spectrum.disperser.D:.5g}"
+                               f"vs {spectrum.header['D2CCD']:.5g}"
                                f"\n\t\tspectrum.header['A2_FIT']={spectrum.header['A2_FIT']:.5g} vs {A2_T:.5g}"
                                f"\n\t\tspectrum.header['CHI2_FIT']={spectrum.header['CHI2_FIT']:.4g}"
                                f"\n\t\tspectrum.chromatic_psf.poly_params="
@@ -181,7 +181,7 @@ def test_ctio_fullchain():
     assert np.isclose(float(spectrum.header['Y0_T'] / parameters.CCD_REBIN), spectrum.x0[1], atol=0.2 * parameters.CCD_REBIN)
     assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle, atol=1e-3)
     assert np.isclose(float(spectrum.header['BKGD_LEV'] * parameters.CCD_REBIN**2), np.mean(spectrum.spectrogram_bgd), rtol=1e-3)
-    assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.1)
+    assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.header["D2CCD"], atol=0.1)
     if parameters.CCD_REBIN == 1:
         assert float(spectrum.header['CHI2_FIT']) < 1.5e-3
     else:
@@ -299,7 +299,7 @@ def auxtel_fullchain():
                                f"\n\t\tspectrum.header['BKGD_LEV']={spectrum.header['BKGD_LEV'] * parameters.CCD_REBIN**2:.5g} "
                                f"vs {np.mean(spectrum.spectrogram_bgd):.5g}"
                                f"\n\t\tspectrum.header['D2CCD_T']={spectrum.header['D2CCD_T']:.5g} "
-                               f"vs {spectrum.disperser.D:.5g}"
+                               f"vs {spectrum.header['D2CCD']:.5g}"
                                f"\n\t\tspectrum.header['A2_FIT']={spectrum.header['A2_FIT']:.5g} vs {A2_T:.5g}"
                                f"\n\t\tspectrum.header['CHI2_FIT']={spectrum.header['CHI2_FIT']:.4g}"
                                f"\n\t\tspectrum.chromatic_psf.poly_params="
@@ -311,7 +311,7 @@ def auxtel_fullchain():
     assert np.isclose(float(spectrum.header['Y0_T'] / parameters.CCD_REBIN), spectrum.x0[1], atol=0.2 * parameters.CCD_REBIN)
     assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle, atol=1e-3)
     assert np.isclose(float(spectrum.header['BKGD_LEV'] * parameters.CCD_REBIN**2), np.mean(spectrum.spectrogram_bgd), rtol=1e-3)
-    assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.1)
+    assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.header['D2CCD'], atol=0.1)
     if parameters.CCD_REBIN == 1:
         assert float(spectrum.header['CHI2_FIT']) < 1.5e-3
     else:

@@ -575,7 +575,7 @@ class Spectrum:
 
         label = f'Order {self.order:d} spectrum\n' \
                 r'$D_{\mathrm{CCD}}=' \
-                rf'{self.disperser.D:.2f}\,$mm'
+                rf'{self.header["D2CCD"]:.2f}\,$mm'
         plot_spectrum_simple(mainPlot, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
                              title='', units=self.units, lw=1, linestyle="-")
         if len(self.target.spectra) > 0:
