@@ -305,7 +305,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                                                                                             apply_bounds=True)
             if order == self.diffraction_orders[0]:  # only first diffraction order
                 self.spectrum.chromatic_psf.from_profile_params_to_shape_params(profile_params)
-            dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(lambdas, dx0, dy0, angle,
+            dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(lambdas, D2CCD, dx0, dy0, angle,
                                                                              niter=5, with_adr=True,
                                                                              order=order)
             profile_params[:, 0] = 1
@@ -475,7 +475,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 self.psf_profile_params[order] = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params[k], apply_bounds=True)
 
             # Dispersion law
-            dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, dx0, dy0, angle,
+            dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, D2CCD, dx0, dy0, angle,
                                                                              niter=5, with_adr=True, order=order)
 
             # Fill spectrogram trace as a function of the pixel column x
@@ -1354,7 +1354,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     # and end 0 nm after parameters.LAMBDA_MAX
     if spectrum.order < 0:
         distance = np.sign(spectrum.order) * (np.arange(Nx) - image.target_pixcoords_rotated[0])
-        lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords, order=spectrum.order)
+        lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords,
+                                                          D=parameters.DISTANCE2CCD, order=spectrum.order)
         lambda_min_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MIN)))
         lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
         xmin = max(0, int(distance[lambda_min_index]))
@@ -1362,7 +1363,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     else:
         lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
                                                           x0=image.target_pixcoords,
-                                                          order=spectrum.order)
+                                                          D=parameters.DISTANCE2CCD, order=spectrum.order)
         xmin = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MIN)))
         xmax = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MAX)))
 
@@ -1473,7 +1474,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     ymax = min(Ny, y0 + int(s.table['Dy_disp_axis'].max()) + ws[1] + 1)  # +1 to  include edges
     ymin = max(0, y0 + int(s.table['Dy_disp_axis'].min()) - ws[1])
     distance = s.get_algebraic_distance_along_dispersion_axis()
-    lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords, order=spectrum.order)
+    lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords,
+                                                      D=parameters.DISTANCE2CCD, order=spectrum.order)
     lambda_min_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MIN)))
     lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
     xmin = max(0, int(s.table['Dx'][lambda_min_index] + x0))
@@ -1528,7 +1530,9 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     # First guess for lambdas
     my_logger.info('\n\t  ======================= first guess for lambdas  =============================')
     first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_algebraic_distance_along_dispersion_axis(),
-                                                                  x0=image.target_pixcoords, order=spectrum.order)
+                                                                  x0=image.target_pixcoords,
+                                                                  D=parameters.DISTANCE2CCD,
+                                                                  order=spectrum.order)
     s.table['lambdas'] = first_guess_lambdas
     spectrum.lambdas = np.array(first_guess_lambdas)
 
@@ -1670,7 +1674,8 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
     spectrum.spectrogram_fit = w.model.reshape((w.Ny, w.Nx))  #s.evaluate(s.set_pixels(mode=mode), poly_params=s.params.values)
     spectrum.spectrogram_residuals = (w.data.reshape((w.Ny, w.Nx)) - spectrum.spectrogram_fit) / w.err.reshape((w.Ny, w.Nx))
     lambdas = spectrum.disperser.grating_pixel_to_lambda(s.get_algebraic_distance_along_dispersion_axis(),
-                                                         x0=spectrum.x0, order=spectrum.order)
+                                                         D=parameters.DISTANCE2CCD, x0=spectrum.x0,
+                                                         order=spectrum.order)
     s.table['lambdas'] = lambdas
     spectrum.lambdas = np.array(lambdas)
     spectrum.data = np.copy(w.amplitude_params)

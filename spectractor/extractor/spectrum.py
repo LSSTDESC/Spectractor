@@ -428,12 +428,12 @@ class Spectrum:
         if label == '':
             label = f'Order {self.order:d} spectrum\n' \
                     r'$D_{\mathrm{CCD}}=' \
-                    rf'{self.disperser.D:.2f}\,$mm'
+                    rf'{self.header["D2CCD"]:.2f}\,$mm'
         if self.x0 is not None:
             label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
         if self.data_next_order is not None and np.sum(np.abs(self.data_next_order)) > 0.05 * np.sum(np.abs(self.data)):
-            distance = self.disperser.grating_lambda_to_pixel(self.lambdas, self.x0, order=parameters.SPEC_ORDER+1)
+            distance = self.disperser.grating_lambda_to_pixel(self.lambdas, self.x0, D=self.header["D2CCD"], order=parameters.SPEC_ORDER+1)
             max_index = np.argmin(np.abs(distance + self.x0[0] - parameters.CCD_IMSIZE))
             plot_spectrum_simple(ax, self.lambdas[:max_index], self.data_next_order[:max_index], data_err=self.err_next_order[:max_index],
                                  xlim=xlim, label=f'Order {parameters.SPEC_ORDER+1} spectrum', linestyle="--", lw=1, color="firebrick")
@@ -1075,8 +1075,7 @@ class Spectrum:
         if self.header.get('TARGETX') and self.header.get('TARGETY'):
             self.x0 = [self.header.get('TARGETX'), self.header.get('TARGETY')]  # should be a tuple not a list
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
-        self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
-                                  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+        self.disperser = Hologram(self.disperser_label, data_dir=parameters.DISPERSER_DIR)
         self.my_logger.info(f'\n\tSpectrum loaded from {input_file_name}')
         if parameters.OBS_OBJECT_TYPE == "STAR":
             self.adr_params = [self.dec, self.hour_angle, self.temperature,
@@ -1258,8 +1257,7 @@ class Spectrum:
         # Wavelengths using the order 0 shifts (ADR has no impact as it shifts order 0 and order p equally)
         new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
         # First guess of wavelengths
-        self.disperser.D = np.copy(D)
-        lambdas = self.disperser.grating_pixel_to_lambda(distance, new_x0, order=order)
+        lambdas = self.disperser.grating_pixel_to_lambda(distance, new_x0, D=D, order=order)
         # Evaluate ADR
         if with_adr:
             for k in range(niter):
@@ -1268,10 +1266,10 @@ class Spectrum:
                 adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
 
                 # Compute lambdas at pixel column x
-                lambdas = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, order=order)
+                lambdas = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, D=D, order=order)
         return lambdas
 
-    def compute_dispersion_in_spectrogram(self, lambdas, shift_x, shift_y, angle, niter=3, with_adr=True, order=1):
+    def compute_dispersion_in_spectrogram(self, lambdas, D, shift_x, shift_y, angle, niter=3, with_adr=True, order=1):
         """Compute the dispersion relation in a spectrogram, using grating dispersion model and ADR, for a given
         diffraction order. Origin is the order 0 centroid.
 
@@ -1279,6 +1277,8 @@ class Spectrum:
         ----------
         lambdas: array_like
             Wavelength array for the given diffraction order.
+        D: float
+            The distance between the CCD and the disperser in mm.
         shift_x: float
             Shift in the x axis direction for order 0 position in pixel.
         shift_y: float
@@ -1305,11 +1305,11 @@ class Spectrum:
         >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
         >>> lambdas[:4]  #doctest: +ELLIPSIS
         array([334.874..., 336.022..., 337.170..., 338.318...])
-        >>> dispersion_law = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=1)
+        >>> dispersion_law = s.compute_dispersion_in_spectrogram(lambdas, 58, 0, 0, 0, order=1)
         >>> dispersion_law[:4]  #doctest: +ELLIPSIS
         array([280.0... +1.0...j, 281.0...+1.0...j,
                282.0...+1.0...j, 283.0... +1.0...j])
-        >>> dispersion_law_order2 = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=2)
+        >>> dispersion_law_order2 = s.compute_dispersion_in_spectrogram(lambdas, 58, 0, 0, 0, order=2)
         >>> dispersion_law_order2[:4]  #doctest: +ELLIPSIS
         array([573.6...+1.0...j, 575.8...+1.0...j,
                577.9...+1.0...j, 580.0...+1.0...j])
@@ -1318,7 +1318,7 @@ class Spectrum:
         new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
         # Distance (not position) in pixel of wavelength lambda centroid in the (x,y) spectrogram frame
         # with respect to order 0 centroid
-        distance_along_disp_axis = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=order)
+        distance_along_disp_axis = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, D=D, order=order)
         Dx = distance_along_disp_axis * np.cos(angle * np.pi / 180)
         Dy_disp_axis = distance_along_disp_axis * np.sin(angle * np.pi / 180)
         # Evaluate ADR
@@ -1894,7 +1894,8 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
     if spectrum.units != "ADU/s":  # go back in ADU/s to remove previous lambda*dlambda normalisation
         spectrum.convert_from_flam_to_ADUrate()
     distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis()
-    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
+    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0,
+                                                                  D=parameters.DISTANCE2CCD, order=spectrum.order)
     # ADR is x>0 westward and y>0 northward while CTIO images are x>0 westward and y>0 southward
     # Must project ADR along dispersion axis
     if with_adr > 0:
@@ -1903,7 +1904,8 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
                                         lambda_ref=spectrum.lambda_ref)
             adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
                                                                    dispersion_axis_angle=spectrum.rotation_angle)
-            spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - adr_u, spectrum.x0, order=spectrum.order)
+            spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - adr_u, spectrum.x0,
+                                                                          D=parameters.DISTANCE2CCD, order=spectrum.order)
     else:
         adr_u = np.zeros_like(distance)
     x0 = spectrum.x0
@@ -1924,7 +1926,8 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
             shift = 0
         dist = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=shift)
         spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(dist - with_adr * adr_u,
-                                                                      x0=[x0[0] + shift, x0[1]], order=spectrum.order)
+                                                                      x0=[x0[0] + shift, x0[1]],
+                                                                      D=D, order=spectrum.order)
         spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
         spectrum.convert_from_ADUrate_to_flam()
         chisq = detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
@@ -1961,7 +1964,8 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
             fig = plt.figure(figsize=(7, 4))
             im = plt.imshow(np.log10(chisq_grid), origin='lower', aspect='auto',
                             extent=(
-                                np.min(pixel_shifts) - pixel_shift_step / 2, np.max(pixel_shifts) + pixel_shift_step / 2,
+                                np.min(pixel_shifts) - pixel_shift_step / 2,
+                                np.max(pixel_shifts) + pixel_shift_step / 2,
                                 np.min(Ds) - D_step / 2, np.max(Ds) + D_step / 2))
             plt.gca().scatter(pixel_shift, D, marker='o', s=100, edgecolors='k', facecolors='none',
                               label='Minimum', linewidth=2)
@@ -1997,7 +2001,8 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
     spectrum.x0 = x0
     # check success, xO or D on the edge of their priors
     distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=pixel_shift)
-    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr * adr_u, x0=x0, order=spectrum.order)
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr * adr_u, x0=x0,
+                                                         D=D,  order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.lambdas_binwidths = np.gradient(lambdas)
     spectrum.convert_from_ADUrate_to_flam()

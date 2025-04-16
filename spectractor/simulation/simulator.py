@@ -468,7 +468,7 @@ class SpectrogramModel(Spectrum):
             if self.tr[k] is None or As[k] == 0:  # diffraction order undefined
                 continue
             # Dispersion law
-            dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
+            dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, D, shift_x, shift_y, angle,
                                                                     niter=5, with_adr=True, order=order)
 
             # Spectrum amplitude is in ADU/s

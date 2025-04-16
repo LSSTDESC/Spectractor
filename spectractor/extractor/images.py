@@ -269,8 +269,7 @@ class Image(object):
         self.header['OUTHUM'] = self.humidity
         self.header['CCDREBIN'] = parameters.CCD_REBIN
 
-        self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
-                                  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+        self.disperser = Hologram(self.disperser_label, data_dir=parameters.DISPERSER_DIR)
         self.compute_statistical_error()
         self.convert_to_ADU_rate_units()
 

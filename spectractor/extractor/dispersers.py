@@ -7,9 +7,10 @@ import os
 from spectractor import parameters
 from spectractor.tools import fit_poly2d
 from spectractor.logbook import set_logger
+from spectractor.config import from_config_to_dict
 
 
-def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=256000):
+def build_hologram(order0_position, order1_position, theta_tilt=0, D=parameters.DISTANCE2CCD, lambda_plot=256000):
     """Produce the interference pattern printed on a hologram, with two sources
     located at order0_position and order1_position, with an angle theta_tilt with respect
     to the X axis. For plotting reasons, the wavelength can be set very large with
@@ -23,6 +24,7 @@ def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=2
         List [x1,y1] of the pixel coordinates of the order 1 source position (source B).
     theta_tilt: float
         Angle (in degree) to tilt the interference pattern with respect to X axis (default: 0)
+    D: float
     lambda_plot: float
         Wavelength to produce the interference pattern (default: 256000)
 
@@ -43,8 +45,7 @@ def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=2
     # superposition of two spherical sources centered in order 0 and order 1 positions
     xA = [order0_position[0] * parameters.CCD_PIXEL2MM, order0_position[1] * parameters.CCD_PIXEL2MM]
     xB = [order1_position[0] * parameters.CCD_PIXEL2MM, order1_position[1] * parameters.CCD_PIXEL2MM]
-    A = lambda x, y: U(x - xA[0], y - xA[1], -parameters.DISTANCE2CCD) + U(x - xB[0], y - xB[1],
-                                                                           -parameters.DISTANCE2CCD)
+    A = lambda x, y: U(x - xA[0], y - xA[1], -D) + U(x - xB[0], y - xB[1], -D)
     intensity = lambda x, y: np.abs(A(x, y)) ** 2
     xholo = np.linspace(0, parameters.CCD_IMSIZE * parameters.CCD_PIXEL2MM, parameters.CCD_IMSIZE)
     yholo = np.linspace(0, parameters.CCD_IMSIZE * parameters.CCD_PIXEL2MM, parameters.CCD_IMSIZE)
@@ -120,7 +121,7 @@ def get_theta0(x0):
         return (x0 - parameters.CCD_IMSIZE / 2) * parameters.CCD_PIXEL2ARCSEC * parameters.CCD_ARCSEC2RADIANS
 
 
-def get_delta_pix_ortho(deltaX, x0, D=parameters.DISTANCE2CCD):
+def get_delta_pix_ortho(deltaX, x0, D):
     """ Subtract from the distance deltaX in pixels between a pixel x the order 0 the distance between
     the projected incident point on the disperser and the order 0. In other words, the projection of the incident
     angle theta0 from the disperser to the CCD is removed. The distance to the CCD D is in mm.
@@ -154,7 +155,7 @@ def get_delta_pix_ortho(deltaX, x0, D=parameters.DISTANCE2CCD):
     return deltaX + deltaX0
 
 
-def get_refraction_angle(deltaX, x0, D=parameters.DISTANCE2CCD):
+def get_refraction_angle(deltaX, x0, D):
     """ Return the refraction angle with respect to the disperser normal, using geometrical consideration.
 
     Parameters
@@ -185,7 +186,7 @@ def get_refraction_angle(deltaX, x0, D=parameters.DISTANCE2CCD):
     return theta
 
 
-def get_N(deltaX, x0, D=parameters.DISTANCE2CCD, wavelength=656, order=1):
+def get_N(deltaX, x0, D, wavelength=656, order=1):
     """ Return the grooves per mm number given the spectrum pixel x position with
     its wavelength in mm, the distance to the CCD in mm and the order number. It
     uses the disperser formula.
@@ -229,12 +230,12 @@ def neutral_lines(x_center, y_center, theta_tilt):
     return xs, line1, line2
 
 
-def order01_positions(holo_center, N, theta_tilt, theta0=0, lambda_constructor=639e-6, verbose=True):  # pragma: no cover
+def order01_positions(holo_center, N, theta_tilt, theta0=0, D=parameters.DISTANCE2CCD, lambda_constructor=639e-6, verbose=True):  # pragma: no cover
     """Return the order 0 and order 1 positions of a hologram."""
     # refraction angle between order 0 and order 1 at construction
     alpha = np.arcsin(N * lambda_constructor + np.sin(theta0))
     # distance between order 0 and order 1 in pixels
-    AB = (np.tan(alpha) - np.tan(theta0)) * parameters.DISTANCE2CCD / parameters.CCD_PIXEL2MM
+    AB = (np.tan(alpha) - np.tan(theta0)) * D / parameters.CCD_PIXEL2MM
     # position of order 1 in pixels
     x_center = holo_center[0]
     y_center = holo_center[1]
@@ -269,10 +270,10 @@ def find_order01_positions(holo_center, N_interp, theta_interp, lambda_construct
     return order0_position, order1_position, AB
 
 
-class Grating:
+class Disperser:
     """Generic class for dispersers."""
 
-    def __init__(self, N=-1, label="", D=parameters.DISTANCE2CCD, data_dir=parameters.DISPERSER_DIR, verbose=False):
+    def __init__(self, N=-1, label="", data_dir=parameters.DISPERSER_DIR):
         """Initialize a standard grating object.
 
         Parameters
@@ -281,31 +282,38 @@ class Grating:
             The number of grooves per mm of the grating (default: -1)
         label: str
             String label for the grating (default: '')
-        D: float
-            The distance between the CCD and the disperser in mm.
         data_dir: str
             The directory where information about this disperser is stored. If relative, then the starting point is the
             installation package directory spectractor/. If absolute, it is taken as it is.
             (default: parameters.DISPERSER_DIR)
-        verbose: bool
-            Set to True to increase the verbosity of the initialisation (default: False)
 
         Examples
         --------
-        >>> g = Grating(400)
+        >>> g = Disperser(N=400)
         >>> print(g.N_input)
         400
-        >>> g = Grating(400, label="Ron400", data_dir=parameters.DISPERSER_DIR)
+        >>> g = Disperser(N=400, label="Ron400", data_dir=parameters.DISPERSER_DIR)
         >>> print(f"{g.N_input:6f}")
         400.869182
-        >>> assert g.D is parameters.DISTANCE2CCD
+
+        Hologram case
+
+        >>> h = Hologram(label='HoloPhP')
+        >>> np.round(h.N((500,500)), 3)
+        345.479
+        >>> np.round(h.theta((700,700)), 3)
+        -0.834
+        >>> h.center
+        [856.004, 562.34]
+
         """
         self.my_logger = set_logger(self.__class__.__name__)
         if N <= 0 and label == '':
             raise ValueError("Set either N grooves per mm or the grating label.")
+        self.is_hologram = False
+        self.center = [0.5 * parameters.CCD_IMSIZE, 0.5 * parameters.CCD_IMSIZE]
         self.N_input = N
         self.N_err = 1
-        self.D = D
         self.label = label
         self.full_name = label
         if os.path.isabs(data_dir):
@@ -314,13 +322,56 @@ class Grating:
             mypath = os.path.dirname(os.path.dirname(__file__))
             self.data_dir = os.path.join(mypath, parameters.DISPERSER_DIR)
         self.theta_tilt = 0
-        self.transmission = None
-        self.transmission_err = None
-        self.ratio_order_2over1 = None
+
+        # transmissions
+        ones = np.ones_like(parameters.LAMBDAS).astype(float)
+        self.transmission = interpolate.interp1d(parameters.LAMBDAS, ones, bounds_error=False, fill_value=0.)
+        self.transmission_err = interpolate.interp1d(parameters.LAMBDAS, 0 * ones, bounds_error=False, fill_value=0.)
+        ratio = parameters.GRATING_ORDER_2OVER1 * np.ones_like(parameters.LAMBDAS).astype(float)
+        self.ratio_order_2over1 = interpolate.interp1d(parameters.LAMBDAS, ratio, bounds_error=False, kind="linear",
+                                                       fill_value="extrapolate")  # "(0, t[-1]))
         self.ratio_order_3over2 = None
         self.ratio_order_3over1 = None
         self.flat_ratio_order_2over1 = True
-        self.load_files(verbose=verbose)
+
+        # N and theta interp grids
+        self.N_x = np.arange(0, parameters.CCD_IMSIZE)
+        self.N_y = np.arange(0, parameters.CCD_IMSIZE)
+        self.N_interp = self.N_flat
+        self.N_fit = self.N_flat
+        self.theta_interp = self.theta_flat
+        self.D = None
+
+        if self.label != "":
+            if os.path.isfile(os.path.join(self.data_dir, self.label, self.label+'.ini')):
+                # should be the default in near future
+                self.load_config(path=os.path.join(self.data_dir, self.label, self.label+'.ini'))
+            else:
+                # going obsolete
+                self.load_files()
+
+        if self.is_hologram:
+            self.x_lines, self.line1, self.line2 = neutral_lines(self.center[0], self.center[1], self.theta_tilt)
+        self.my_logger.info(f"\n\t{self}")
+
+    def __str__(self):
+        if self.is_hologram:
+            return(f'Hologram characteristics:'
+                   f'\nN = {self.N(self.center):.2f} +/- {self.N_err:.2f} '
+                   f'grooves/mm at hologram center'
+                   f'\nHologram center at x0 = {self.center[0]:.1f} '
+                   f'and y0 = {self.center[1]:.1f} with average tilt of {self.theta_tilt:.1f} '
+                   f'degrees')
+        else:
+            return(f'Disperser characteristics:'
+                   f'\nN = {self.N([0, 0]):.2f} +/- {self.N_err:.2f} grooves/mm'
+                   f'\nAverage tilt of {self.theta_tilt:.1f} degrees')
+
+    def N_flat(self, x, y):
+        return self.N_input
+
+    def theta_flat(self, x, y):
+        return self.theta_tilt
 
     def N(self, x):
         """Return the number of grooves per mm of the grating at position x.
@@ -337,27 +388,59 @@ class Grating:
 
         Examples
         --------
-        >>> g = Grating(400)
+        >>> g = Disperser(400)
         >>> g.N((500,500))
         400
-        """
-        return self.N_input
 
-    def load_files(self, verbose=False):
-        """If they exist, load the files in data_dir/label/ to set the main
-        characteristics of the grating. Overrides the N input at initialisation.
+        >>> h = Hologram(label='HoloPhP')
+        >>> np.round(h.N((500,500)), 3)
+        345.479
+        >>> np.round(h.N((0,0)), 3)
+        283.569
+
+        """
+        if x[0] < np.min(self.N_x) or x[0] > np.max(self.N_x) \
+                or x[1] < np.min(self.N_y) or x[1] > np.max(self.N_y):
+            N = float(self.N_fit(*x))
+        else:
+            N = int(self.N_interp(*x))
+        return N
+
+    def theta(self, x):
+        """Return the mean dispersion angle of the grating at position x.
 
         Parameters
         ----------
-        verbose: bool
-            Set to True to get more verbosity.
+        x: float, array
+            The [x,y] pixel position on the CCD.
+
+        Returns
+        -------
+        theta: float
+            The mean dispersion angle at position x in degrees.
+
+        Examples
+        --------
+        >>> g = Disperser(400)
+        >>> g.theta((500,500))
+        0.0
+
+        >>> h = Hologram('HoloPhP')
+        >>> np.round(h.theta((700,700)), 3)
+        -0.834
+        """
+        return float(self.theta_interp(*x))
+
+    def load_files(self):
+        """OBSOLETE. If they exist, load the files in data_dir/label/ to set the main
+        characteristics of the grating. Overrides the N input at initialisation.
 
         Examples
         --------
 
         The files exist:
 
-        >>> g = Grating(400, label='Ron400')
+        >>> g = Disperser(400, label='Ron400')
         >>> g.N_input
         400.86918248709316
         >>> print(g.theta_tilt)
@@ -365,28 +448,36 @@ class Grating:
 
         The files do not exist:
 
-        >>> g = Grating(400, label='XXX')
+        >>> g = Disperser(400, label='XXX')
         >>> g.N_input
         400
         >>> print(g.theta_tilt)
         0
 
+        Hologram case
+
+        >>> h = Hologram(label='HoloPhP')
+        >>> h.N((500,500))
+        345.47941688229855
+        >>> h.theta((700,700))
+        -0.8335087452358715
+        >>> h.center
+        [856.004, 562.34]
+
         """
+        self.my_logger.warning(f'Obsolete: no config file found for {self.label}. '
+                               f'Consider converting the disperser text files into a config .ini file.')
         filename = os.path.join(self.data_dir, self.label, "N.txt")
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             self.N_input = a[0]
             self.N_err = a[1]
-        # else:
-        #     raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
 
         filename = os.path.join(self.data_dir, self.label, "full_name.txt")
         if os.path.isfile(filename):
             with open(filename, 'r') as f:
                 for line in f:  # MFL: you really just want the last line of the file?
                     self.full_name = line.rstrip('\n')
-        # else:
-        #     raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
 
         filename = os.path.join(self.data_dir, self.label, "transmission.txt")
         if os.path.isfile(filename):
@@ -394,12 +485,6 @@ class Grating:
             l, t, e = a.T
             self.transmission = interpolate.interp1d(l, t, bounds_error=False, fill_value=0.)
             self.transmission_err = interpolate.interp1d(l, e, bounds_error=False, fill_value=0.)
-        else:
-            ones = np.ones_like(parameters.LAMBDAS).astype(float)
-            self.transmission = interpolate.interp1d(parameters.LAMBDAS, ones, bounds_error=False, fill_value=0.)
-            self.transmission_err = interpolate.interp1d(parameters.LAMBDAS, 0*ones, bounds_error=False, fill_value=0.)
-            msg = f"Failed to load {filename} for {self.label}, using default (perfect) transmission"
-            self.my_logger.info(msg)
 
         filename = os.path.join(self.data_dir, self.label, "ratio_order_2over1.txt")
         if os.path.isfile(filename):
@@ -411,11 +496,6 @@ class Grating:
             self.ratio_order_2over1 = interpolate.interp1d(l, t, bounds_error=False, kind="linear",
                                                            fill_value="extrapolate")  # "(0, t[-1]))
             self.flat_ratio_order_2over1 = False
-        else:
-            ratio = parameters.GRATING_ORDER_2OVER1 * np.ones_like(parameters.LAMBDAS).astype(float)
-            self.ratio_order_2over1 = interpolate.interp1d(parameters.LAMBDAS, ratio, bounds_error=False, kind="linear",
-                                                           fill_value="extrapolate")  # "(0, t[-1]))
-            self.flat_ratio_order_2over1 = True
         filename = os.path.join(self.data_dir, self.label, "ratio_order_3over2.txt")
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
@@ -426,23 +506,173 @@ class Grating:
             self.ratio_order_3over2 = interpolate.interp1d(l, t, bounds_error=False, kind="linear", fill_value="extrapolate")
             self.ratio_order_3over1 = interpolate.interp1d(l, self.ratio_order_3over2(l)*self.ratio_order_2over1(l),
                                                            bounds_error=False, kind="linear", fill_value="extrapolate")
-        else:
-            self.ratio_order_3over2 = None
-            self.ratio_order_3over1 = None
+
         filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
         if os.path.isfile(filename):
             with open(filename) as f:
                 lines = [ll.rstrip('\n') for ll in f]
             self.theta_tilt = float(lines[1].split(' ')[2])
+
+        filename = os.path.join(self.data_dir, self.label, "hologram_grooves_per_mm.txt")
+        if os.path.isfile(filename):
+            self.is_hologram = True
+            a = np.loadtxt(filename)
+            self.N_x, self.N_y, self.N_data = a.T
+            if parameters.CCD_REBIN > 1:
+                self.N_x /= parameters.CCD_REBIN
+                self.N_y /= parameters.CCD_REBIN
+            self.N_interp = interpolate.CloughTocher2DInterpolator((self.N_x, self.N_y), self.N_data)
+            self.N_fit = fit_poly2d(self.N_x, self.N_y, self.N_data, order=2)
+
+        filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
+        if os.path.isfile(filename):
+            with open(filename) as f:
+                lines = [ll.rstrip('\n') for ll in f]
+            self.center = list(map(float, lines[1].split(' ')[:2]))
+            self.theta_tilt = float(lines[1].split(' ')[2])
+
+        filename = os.path.join(self.data_dir, self.label, "hologram_rotation_angles.txt")
+        if os.path.isfile(filename):
+            a = np.loadtxt(filename)
+            self.theta_x, self.theta_y, self.theta_data = a.T
+            if parameters.CCD_REBIN > 1:
+                self.theta_x /= parameters.CCD_REBIN
+                self.theta_y /= parameters.CCD_REBIN
+            self.theta_interp = interpolate.CloughTocher2DInterpolator((self.theta_x, self.theta_y), self.theta_data,
+                                                                       fill_value=self.theta_tilt)
+
+
+    def load_config(self, path):
+        """If they exist, load the config file in data_dir/label/ to set the main
+        characteristics of the grating. Overrides the N input at initialisation.
+
+        Parameters
+        ----------
+        path: str
+            The path to the config file.
+
+        Examples
+        --------
+
+        The files exist:
+
+        >>> g = Disperser(400, label='Ron400')
+        >>> g.N_input
+        400.86918248709316
+        >>> print(g.theta_tilt)
+        -0.277
+
+        Hologram case
+
+        >>> h = Hologram(label='HoloPhP')
+        >>> np.round(h.N((500,500)), 3)
+        345.479
+        >>> np.round(h.theta((700,700)), 3)
+        -0.834
+        >>> h.center
+        [856.004, 562.34]
+
+        """
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f'{path} is not a file.')
+        self.my_logger.info(f'\n\tLoad disperser {self.label}:\n\tfrom {os.path.join(self.data_dir, self.label)}')
+        d = from_config_to_dict(path)
+        self.full_name = d["main"]["full_name"].rstrip('\n')
+
+        # Disperser grooves per mm
+        if type(d["main"]["n"]) == float:
+            self.is_hologram = False
+            self.N_input = float(d["main"]["n"])
+            self.N_x = np.arange(0, parameters.CCD_IMSIZE)
+            self.N_y = np.arange(0, parameters.CCD_IMSIZE)
+            self.N_interp = self.N_flat
+            self.N_fit = self.N_flat
+        elif type(d["main"]["n"]) == str:
+            self.is_hologram = True
+            N_filename = os.path.join(self.data_dir, self.label, d["main"]["n"])
+            a = np.loadtxt(N_filename)
+            self.N_x, self.N_y, self.N_data = a.T
+            if parameters.CCD_REBIN > 1:
+                self.N_x /= parameters.CCD_REBIN
+                self.N_y /= parameters.CCD_REBIN
+            self.N_interp = interpolate.CloughTocher2DInterpolator((self.N_x, self.N_y), self.N_data)
+            self.N_fit = fit_poly2d(self.N_x, self.N_y, self.N_data, order=2)
         else:
-            self.theta_tilt = 0
-            msg = f"Failed to load {filename} for {self.label}, using default tilt of {self.theta_tilt}"
-            self.my_logger.info(msg)
+            raise ValueError("Unknown N type. Must be path or float.")
+        self.N_err = float(d["main"]["n_err"])
+        if self.is_hologram:
+            self.center = [d["main"]["x_center"], d["main"]["y_center"]]
 
-        if verbose:
-            self.my_logger.info(f'\n\tGrating average tilt of {self.theta_tilt:.1f} degrees')
+        # Disperser axis orientation
+        if type(d["main"]["theta_tilt"]) == float:
+            self.theta_tilt = float(d["main"]["theta_tilt"])
+            self.theta_interp = self.theta_flat
+        elif type(d["main"]["theta_tilt"]) == str:
+            theta_filename = os.path.join(self.data_dir, self.label, d["main"]["theta_tilt"])
+            a = np.loadtxt(theta_filename)
+            self.theta_x, self.theta_y, self.theta_data = a.T
+            if parameters.CCD_REBIN > 1:
+                self.theta_x /= parameters.CCD_REBIN
+                self.theta_y /= parameters.CCD_REBIN
+            self.theta_interp = interpolate.CloughTocher2DInterpolator((self.theta_x, self.theta_y), self.theta_data,
+                                                                       fill_value=self.theta_tilt)
+        else:
+            raise ValueError("Unknown theta_tilt type. Must be path or float.")
 
-    def refraction_angle(self, deltaX, x0):
+        if "transmission" in d["transmissions"].keys():
+            if type(d["transmissions"]["transmission"]) == str:
+                tr_filename = os.path.join(self.data_dir, self.label, d["transmissions"]["transmission"].rstrip('\n'))
+                a = np.loadtxt(tr_filename)
+                l, t, e = a.T
+                self.transmission = interpolate.interp1d(l, t, bounds_error=False, fill_value=0.)
+                self.transmission_err = interpolate.interp1d(l, e, bounds_error=False, fill_value=0.)
+            elif type(d["transmissions"]["transmission"]) == float:
+                t = d["transmissions"]["transmission"] * np.ones_like(parameters.LAMBDAS).astype(float)
+                self.transmission = interpolate.interp1d(parameters.LAMBDAS, tr, bounds_error=False,
+                                                         fill_value=0.)
+                self.transmission_err = interpolate.interp1d(parameters.LAMBDAS, 0 * tr, bounds_error=False,
+                                                             fill_value=0.)
+            else:
+                raise ValueError("Unknown transmission type. Must be path or float.")
+        if "ratio_order_2over1" in d["transmissions"].keys():
+            if type(d["transmissions"]["ratio_order_2over1"]) == str:
+                tr_filename = os.path.join(self.data_dir, self.label, d["transmissions"]["ratio_order_2over1"].rstrip('\n'))
+                a = np.loadtxt(tr_filename)
+                if a.T.shape[0] == 2:
+                    l, t = a.T
+                else:
+                    l, t, e = a.T
+                self.ratio_order_2over1 = interpolate.interp1d(l, t, bounds_error=False, kind="linear",
+                                                               fill_value="extrapolate")  # "(0, t[-1]))
+                self.flat_ratio_order_2over1 = False
+            elif type(d["transmissions"]["ratio_order_2over1"]) == float:
+                ratio = d["transmissions"]["ratio_order_2over1"] * np.ones_like(parameters.LAMBDAS).astype(float)
+                self.ratio_order_2over1 = interpolate.interp1d(parameters.LAMBDAS, ratio, bounds_error=False, kind="linear",
+                                                       fill_value="extrapolate")  # "(0, t[-1]))
+                self.flat_ratio_order_2over1 = True
+            else:
+                raise ValueError("Unknown ratio_order_2over1 type. Must be path or float.")
+        if "ratio_order_3over2" in d["transmissions"].keys():
+            if type(d["transmissions"]["ratio_order_3over2"]) == str:
+                tr_filename = os.path.join(self.data_dir, self.label, d["transmissions"]["ratio_order_3over2"].rstrip('\n'))
+                a = np.loadtxt(tr_filename)
+                if a.T.shape[0] == 2:
+                    l, t = a.T
+                else:
+                    l, t, e = a.T
+                self.ratio_order_3over2 = interpolate.interp1d(l, t, bounds_error=False, kind="linear",
+                                                               fill_value="extrapolate")  # "(0, t[-1]))
+            elif type(d["transmissions"]["ratio_order_3over2"]) == float:
+                ratio = d["transmissions"]["ratio_order_3over2"] * np.ones_like(parameters.LAMBDAS).astype(float)
+                self.ratio_order_3over2 = interpolate.interp1d(parameters.LAMBDAS, ratio, bounds_error=False, kind="linear",
+                                                       fill_value="extrapolate")  # "(0, t[-1]))
+            else:
+                raise ValueError("Unknown ratio_order_2over1 type. Must be path or float.")
+
+            self.ratio_order_3over1 = interpolate.interp1d(l, self.ratio_order_3over2(l)*self.ratio_order_2over1(l),
+                                                           bounds_error=False, kind="linear", fill_value="extrapolate")
+
+    def refraction_angle(self, deltaX, x0, D):
         """ Return the refraction angle with respect to the disperser normal, using geometrical consideration,
         given the distance to order 0 in pixels.
 
@@ -452,6 +682,8 @@ class Grating:
             The distance in pixels between the order 0 and a spectrum pixel in the rotated image.
         x0: array
             The order 0 position [x0,y0] in the full non-rotated image.
+        D: float
+            The distance between the CCD and the disperser in mm.
 
         Returns
         -------
@@ -462,11 +694,11 @@ class Grating:
         --------
         >>> from spectractor.config import load_config
         >>> load_config("ctio.ini")
-        >>> g = Grating(400)
-        >>> theta = g.refraction_angle(500, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2])
-        >>> assert np.isclose(theta, np.arctan2(500*parameters.CCD_PIXEL2MM, parameters.DISTANCE2CCD))
+        >>> g = Disperser(400)
+        >>> theta = g.refraction_angle(500, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2], D=55)
+        >>> assert np.isclose(theta, np.arctan2(500*parameters.CCD_PIXEL2MM, 55))
         """
-        theta = get_refraction_angle(deltaX, x0, D=self.D)
+        theta = get_refraction_angle(deltaX, x0, D=D)
         return theta
 
     def refraction_angle_lambda(self, lambdas, x0, order=1):
@@ -491,9 +723,9 @@ class Grating:
         --------
         >>> from spectractor.config import load_config
         >>> load_config("ctio.ini")
-        >>> g = Grating(400)
-        >>> theta = g.refraction_angle(500, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2])
-        >>> assert np.isclose(theta, np.arctan2(500*parameters.CCD_PIXEL2MM, parameters.DISTANCE2CCD))
+        >>> g = Disperser(400)
+        >>> theta = g.refraction_angle(500, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2], D=55)
+        >>> assert np.isclose(theta, np.arctan2(500*parameters.CCD_PIXEL2MM, 55))
         """
         theta0 = get_theta0(x0)
         return np.arcsin(np.clip(order * lambdas * 1e-6 * self.N(x0) + np.sin(theta0),-1, 1))
@@ -514,7 +746,7 @@ class Grating:
         --------
         >>> from spectractor.config import load_config
         >>> load_config("default.ini")
-        >>> disperser = Grating(N=300, D=55)
+        >>> disperser = Disperser(N=300)
         >>> x0 = [800,800]
         >>> lambdas = np.arange(300, 900, 100)
         >>> thetas = disperser.refraction_angle_lambda(lambdas, x0, order=1)
@@ -528,7 +760,7 @@ class Grating:
         lambdas = (np.sin(thetas) - np.sin(theta0)) / (order * self.N(x0))
         return lambdas * 1e6
 
-    def grating_pixel_to_lambda(self, deltaX, x0, order=1):
+    def grating_pixel_to_lambda(self, deltaX, x0, D, order=1):
         """ Convert pixels into wavelengths (in nm) with.
 
         Parameters
@@ -537,6 +769,8 @@ class Grating:
             *Algebraic* pixel distances to order 0 along the dispersion axis.
         x0: float or [float, float]
             Order 0 position detected in the non-rotated image.
+        D: float
+            The distance between the CCD and the disperser in mm.
         order: int
             Order of the spectrum (default: 1).
 
@@ -544,22 +778,22 @@ class Grating:
         --------
         >>> from spectractor.config import load_config
         >>> load_config("default.ini")
-        >>> disperser = Grating(N=300, D=55)
+        >>> disperser = Disperser(N=300)
         >>> x0 = [800,800]
         >>> deltaX = np.arange(0,1000,1).astype(float)
-        >>> lambdas = disperser.grating_pixel_to_lambda(deltaX, x0, order=1)
+        >>> lambdas = disperser.grating_pixel_to_lambda(deltaX, x0, D=55, order=1)
         >>> print(lambdas[:5])
         [0.         1.45454532 2.90909063 4.36363511 5.81817793]
-        >>> pixels = disperser.grating_lambda_to_pixel(lambdas, x0, order=1)
+        >>> pixels = disperser.grating_lambda_to_pixel(lambdas, x0, D=55, order=1)
         >>> print(pixels[:5])
         [0. 1. 2. 3. 4.]
         """
-        theta = self.refraction_angle(deltaX, x0)
+        theta = self.refraction_angle(deltaX, x0, D=D)
         theta0 = get_theta0(x0)
         lambdas = (np.sin(theta) - np.sin(theta0)) / (order * self.N(x0))
         return lambdas * 1e6
 
-    def grating_lambda_to_pixel(self, lambdas, x0, order=1):
+    def grating_lambda_to_pixel(self, lambdas, x0, D, order=1):
         """ Convert wavelength in nm into pixel distance with order 0.
 
         Parameters
@@ -568,6 +802,8 @@ class Grating:
             Wavelengths in nm.
         x0: float or [float, float]
             Order 0 position detected in the raw image.
+        D: float
+            The distance between the CCD and the disperser in mm.
         order: int
             Order of the spectrum (default: 1)
 
@@ -575,32 +811,32 @@ class Grating:
         --------
         >>> from spectractor.config import load_config
         >>> load_config("default.ini")
-        >>> disperser = Grating(N=300, D=55)
+        >>> disperser = Disperser(N=300)
         >>> x0 = [800,800]
         >>> deltaX = np.arange(0,1000,1).astype(float)
-        >>> lambdas = disperser.grating_pixel_to_lambda(deltaX, x0, order=1)
+        >>> lambdas = disperser.grating_pixel_to_lambda(deltaX, x0, D=55, order=1)
         >>> print(lambdas[:5])
         [0.         1.45454532 2.90909063 4.36363511 5.81817793]
-        >>> pixels = disperser.grating_lambda_to_pixel(lambdas, x0, order=1)
+        >>> pixels = disperser.grating_lambda_to_pixel(lambdas, x0, D=55, order=1)
         >>> print(pixels[:5])
         [0. 1. 2. 3. 4.]
         """
         lambdas = np.copy(lambdas)
         theta0 = get_theta0(x0)
         theta = self.refraction_angle_lambda(lambdas, x0, order=order)
-        deltaX = self.D * (np.tan(theta) - np.tan(theta0)) / parameters.CCD_PIXEL2MM
+        deltaX = D * (np.tan(theta) - np.tan(theta0)) / parameters.CCD_PIXEL2MM
         return deltaX
 
-    def grating_resolution(self, deltaX, x0, order=1):
+    def grating_resolution(self, deltaX, x0, D, order=1):
         """ Return wavelength resolution in nm per pixel.
         See mathematica notebook: derivative of the grating formula.
         x0: the order 0 position on the full raw image.
         deltaX: the distance in pixels between order 0 and signal point
         in the rotated image."""
-        delta = get_delta_pix_ortho(deltaX, x0, D=self.D) * parameters.CCD_PIXEL2MM
+        delta = get_delta_pix_ortho(deltaX, x0, D=D) * parameters.CCD_PIXEL2MM
         # theta = self.refraction_angle(x,x0,order=order)
         # res = (np.cos(theta)**3*CCD_PIXEL2MM*1e6)/(order*self.N(x0)*self.D)
-        res = (self.D ** 2 / pow(self.D ** 2 + delta ** 2, 1.5)) * parameters.CCD_PIXEL2MM * 1e6 / (order * self.N(x0))
+        res = (D ** 2 / pow(D ** 2 + delta ** 2, 1.5)) * parameters.CCD_PIXEL2MM * 1e6 / (order * self.N(x0))
         return res
 
     def plot_transmission(self, xlim=None):
@@ -613,7 +849,7 @@ class Grating:
 
         Examples
         --------
-        >>> g = Grating(400, label='Ron400')
+        >>> g = Disperser(400, label='Ron400')
         >>> g.plot_transmission(xlim=(400,800))
         >>> g = Hologram(label='holo4_003')
         >>> g.plot_transmission(xlim=(400,800))
@@ -635,204 +871,10 @@ class Grating:
             parameters.PdfPages.savefig()
 
 
-class Hologram(Grating):
+class Hologram(Disperser):
 
-    def __init__(self, label, D=parameters.DISTANCE2CCD, data_dir=parameters.DISPERSER_DIR,
-                 lambda_plot=256000, verbose=False):
-        """Initialize a Hologram object, given its label. Specification are loaded from text files
-        in data_dir/label/... Inherit from the Grating class.
-
-        Parameters
-        ----------
-        label: str
-            String label for the grating (default: '')
-        D: float
-            The distance between the CCD and the disperser in mm.
-        data_dir: str
-            The directory where information about this disperser is stored. Must be in the form data_dir/label/...
-            (default: parameters.DISPERSER_DIR)
-        lambda_plot: float, optional
-            Wavelength to plot the hologram pattern (default: 256000).
-        verbose: bool
-            Set to True to increase the verbosity of the initialisation (default: False)
-
-        Examples
-        --------
-        >>> h = Hologram(label="HoloPhP", data_dir=parameters.DISPERSER_DIR)
-        >>> h.label
-        'HoloPhP'
-        >>> h.N((500,500))
-        345.4794168822986
-
-        """
-        Grating.__init__(self, 350, D=D, label=label, data_dir=data_dir, verbose=False)
-        self.holo_center = None  # center of symmetry of the hologram interferences in pixels
-        self.theta_interp = None  # interpolated rotation angle map of the hologram from data in degrees
-        self.theta_data = None  # rotation angle map data of the hologram from data in degrees
-        self.theta_x = None  # x coordinates for the interpolated rotation angle map
-        self.theta_y = None  # y coordinates for the interpolated rotation angle map
-        self.x_lines = None
-        self.line1 = None
-        self.line2 = None
-        self.order0_position = None
-        self.order1_position = None
-        self.AB = None
-        self.N_x = None
-        self.N_y = None
-        self.N_data = None
-        self.N_interp = None
-        self.N_fit = None
-        self.lambda_plot = lambda_plot
-        self.is_hologram = True
-        self.load_specs(verbose=verbose)
-
-    def theta_func(self, x, y):
-        return self.theta_tilt
-
-    def N_func(self, x, y):
-        return self.N_input
-
-    def N(self, x):
-        """Return the number of grooves per mm of the grating at position x. If the position is inside
-        the data provided by the text files, this number is computed from an interpolation. If it lies outside,
-        it is computed from a 2D polynomial fit.
-
-        Parameters
-        ----------
-        x: float, array
-            The [x,y] pixel position on the CCD.
-
-        Returns
-        -------
-        N: float
-            The number of grooves per mm at position x
-
-        Examples
-        --------
-        >>> h = Hologram('HoloPhP')
-        >>> h.N((500,500))
-        345.4794168822986
-        >>> h.N((0,0))
-        283.56876727310373
-        """
-
-        if x[0] < np.min(self.N_x) or x[0] > np.max(self.N_x) \
-                or x[1] < np.min(self.N_y) or x[1] > np.max(self.N_y):
-            N = float(self.N_fit(*x))
-        else:
-            N = int(self.N_interp(*x))
-        return N
-
-    def theta(self, x):
-        """Return the mean dispersion angle of the grating at position x.
-
-        Parameters
-        ----------
-        x: float, array
-            The [x,y] pixel position on the CCD.
-
-        Returns
-        -------
-        theta: float
-            The mean dispersion angle at position x in degrees.
-
-        Examples
-        --------
-        >>> h = Hologram('HoloPhP')
-        >>> h.theta((700,700))
-        -0.8335087452358715
-        >>> h.theta((0,0))
-        -1.046
-        """
-        return float(self.theta_interp(*x))
-
-    def load_specs(self, verbose=True):
-        """Load the files in data_dir/label/ to set the main
-        characteristics of the hologram. If they do not exist, default values are used.
-
-        Parameters
-        ----------
-        verbose: bool
-            Set to True to get more verbosity.
-
-        Examples
-        --------
-
-        The files exist:
-
-        >>> h = Hologram(label='HoloPhP')
-        >>> h.N((500,500))
-        345.4794168822986
-        >>> h.theta((700,700))
-        -0.8335087452358715
-        >>> h.holo_center
-        [856.004, 562.34]
-
-        The files do not exist:
-
-        >>> h = Hologram(label='XXX')  # doctest: +ELLIPSIS
-        Traceback (most recent call last):
-        ...
-        ValueError:...
-
-        """
-        if verbose:
-            self.my_logger.info(f'\n\tLoad disperser {self.label}:\n\tfrom {os.path.join(self.data_dir, self.label)}')
-        filename = os.path.join(self.data_dir, self.label, "hologram_grooves_per_mm.txt")
-        if os.path.isfile(filename):
-            a = np.loadtxt(filename)
-            self.N_x, self.N_y, self.N_data = a.T
-            if parameters.CCD_REBIN > 1:
-                self.N_x /= parameters.CCD_REBIN
-                self.N_y /= parameters.CCD_REBIN
-            self.N_interp = interpolate.CloughTocher2DInterpolator((self.N_x, self.N_y), self.N_data)
-            self.N_fit = fit_poly2d(self.N_x, self.N_y, self.N_data, order=2)
-        else:
-            self.is_hologram = False
-            self.N_x = np.arange(0, parameters.CCD_IMSIZE)
-            self.N_y = np.arange(0, parameters.CCD_IMSIZE)
-            filename = os.path.join(self.data_dir, self.label, "N.txt")
-            if os.path.isfile(filename):
-                a = np.loadtxt(filename)
-                self.N_input = a[0]
-                self.N_err = a[1]
-                self.N_interp = self.N_func
-                self.N_fit = self.N_func
-            else:
-                raise ValueError("To define an hologram, you must provide hologram_grooves_per_mm.txt or N.txt files.")
-        filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
-        if os.path.isfile(filename):
-            with open(filename) as f:
-                lines = [ll.rstrip('\n') for ll in f]
-            self.holo_center = list(map(float, lines[1].split(' ')[:2]))
-            self.theta_tilt = float(lines[1].split(' ')[2])
-        else:
-            self.holo_center = [0.5 * parameters.CCD_IMSIZE, 0.5 * parameters.CCD_IMSIZE]
-            self.theta_tilt = 0
-        filename = os.path.join(self.data_dir, self.label, "hologram_rotation_angles.txt")
-        if os.path.isfile(filename):
-            a = np.loadtxt(filename)
-            self.theta_x, self.theta_y, self.theta_data = a.T
-            if parameters.CCD_REBIN > 1:
-                self.theta_x /= parameters.CCD_REBIN
-                self.theta_y /= parameters.CCD_REBIN
-            self.theta_interp = interpolate.CloughTocher2DInterpolator((self.theta_x, self.theta_y), self.theta_data,
-                                                                       fill_value=self.theta_tilt)
-        else:
-            self.theta_interp = self.theta_func
-        self.x_lines, self.line1, self.line2 = neutral_lines(self.holo_center[0], self.holo_center[1], self.theta_tilt)
-        if verbose:
-            if self.is_hologram:
-                self.my_logger.info(f'\n\tHologram characteristics:'
-                                    f'\n\tN = {self.N(self.holo_center):.2f} +/- {self.N_err:.2f} '
-                                    f'grooves/mm at hologram center'
-                                    f'\n\tHologram center at x0 = {self.holo_center[0]:.1f} '
-                                    f'and y0 = {self.holo_center[1]:.1f} with average tilt of {self.theta_tilt:.1f} '
-                                    f'degrees')
-            else:
-                self.my_logger.info(f'\n\tGrating characteristics:'
-                                    f'\n\tN = {self.N([0, 0]):.2f} +/- {self.N_err:.2f} grooves/mm'
-                                    f'\n\tAverage tilt of {self.theta_tilt:.1f} degrees')
+    def __init__(self, label, **kwargs):
+        Disperser.__init__(self, N=-1, label=label, **kwargs)
 
 
 if __name__ == "__main__":

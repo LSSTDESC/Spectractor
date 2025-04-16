@@ -587,7 +587,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     spectrogram = SpectrogramModel(spectrum, atmosphere=atmosphere, fast_sim=False, full_image=True,
                                    with_adr=with_adr, diffraction_orders=diffraction_orders)
     spectrogram.simulate(A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv,
-                         spectrum.disperser.D, 0, 0, rotation_angle, psf_poly_params)
+                         parameters.DISTANCE2CCD, 0, 0, rotation_angle, psf_poly_params)
 
     # Image model
     my_logger.info('\n\tImage model...')
@@ -636,7 +636,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['A3_T'] = A3
     image.header['X0_T'] = spectrum.x0[0]
     image.header['Y0_T'] = spectrum.x0[1]
-    image.header['D2CCD_T'] = float(spectrum.disperser.D)
+    image.header['D2CCD_T'] = float(parameters.DISTANCE2CCD)
     image.header['OZONE_T'] = ozone
     image.header['PWV_T'] = pwv
     image.header['VAOD_T'] = aerosols
