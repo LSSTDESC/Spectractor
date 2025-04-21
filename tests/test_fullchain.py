@@ -200,7 +200,7 @@ def test_ctio_fullchain():
     w = SpectrumFitWorkspace(spectrum, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
                              verbose=True, plot=True, live_fit=False)
     run_spectrum_minimisation(w, method="newton")
-    nsigma = 2
+    nsigma = 3
     labels = ["VAOD_T", "OZONE_T", "PWV_T"]
     indices = [2, 4, 5]
     ipar = w.params.get_free_parameters()  # non fixed param indices
@@ -226,7 +226,7 @@ def test_ctio_fullchain():
     nsigma = 2
     labels = ["A1_T", "A2_T", "VAOD_T", "OZONE_T", "PWV_T"]
     indices = [0, 1, 3, 5, 6]
-    A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, B, Astar, D, shift_x, shift_y, shift_t, *psf_poly_params = w.params.values
+    A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, B, Astar, D, shift_x, shift_y, shift_t, pressure, *psf_poly_params = w.params.values
     ipar = w.params.get_free_parameters()  # non fixed param indices
     cov_indices = [list(ipar).index(k) for k in indices]  # non fixed param indices in cov matrix
     assert w.costs[-1] / w.data.size < 1e-3
