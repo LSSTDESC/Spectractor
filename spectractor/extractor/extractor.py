@@ -1538,6 +1538,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
                    f'\n\tNew target position in spectrogram frame: {target_pixcoords_spectrogram}')
 
     # Save results
+    spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask))
     spectrum.spectrogram_x0 = target_pixcoords_spectrogram[0]
     spectrum.spectrogram_y0 = target_pixcoords_spectrogram[1]
     spectrum.spectrogram_xmin = xmin
