@@ -419,7 +419,10 @@ class Star(Target):
 
     def load_gaia(self):
         gaia = getGaia.Gaia(self.label)
-        self.emission_spectrum = False
+        if "PNG" in self.label:
+            self.emission_spectrum = True
+        else:
+            self.emission_spectrum = False
         self.hydrogen_only = False
         self.lines = Lines(
             HYDROGEN_LINES + ATMOSPHERIC_LINES + STELLAR_LINES,
