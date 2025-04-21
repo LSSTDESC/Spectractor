@@ -1648,8 +1648,7 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
             return fit_workspace.jacobian(params, model_input=None).T
 
         start = time.time()
-        dummy_x = np.arange(len(fit_workspace.data))
-        result = optimize.curve_fit(model, dummy_x, fit_workspace.data, jac=Dfun, x_scale='jac',
+        result = optimize.curve_fit(model, fit_workspace.x, fit_workspace.data, jac=Dfun, x_scale='jac',
                                     p0=fit_workspace.params.values, sigma=fit_workspace.err,
                                     verbose=0, xtol=xtol, ftol=ftol,
                                     bounds=list(np.array(bounds).T), absolute_sigma=True)
