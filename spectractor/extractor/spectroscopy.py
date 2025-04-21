@@ -14,7 +14,7 @@ class Line:
     """Class modeling the emission or absorption lines."""
 
     def __init__(self, wavelength, label, atmospheric=False, emission=False, label_pos=[0.007, 0.02],
-                 width_bounds=[0.5, 6], use_for_calibration=False):
+                 width_bounds=[1, 6], use_for_calibration=False):
         """Class modeling the emission or absorption lines. lines attributes contains main spectral lines
         sorted in wavelength.
 
