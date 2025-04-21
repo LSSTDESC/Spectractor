@@ -13,8 +13,9 @@ class LineFitWorkspace(FitWorkspace):
     def __init__(self, x, y, yerr, file_name="", epsilon=None, verbose=0, plot=False, live_fit=False, truth=None):
         params = FitParameters(np.array([1, 1]), labels=["a", "b"], axis_names=["$a$", "$b$"],
                                bounds=[[-100, 100], [-100, 100]], truth=truth, filename=file_name)
-        FitWorkspace.__init__(self, params, x=x, data=y, err=yerr, epsilon=epsilon,
+        FitWorkspace.__init__(self, params, data=y, err=yerr, epsilon=epsilon,
                               file_name=file_name, verbose=verbose, plot=plot, live_fit=live_fit)
+        self.x = x
         self.my_logger = set_logger(self.__class__.__name__)
 
     def simulate(self, *params):
