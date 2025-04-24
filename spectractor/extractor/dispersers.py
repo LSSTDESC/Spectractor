@@ -115,10 +115,11 @@ def get_theta0(x0):
     >>> get_theta0(parameters.CCD_IMSIZE/2)
     0.0
     """
+    pix_to_rad = parameters.CCD_PIXEL2ARCSEC * np.pi / (180. * 3600.)
     if isinstance(x0, (list, tuple, np.ndarray)):
-        return (x0[0] - parameters.CCD_IMSIZE / 2) * parameters.CCD_PIXEL2ARCSEC * parameters.CCD_ARCSEC2RADIANS
+        return (x0[0] - parameters.CCD_IMSIZE / 2) * pix_to_rad
     else:
-        return (x0 - parameters.CCD_IMSIZE / 2) * parameters.CCD_PIXEL2ARCSEC * parameters.CCD_ARCSEC2RADIANS
+        return (x0 - parameters.CCD_IMSIZE / 2) * pix_to_rad
 
 
 def get_delta_pix_ortho(deltaX, x0, D):

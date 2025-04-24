@@ -173,17 +173,12 @@ def update_derived_parameters():
     # Derive other parameters
     parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
     parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, parameters.LAMBDA_STEP)
-    parameters.CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
     if not isinstance(parameters.OBS_SURFACE, astropy.units.quantity.Quantity):
         parameters.OBS_SURFACE *= units.cm ** 2  # Surface of telescope
-    # Conversion factor
     # Units of SEDs in flam (erg/s/cm2/nm) :
-    parameters.hc = const.h * const.c  # h.c product of fundamental constants c and h
-    parameters.SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
-    parameters.TIME_UNIT = 1 * units.s  # flux for 1 second
-    parameters.wl_dwl_unit = units.nanometer ** 2  # lambda.dlambda  in wavelength in nm
-    parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * parameters.SED_UNIT * parameters.TIME_UNIT
-                                   * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
+    SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
+    parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * parameters.SED_UNIT * units.s
+                                   * units.nanometer ** 2 / (const.h * const.c) / parameters.CCD_GAIN).decompose()).value
 
 
 def apply_rebinning_to_parameters():
