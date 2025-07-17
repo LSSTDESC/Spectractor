@@ -1807,7 +1807,19 @@ class ChromaticPSF:
             w = ChromaticPSFFitWorkspace(self, data, mask=mask, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
                                         amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                         live_fit=live_fit, analytical=analytical)
-            run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, with_line_search=True)
+            # first fit order 0 terms
+            w.my_logger.info("\n\tFit order 0 parameters...")
+            fixed_default = np.copy(w.params.fixed)
+            w.params.fixed = [True] * w.params.ndim
+            for k in range(w.params.ndim):
+                if "_0" not in w.params.labels[k] and not w.params.fixed[k]:
+                    w.params.fixed[k] = True  # _k parameters that are yet fixed
+                    w.params.values[k] = 0.0  # set them to zero
+            run_minimisation(w, method="newton", ftol=100 / (w.Nx * w.Ny), xtol=1e-3, niter=10, verbose=verbose, with_line_search=False)
+            # then fit all parameters together
+            w.my_logger.info("\n\tFit all ChromaticPSF parameters...")
+            w.params.fixed = fixed_default
+            run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, with_line_search=False)
         elif mode == "2D":
             # first shot to set the mask
             w = ChromaticPSFFitWorkspace(self, data, mask=mask, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
