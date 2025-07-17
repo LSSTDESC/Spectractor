@@ -42,8 +42,6 @@ setup(
     version=current_version,
     packages=['spectractor', 'spectractor.extractor', 'spectractor.simulation', 'spectractor.fit'],
     install_requires=reqs,
-    test_suite='nose.collector',
-    tests_require=['nose'],
     package_dir={'spectractor': './spectractor'},
     package_data={'': disperser_files,
                   'spectractor': ['../config/*.ini'],

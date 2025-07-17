@@ -214,9 +214,10 @@ def test_ctio_fullchain():
                                 f"{np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
         assert np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
         k += 1
-    assert np.abs(w.params.values[1]) / np.sqrt(w.params.cov[1, 1]) < 2 * nsigma  # A2
-    assert np.isclose(np.abs(w.params.values[8]), 0, atol=parameters.PIXSHIFT_PRIOR)  # pixshift
-    assert np.isclose(np.abs(w.params.values[9]), 0, atol=1e-3)  # B
+    A2id = w.params.get_index("A2")
+    assert np.abs(w.params.values[A2id] / w.params.err[A2id]) < 3 * nsigma  # A2
+    assert np.isclose(np.abs(w.params.values[w.params.get_index("alpha_pix [pix]")]), 0, atol=parameters.PIXSHIFT_PRIOR)  # pixshift
+    assert np.isclose(np.abs(w.params.values[w.params.get_index("B")]), 0, atol=1e-3)  # B
 
     parameters.DEBUG = False
     parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
@@ -224,8 +225,8 @@ def test_ctio_fullchain():
                                 verbose=True, plot=True, live_fit=False)
     run_spectrogram_minimisation(w, method="newton")
     nsigma = 2
-    labels = ["A1_T", "A2_T", "VAOD_T", "OZONE_T", "PWV_T"]
-    indices = [0, 1, 3, 5, 6]
+    labels = ["A2_T", "VAOD_T", "OZONE_T", "PWV_T"]  # "A1_T" fixed
+    indices = [1, 3, 5, 6]
     A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, B, Astar, D, shift_x, shift_y, shift_t, pressure, *psf_poly_params = w.params.values
     ipar = w.params.get_free_parameters()  # non fixed param indices
     cov_indices = [list(ipar).index(k) for k in indices]  # non fixed param indices in cov matrix
@@ -238,6 +239,8 @@ def test_ctio_fullchain():
                                 f"{np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
         assert np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
         k += 1
+    A2id = w.params.get_index("A2")
+    assert np.abs((A2 - 1) / w.params.err[A2id]) < 2 * nsigma  # A2
     assert np.isclose(shift_y, 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
     assert np.isclose(D, spectrum.header["D2CCD_T"], atol=0.1)  # D2CCD
     assert np.isclose(B, 1, atol=1e-3)  # B
