@@ -219,7 +219,7 @@ class Image(object):
             QN4_1 = Line(620, atmospheric=True, label=r'$QN4$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 4th band left edge
             QN = [QN1_1, QN1_2, QN2_1, QN2_2, QN3_1, QN3_2, QN4_1, QN1_3, QN2_3, QN3_3] 
             for line in self.target.lines.lines:
-                # print(line.label, line.wavelength, line.use_for_calibration)
+                # TODO: put this has an attribute of the disperser of filter
                 if 410 < line.wavelength < 415 or 475 < line.wavelength < 500 or 520 < line.wavelength < 545 or 610 < line.wavelength:
                     line.use_for_calibration = False
             
