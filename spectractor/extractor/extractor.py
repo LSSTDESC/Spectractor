@@ -306,7 +306,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             if order == self.diffraction_orders[0]:  # only first diffraction order
                 self.spectrum.chromatic_psf.from_profile_params_to_shape_params(profile_params)
             dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(lambdas, D2CCD, dx0, dy0, angle,
-                                                                             niter=5, with_adr=True,
+                                                                             with_adr=True,
                                                                              order=order)
             profile_params[:, 0] = 1
             profile_params[:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0
@@ -476,7 +476,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
             # Dispersion law
             dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, D2CCD, dx0, dy0, angle,
-                                                                             niter=5, with_adr=True, order=order)
+                                                                             with_adr=True, order=order)
 
             # Fill spectrogram trace as a function of the pixel column x
             self.psf_profile_params[order][:, 0] = self.params[f"A{order}"] * self.tr[k](self.lambdas)
