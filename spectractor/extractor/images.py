@@ -207,22 +207,26 @@ class Image(object):
             self.header['REDSHIFT'] = self.target.redshift
 
         if self.disperser_label == "blue300lpmm_qn1":
-            QN1_1 = Line(396, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 1st band left edge
-            QN1_2 = Line(413.5, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 1st band right edge
-            QN1_3 = Line(405, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[1, 20], use_for_calibration=False) # QN 1st band center
-            QN2_1 = Line(481, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 2nd band left edge
-            QN2_2 = Line(494, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 2nd band right edge
-            QN2_3 = Line(487, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[1, 20], use_for_calibration=False) # QN 2nd band center
-            QN3_1 = Line(524, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 3rd band left edge
-            QN3_2 = Line(539, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 3rd band right edge
-            QN3_3 = Line(531, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[1, 20], use_for_calibration=False) # QN 3rd band center
-            QN4_1 = Line(620, atmospheric=True, label=r'$QN4$', label_pos=[0.007, 0.02], width_bounds=[0.2, 3], use_for_calibration=True) # QN 4th band left edge
-            QN = [QN1_1, QN1_2, QN2_1, QN2_2, QN3_1, QN3_2, QN4_1]  # QN1_3, QN2_3, QN3_3, 
-            print(len(self.target.lines.lines))
+            QN1_1 = Line(396, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 1st band left edge
+            QN1_2 = Line(413.5, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 1st band right edge
+            QN1_3 = Line(405, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[1, 50], use_for_calibration=False) # QN 1st band center
+            QN2_1 = Line(481, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 2nd band left edge
+            QN2_2 = Line(494, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 2nd band right edge
+            QN2_3 = Line(487, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[1, 50], use_for_calibration=False) # QN 2nd band center
+            QN3_1 = Line(524, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 3rd band left edge
+            QN3_2 = Line(539, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 3rd band right edge
+            QN3_3 = Line(531, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[1, 50], use_for_calibration=False) # QN 3rd band center
+            QN4_1 = Line(620, atmospheric=True, label=r'$QN4$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 4th band left edge
+            QN = [QN1_1, QN1_2, QN2_1, QN2_2, QN3_1, QN3_2, QN4_1, QN1_3, QN2_3, QN3_3] 
+            for line in self.target.lines.lines:
+                # print(line.label, line.wavelength, line.use_for_calibration)
+                if 410 < line.wavelength < 415 or 475 < line.wavelength < 500 or 520 < line.wavelength < 545 or 610 < line.wavelength:
+                    line.use_for_calibration = False
+            
             for l in QN:
                 self.target.lines.lines.append(l)
+            _ = self.target.lines.sort_lines()
             self.target.lines.sort_lines()
-            print(len(self.target.lines.lines))
             
 
     def rebin(self):
