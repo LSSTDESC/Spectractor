@@ -1,5 +1,7 @@
 import importlib.metadata
 import packaging.version
+import importlib.metadata
+import packaging.version
 from astropy.coordinates import SkyCoord, Distance
 import astropy.units as u
 from astropy.time import Time
@@ -17,6 +19,13 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
                                                 ISM_LINES, STELLAR_LINES)
+
+# Astroquery versions change the Simbad API.
+_astroquery_version = packaging.version.parse(importlib.metadata.version("astroquery"))
+if _astroquery_version < packaging.version.parse("0.4.8"):
+    _USE_NEW_SIMBAD = False
+else:
+    _USE_NEW_SIMBAD = True
 
 from getCalspec import getCalspec
 
