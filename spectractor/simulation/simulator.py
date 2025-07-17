@@ -469,7 +469,7 @@ class SpectrogramModel(Spectrum):
                 continue
             # Dispersion law
             dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, D, shift_x, shift_y, angle,
-                                                                    niter=5, with_adr=True, order=order)
+                                                                    with_adr=True, order=order)
 
             # Spectrum amplitude is in ADU/s
             spec = As[k] * self.tr[k](self.lambdas) * spectrum
