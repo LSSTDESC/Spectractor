@@ -873,7 +873,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         strategy = copy.copy(self.amplitude_priors_method)
         self.amplitude_priors_method = "fixed"
         # let A1 free to help finding the spectrogram trace, with amplitude fixed to prior
-        self.params.fixed[self.params.get_index(f"A{self.diffraction_orders[0]}")] = False  # A1
+        self.params.fixed[self.params.get_index(f"A{self.diffraction_orders[0]}")] = True  # A1
         self.params.fixed[self.params.get_index(r"shift_y [pix]")] = False  # shift y
         self.params.fixed[self.params.get_index(r"angle [deg]")] = False  # angle
         run_minimisation(self, "newton", xtol=1e-2, ftol=0.01, with_line_search=False)  # 1000 / self.data.size)
@@ -1367,7 +1367,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
         xmax = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MAX)))
     # remove last pixel column of rotated image if it is full of nan values in signal region
     while np.any(data[max(0, y0 - ws[0]):min(Ny, y0 + ws[0]), xmax]==0) or np.any(np.isnan(data[max(0, y0 - ws[0]):min(Ny, y0 + ws[0]), xmax])):
-        print(xmax, np.all(np.isnan(data[max(0, y0 - ws[0]):min(Ny, y0 + ws[0]), xmax])), np.all(data[max(0, y0 - ws[0]):min(Ny, y0 + ws[0]), xmax]==0), data[max(0, y0 - ws[0]):min(Ny, y0 + ws[0]), xmax])
         image.my_logger.warning(f"Last data column is invalid (full of nan or zeros). Subtract 1 to {xmax=}->{xmax-1}")
         xmax -= 1
 
