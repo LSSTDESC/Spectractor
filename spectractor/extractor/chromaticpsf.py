@@ -1680,10 +1680,13 @@ class ChromaticPSF:
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
         # keep only brightest transverse profiles
-        selected_pixels = self.profile_params[:, 0] > 0.1 * np.max(self.profile_params[:, 0])
+        selected_pixels = self.fitted_pixels & (self.profile_params[:, 0] > 0.1 * np.median(self.profile_params[:, 0]))
         # then keep only profiles with first shape parameter (index=3) are not too deviant from its median value
         for k in range(3, self.profile_params.shape[1]):
-            selected_pixels = selected_pixels & (np.abs(self.profile_params[:, k]) < 5 * np.median(self.profile_params[:, k]))
+            keep = selected_pixels & (np.abs(self.profile_params[:, k]) < 5 * np.median(self.profile_params[:, k]))
+            # keep at least 20% of the fitted pixels or twice the number of data points needed for a polynomial fit
+            if np.sum(keep) > 0.2 * len(selected_pixels) or np.sum(keep) > 2 * (self.deg + 1):
+                selected_pixels = keep
         self.params.values = self.from_profile_params_to_poly_params(self.profile_params, indices=selected_pixels)
         self.from_profile_params_to_shape_params(self.profile_params)
         self.cov_matrix = np.diag(1 / np.array(self.table['flux_err']) ** 2)
@@ -1810,12 +1813,22 @@ class ChromaticPSF:
             # first fit order 0 terms
             w.my_logger.info("\n\tFit order 0 parameters...")
             fixed_default = np.copy(w.params.fixed)
-            w.params.fixed = [True] * w.params.ndim
+            # fix higher order coefficients of polynomes
             for k in range(w.params.ndim):
                 if "_0" not in w.params.labels[k] and not w.params.fixed[k]:
                     w.params.fixed[k] = True  # _k parameters that are yet fixed
                     w.params.values[k] = 0.0  # set them to zero
-            run_minimisation(w, method="newton", ftol=100 / (w.Nx * w.Ny), xtol=1e-3, niter=10, verbose=verbose, with_line_search=False)
+            # if zero order coefficient is closer than 5% to its bound, change the value
+            for k, name in enumerate(self.psf.params.labels):
+                if name == 'amplitude':
+                    continue
+                ind = w.params.get_index(name+"_0")
+                val = w.params.values[ind]
+                if (val-self.psf.params.bounds[k][0]) < 0.05 * val:
+                    w.params.values[ind] = min(val * 1.05, self.psf.params.bounds[k][1])
+                if (val-self.psf.params.bounds[k][1]) < 0.05 * val:
+                    w.params.values[ind] = max(val * 0.95, self.psf.params.bounds[k][0])
+            run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=20, verbose=verbose, with_line_search=False)
             # then fit all parameters together
             w.my_logger.info("\n\tFit all ChromaticPSF parameters...")
             w.params.fixed = fixed_default

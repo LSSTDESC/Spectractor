@@ -1757,7 +1757,7 @@ class RegFitWorkspace(FitWorkspace):
         self.my_logger.info(f"\n\tOptimal regularisation parameter: {self.opt_reg}"
                             f"\n\tTr(R) = N_dof = {np.trace(self.resolution)}"
                             f"\n\tN_params = {len(self.w.amplitude_params)}"
-                            f"\n\tN_data = {self.w.data.size - len(self.w.mask) - len(self.w.outliers)}"
+                            f"\n\tN_data = {np.concatenate([self.w.data]).size - len(self.w.mask) - len(self.w.outliers)}"
                             f" (excluding masked pixels and outliers)")
 
     def simulate(self, log10_r):
@@ -1768,22 +1768,31 @@ class RegFitWorkspace(FitWorkspace):
             cov = L.T @ L
         except np.linalg.LinAlgError:
             cov = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-        if self.w.W.ndim == 1:
-            A = cov @ (self.w.M.T @ (self.w.W * self.w.data) + reg * self.w.Q_dot_A0)
+        if self.w.W.dtype == object:
+            K = len(self.w.W)
+            M_dot_W = [self.w.M[k].T @ self.w.W[k] for k in range(K)]
+            M_dot_W_dot_D = np.sum([M_dot_W[k] @ self.w.data[k] for k in range(K)], axis=0)
+            A = cov @ (M_dot_W_dot_D + reg * self.w.Q_dot_A0)
+            diff = [self.w.data[k] - self.w.M[k] @ A for k in range(K)]
+            self.chisquare = np.sum([diff[k] @ self.w.W[k] @ diff[k] for k in range(K)])
         else:
-            A = cov @ (self.w.M.T @ (self.w.W @ self.w.data) + reg * self.w.Q_dot_A0)
-        if A.ndim == 2:  # ndim == 2 when A comes from a sparse matrix computation
-            A = np.asarray(A).reshape(-1)
+            if self.w.W.ndim == 1:
+                A = cov @ (self.w.M.T @ (self.w.W * self.w.data) + reg * self.w.Q_dot_A0)
+            else:
+                A = cov @ (self.w.M.T @ (self.w.W @ self.w.data) + reg * self.w.Q_dot_A0)
+         
+            if A.ndim == 2:  # ndim == 2 when A comes from a sparse matrix computation
+                A = np.asarray(A).reshape(-1)
+            diff = self.w.data - self.w.M @ A
+            if self.w.W.ndim == 1:
+                self.chisquare = diff @ (self.w.W * diff)
+            else:
+                self.chisquare = diff @ self.w.W @ diff
         self.resolution = np.eye(A.size) - reg * cov @ self.w.Q
-        diff = self.w.data - self.w.M @ A
-        if self.w.W.ndim == 1:
-            self.chisquare = diff @ (self.w.W * diff)
-        else:
-            self.chisquare = diff @ self.w.W @ diff
         self.w.amplitude_params = A
         self.w.amplitude_cov_matrix = cov
         self.w.amplitude_params_err = np.array([np.sqrt(np.abs(cov[x, x])) for x in range(cov.shape[0])])
-        self.G = self.chisquare / ((self.w.data.size - len(self.w.mask) - len(self.w.outliers)) - np.trace(self.resolution)) ** 2
+        self.G = self.chisquare / (np.concatenate([self.w.data]).size - len(self.w.mask) - len(self.w.outliers) - np.trace(self.resolution)) ** 2
         return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
 
     def plot_fit(self):

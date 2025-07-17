@@ -873,7 +873,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         strategy = copy.copy(self.amplitude_priors_method)
         self.amplitude_priors_method = "fixed"
         # let A1 free to help finding the spectrogram trace, with amplitude fixed to prior
-        self.params.fixed[self.params.get_index(r"A1")] = False  # A1
+        self.params.fixed[self.params.get_index(f"A{self.diffraction_orders[0]}")] = True  # A1
         self.params.fixed[self.params.get_index(r"shift_y [pix]")] = False  # shift y
         self.params.fixed[self.params.get_index(r"angle [deg]")] = False  # angle
         run_minimisation(self, "newton", xtol=1e-2, ftol=0.01, with_line_search=False)  # 1000 / self.data.size)
@@ -881,7 +881,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.set_mask(params=self.params.values, fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
         # refix A1=1 and let amplitude parameters free
         self.amplitude_priors_method = strategy
-        self.params.values[self.params.get_index(r"A1")] = 1
+        self.params.values[self.params.get_index(f"A{self.diffraction_orders[0]}")] = 1
 
 
 def run_ffm_minimisation(w, method="newton", niter=2):
@@ -1344,8 +1344,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     Ny, Nx = data.shape
     y0 = int(image.target_pixcoords_rotated[1])
     right_edge = image.data_rotated.shape[1]
-    ymax = min(Ny, y0 + ws[1])
     ymin = max(0, y0 - ws[1])
+    ymax = min(Ny, y0 + ws[1])
 
     # Roughly estimates the wavelengths and set start 0 nm before parameters.LAMBDA_MIN
     # and end 0 nm after parameters.LAMBDA_MAX
@@ -1363,6 +1363,10 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
                                                           D=parameters.DISTANCE2CCD, order=spectrum.order)
         xmin = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MIN)))
         xmax = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MAX)))
+    # remove last pixel column of rotated image if it is full of nan values in signal region
+    while np.any(data[max(0, y0 - ws[0]):min(Ny, y0 + ws[0]), xmax]==0) or np.any(np.isnan(data[max(0, y0 - ws[0]):min(Ny, y0 + ws[0]), xmax])):
+        image.my_logger.warning(f"Last data column is invalid (full of nan or zeros). Subtract 1 to {xmax=}->{xmax-1}")
+        xmax -= 1
 
     # Create spectrogram
     data = data[ymin:ymax, xmin:xmax]
@@ -1515,7 +1519,9 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
             data /= spectrum.spectrogram_flat
         bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, spectrum.spectrogram_err,
                                                                                      ws=ws, Dy_disp_axis=s.table['y_c'])
+        # bgd_model_func = extract_spectrogram_background_fit1D(data, spectrum.spectrogram_err, deg=5, ws=ws, pixel_step=1, sigma=5)
         bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
+        # bgd_rms = np.zeros_like(bgd)
         my_logger.info(f"\n\tBackground statistics: mean={np.nanmean(bgd):.3f} {image.units}, "
                    f"RMS={np.nanmean(bgd_rms):.3f} {image.units}.")
 

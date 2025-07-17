@@ -4,11 +4,14 @@ from astropy.coordinates import SkyCoord, Distance
 import astropy.units as u
 from astropy.time import Time
 from astroquery.simbad import SimbadClass
-from pyvo import DALServiceError
+import astropy.config
+from astropy.io import ascii
 
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 import numpy as np
+import os
+import shutil
 
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -28,6 +31,22 @@ try:
     from gaiaspec import getGaia
 except ModuleNotFoundError:
     getGaia = None
+
+
+def _get_cache_dir():
+    cache = os.path.join(astropy.config.get_cache_dir(), "astroquery", "Simbad")
+    os.makedirs(cache, exist_ok=True)
+    return cache
+
+
+def _get_cache_file(tag):
+    filename = tag.replace("*", "").replace(" ", "_").replace(".", "_")
+    return filename
+
+
+def _clean_cache_dir():
+    cache = _get_cache_dir()
+    shutil.rmtree(cache)
 
 
 def load_target(label, verbose=False):
@@ -268,81 +287,63 @@ class Star(Target):
         >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
         -32d18m23...s
         """
-        # explicitly make a class instance here because:
-        # when using ``from astroquery.simbad import Simbad`` and then using
-        # ``Simbad...`` methods secretly makes an instance, which stays around,
-        # has a connection go stale, and then raises an exception seemingly
-        # at some random time later
-
-        if getGaia is None:
-            is_gaiaspec = False
-        else:
-            is_gaiaspec = getGaia.is_gaiaspec(self.label)
+        date_reference="J2000"
         if not getCalspec.is_calspec(self.label) and getCalspec.is_calspec(self.label.replace(".", " ")):
             self.label = self.label.replace(".", " ")
         astroquery_label = self.label
         if getCalspec.is_calspec(self.label):
             calspec = getCalspec.Calspec(self.label)
             astroquery_label = calspec.Astroquery_Name
-        if is_gaiaspec:
-            # In the case where the gaia spectrum is not available in the 
-            # package data, get source info from simbadQuerier
-            gaia_sources = getGaia.get_gaia_sources()
-            gaia_label = getGaia.get_gaia_name_from_star_name(astroquery_label)
-            source = gaia_sources[gaia_sources["SOURCE_ID"] == gaia_label]
-            self.simbad_table = [{"ra":  source["ra"].iloc[0],
-                                  "dec": source["dec"].iloc[0],
-                                  "pmra": source["pmra"].iloc[0],
-                                  "pmdec": source["pmdec"].iloc[0],
-                                  "plx_value": source["parallax"].iloc[0],
-                                  "ref_epoch": source["ref_epoch"].iloc[0]}]
 
-            date_reference="J"+str(source["ref_epoch"].iloc[0])
-            self.radec_position = SkyCoord(ra = source["ra"].iloc[0],
-                                           dec = source["dec"].iloc[0],
-                                           obstime=date_reference, frame="icrs",
-                                           unit=u.deg, equinox="J2000")
-            self.redshift = 0
+        cache_location = _get_cache_dir()
+        cache_file = _get_cache_file(astroquery_label)
+        if os.path.exists(os.path.join(cache_location, f"{cache_file}.ecsv")):
+            self.my_logger.debug(f"\n\tLoad {self.label} coordinates from cached file {cache_file}.ecsv")
+            self.simbad_table = ascii.read(os.path.join(cache_location, f"{cache_file}.ecsv"))
         else:
+            # explicitly make a class instance here because:
+            # when using ``from astroquery.simbad import Simbad`` and then using
+            # ``Simbad...`` methods secretly makes an instance, which stays around,
+            # has a connection go stale, and then raises an exception seemingly
+            # at some random time later
             simbadQuerier = SimbadClass()
             patchSimbadURL(simbadQuerier)
+
             if _USE_NEW_SIMBAD:
                 simbadQuerier.add_votable_fields('U', 'B', 'V', 'R', 'I', 'J', 'sp_type',
                                                  'parallax', 'propermotions', 'rvz_redshift')
-                ra_key = "ra"
-                dec_key = "dec"
-                redshift_key = "rvz_redshift"
             else:
                 simbadQuerier.add_votable_fields(
                     'flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
                     'parallax', 'pm', 'z_value'
                 )
-                ra_key = "RA"
-                dec_key = "DEC"
-                redshift_key = "Z_VALUE"
-            try:
-                self.simbad_table = simbadQuerier.query_object(astroquery_label)
-            except (ProxyError, DALServiceError) as err:
-                self.my_logger.warning(f"Simbad proxy error: {err}")
-                self.simbad_table = None
+            self.my_logger.debug(f"\n\tDownload {self.label} coordinates from Simbad...")
+            self.simbad_table = simbadQuerier.query_object(astroquery_label)
+            self.simbad_table.write(os.path.join(cache_location,f"{cache_file}.ecsv"), overwrite=True)
 
-            date_reference="J2000"
-            if self.simbad_table is not None:
-                if self.verbose or True:
-                    self.my_logger.info(f'\n\tSimbad:\n{self.simbad_table}')
-                if _USE_NEW_SIMBAD:
-                    self.radec_position = SkyCoord(self.simbad_table[ra_key][0],
-                                                   self.simbad_table[dec_key][0], obstime=date_reference,
-                                                   unit="deg", frame='icrs', equinox="J2000")
-                else:
-                    self.radec_position = SkyCoord(self.simbad_table[ra_key][0] + ' ' + self.simbad_table[dec_key][0],
-                                                   unit=(u.hourangle, u.deg),
-                                                   frame='icrs', obstime=date_reference, equinox="J2000")
-                if not np.ma.is_masked(self.simbad_table[redshift_key][0]):
-                    self.redshift = float(self.simbad_table[redshift_key][0])
+        if "ra" in self.simbad_table.keys():
+            ra_key = "ra"
+            dec_key = "dec"
+            redshift_key = "rvz_redshift"
+        else:
+            ra_key = "RA"
+            dec_key = "DEC"
+            redshift_key = "Z_VALUE"
+        if self.simbad_table is not None:
+            if self.verbose:
+                self.my_logger.info(f'\n\tSimbad:\n{self.simbad_table}')
+            if _USE_NEW_SIMBAD:
+                self.radec_position = SkyCoord(self.simbad_table[ra_key][0], self.simbad_table[dec_key][0], unit="deg")
             else:
-                self.my_logger.warning(f"Target {self.label} not found by Simbad")
-
+                self.radec_position = SkyCoord(
+                    self.simbad_table[ra_key][0] + ' ' + self.simbad_table[dec_key][0], unit=(u.hourangle, u.deg)
+                )
+        else:
+            raise RuntimeError(f"Target {self.label} not found in Simbad")
+        if not np.ma.is_masked(self.simbad_table[redshift_key][0]):
+            self.redshift = float(self.simbad_table[redshift_key][0])
+        else:
+            self.redshift = 0
         self.get_radec_position_after_pm(self.simbad_table, 
                                          date_obs="J2000", 
                                          date_reference = date_reference)

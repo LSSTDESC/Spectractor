@@ -1469,6 +1469,9 @@ def _init_fit_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_f
     # plt.plot(lambdas,spec)
     # plt.show()
     # initialisation
+    lambda_shifts = []
+    calib_lines = []
+    snrs = []
     index_list = []
     bgd_npar_list = []
     peak_index_list = []
@@ -1551,6 +1554,15 @@ def _init_fit_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_f
         # to fit for background around the peak
         index = list(np.arange(max(0, index_inf - bgd_width),
                                min(len(lambdas), index_sup + bgd_width), 1).astype(int))
+        
+        # exclude pixels very weak compared to the median signal in this zone
+        # if most pixels are excluded, temove the line from the fit
+        mask = spec_smooth[index] > 5e-2 * np.median(spec_smooth[index])
+        if np.sum(mask) > peak_width:
+            index = list(np.array(index)[mask])
+        else:
+            continue
+        
         # skip if data is masked with NaN
         if np.any(np.isnan(spec_smooth[index])):
             continue
@@ -1685,17 +1697,17 @@ def _init_fit_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_f
             else:
                 w = np.ones_like(lambdas[index])
             fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index], order=bgd_npar - 1, w=w)
-        # bgd_mean = float(np.mean(spec_smooth[bgd_index]))
-        # bgd_std = float(np.std(spec_smooth[bgd_index]))
+        bgd_mean = float(np.mean(spec_smooth[bgd_index]))
+        bgd_std = float(np.std(spec_smooth[bgd_index]))
         for n in range(bgd_npar):
             guess[n] = fit[n]
             b = abs(baseline_prior * guess[n])
             # b = abs(baseline_prior * np.sqrt(cov[n,n]))
-            # CHECK: following is completely inefficient as rtol has no effect when second argument is 0...
-            # if np.isclose(b, 0, rtol=1e-2 * bgd_mean):
-            #     b = baseline_prior * bgd_std
-            #     if np.isclose(b, 0, rtol=1e-2 * bgd_mean):
-            #         b = np.inf
+            # Following is useful if by mistake guess is a zero vector
+            if np.isclose(b, 0, atol=1e-2 * bgd_mean):
+                b = baseline_prior * bgd_std
+                if np.isclose(b, 0, atol=1e-2 * bgd_mean):
+                    b = np.inf
             bounds[0][n] = -np.inf  # guess[n] - b
             bounds[1][n] = np.inf  # guess[n] + b
         for j in range(len(new_lines_list[k])):
@@ -1837,6 +1849,7 @@ def _fit_lines(fitworkspaces, snr_minlevel=3, ax=None):
                 if snr > snr_minlevel:
                     lambda_shifts.append(peak_pos - line.wavelength)
                     snrs.append(snr)
+                calib_lines.append(line)
                 # print(line.label, line.wavelength, peak_pos - line.wavelength)
                 res.append((peak_pos - line.wavelength) / max(0.1, popt[bgd_npar + 3 * j + 2])) # max(0.1, w.params.err[
                     #w.params.get_index(f"x0_{j}")]))  # np.sqrt(pcov[bgd_npar + 3 * j + 1,bgd_npar + 3 * j + 1]))
