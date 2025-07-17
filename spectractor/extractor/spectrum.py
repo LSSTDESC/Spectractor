@@ -1508,6 +1508,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
     # plt.show()
     # initialisation
     lambda_shifts = []
+    calib_lines = []
     snrs = []
     index_list = []
     bgd_npar_list = []
@@ -1735,17 +1736,17 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             else:
                 w = np.ones_like(lambdas[index])
             fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index], order=bgd_npar - 1, w=w)
-        # bgd_mean = float(np.mean(spec_smooth[bgd_index]))
-        # bgd_std = float(np.std(spec_smooth[bgd_index]))
+        bgd_mean = float(np.mean(spec_smooth[bgd_index]))
+        bgd_std = float(np.std(spec_smooth[bgd_index]))
         for n in range(bgd_npar):
             guess[n] = fit[n]
             b = abs(baseline_prior * guess[n])
             # b = abs(baseline_prior * np.sqrt(cov[n,n]))
-            # CHECK: following is completely inefficient as rtol has no effect when second argument is 0...
-            # if np.isclose(b, 0, rtol=1e-2 * bgd_mean):
-            #     b = baseline_prior * bgd_std
-            #     if np.isclose(b, 0, rtol=1e-2 * bgd_mean):
-            #         b = np.inf
+            # Following is useful if by mistake guess is a zero vector
+            if np.isclose(b, 0, atol=1e-2 * bgd_mean):
+                b = baseline_prior * bgd_std
+                if np.isclose(b, 0, atol=1e-2 * bgd_mean):
+                    b = np.inf
             bounds[0][n] = guess[n] - b
             bounds[1][n] = guess[n] + b
         for j in range(len(new_lines_list[k])):
@@ -1841,6 +1842,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
                 # wavelength shift between tabulate and observed lines
                 lambda_shifts.append(peak_pos - line.wavelength)
                 snrs.append(snr)
+                calib_lines.append(line)
     if ax is not None:
         lines.plot_detected_lines(ax)
     lines.table = lines.build_detected_line_table()
