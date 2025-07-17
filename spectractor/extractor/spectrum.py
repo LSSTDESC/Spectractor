@@ -1767,7 +1767,8 @@ def _fit_lines(fitworkspaces, snr_minlevel=3, ax=None):
     snrs = []
     res = []
     global_chisq = 0
-
+    calib_lines = []
+    
     for w in fitworkspaces:
         bgd_npar = w.bgd_npar
         index = w.indices
