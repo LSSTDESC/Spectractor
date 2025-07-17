@@ -120,14 +120,14 @@ def make_auxtel_image():
 @astropy.config.set_temp_cache(os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache"))
 def test_ctio_fullchain():
     parameters.VERBOSE = True
-    parameters.DEBUG = True
+    parameters.DEBUG = False
     parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     sim_image_filename = "./tests/data/sim_20170530_134.fits"
 
     # load test and make image simulation
     # if not os.path.isfile(sim_image_filename):
     sim = make_image()
-    image = Image(sim_image_filename, config="./config/ctio.ini")
+    image = Image(sim_image_filename, config="ctio.ini")
     lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=',')
     amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=',', dtype=float)
     parameters.AMPLITUDE_TRUTH = np.copy(amplitude_truth)
@@ -138,7 +138,7 @@ def test_ctio_fullchain():
     tag = tag.replace('sim_', 'reduc_')
     logbook = LogBook(logbook="./tests/data/ctiofulllogbook_jun2017_v5.csv")
     disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
-    load_config("./config/ctio.ini")
+    load_config("ctio.ini")
     parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
     parameters.CCD_REBIN = 1
@@ -375,3 +375,6 @@ def auxtel_fullchain():
     assert np.all(np.isclose(psf_poly_params[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              np.array(PSF_POLY_PARAMS_TRUTH)[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              rtol=0.01, atol=0.01))
+
+
+test_ctio_fullchain()

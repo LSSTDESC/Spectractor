@@ -254,8 +254,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             if order == self.diffraction_orders[0]:  # only first diffraction order
                 self.spectrum.chromatic_psf.from_profile_params_to_shape_params(profile_params)
             dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, D, shift_x, shift_y, angle,
-                                                                             niter=5, with_adr=True,
-                                                                             order=order)
+                                                                             with_adr=True, order=order)
             profile_params[:, 0] = 1
             profile_params[:, 1] = dispersion_law.real + self.spectrogram_simulation.r0.real
             profile_params[:, 2] += dispersion_law.imag # - self.bgd_width

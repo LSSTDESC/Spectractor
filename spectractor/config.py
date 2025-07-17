@@ -177,7 +177,7 @@ def update_derived_parameters():
         parameters.OBS_SURFACE *= units.cm ** 2  # Surface of telescope
     # Units of SEDs in flam (erg/s/cm2/nm) :
     SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
-    parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * parameters.SED_UNIT * units.s
+    parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * SED_UNIT * units.s
                                    * units.nanometer ** 2 / (const.h * const.c) / parameters.CCD_GAIN).decompose()).value
 
 
