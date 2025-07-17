@@ -48,7 +48,7 @@ setup(
                   'spectractor.simulation': ['CTIOThroughput/*.txt', 'AuxTelThroughput/*.txt', 'StarDiceThroughput/*.txt']},
     url='https://github.com/LSSTDESC/Spectractor',
     license='BSD',
-    python_requires='>=3.7',
+    python_requires='>=3.9',
     author='J. Neveu, S. Dagoret-Campagne',
     author_email='jeremy.neveu@universite-paris-saclay.fr',
     description='',
