@@ -106,6 +106,8 @@ class StarFieldModel:
         >>> im = Image('tests/data/reduc_20170530_134.fits', target_label="HD111980")
         >>> x0, y0 = find_target(im, guess=(740, 680))
         >>> s = StarFieldModel(im)
+        >>> xx, yy = np.mgrid[0:1000:1, 0:1000:1]
+        >>> s.field = s.model(xx, yy)
         >>> s.plot_model()
 
         """
@@ -254,8 +256,7 @@ class BackgroundModel:
         >>> model = bgd.model()
         >>> np.all(model==10)
         True
-        >>> model.shape
-        (200, 200)
+        >>> assert model.shape == (Ny, Nx)
         >>> bgd = BackgroundModel(Nx, Ny, 10, frame=(160, 180, 3))
         >>> bgd.plot_model()
         """
@@ -353,8 +354,7 @@ class FlatModel:
         >>> model = flat.model()
         >>> print(f"{np.mean(model):.4f}")
         1.0000
-        >>> model.shape
-        (200, 200)
+        >>> assert model.shape == (Ny, Nx)
         >>> flat.plot_model()
         """
         self.my_logger = set_logger(self.__class__.__name__)
@@ -587,7 +587,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     spectrogram = SpectrogramModel(spectrum, atmosphere=atmosphere, fast_sim=False, full_image=True,
                                    with_adr=with_adr, diffraction_orders=diffraction_orders)
     spectrogram.simulate(A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv,
-                         spectrum.disperser.D, 0, 0, rotation_angle, psf_poly_params)
+                         parameters.DISTANCE2CCD, 0, 0, rotation_angle, psf_poly_params)
 
     # Image model
     my_logger.info('\n\tImage model...')
@@ -636,7 +636,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['A3_T'] = A3
     image.header['X0_T'] = spectrum.x0[0]
     image.header['Y0_T'] = spectrum.x0[1]
-    image.header['D2CCD_T'] = float(spectrum.disperser.D)
+    image.header['D2CCD_T'] = float(parameters.DISTANCE2CCD)
     image.header['OZONE_T'] = ozone
     image.header['PWV_T'] = pwv
     image.header['VAOD_T'] = aerosols

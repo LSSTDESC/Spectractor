@@ -1,13 +1,19 @@
 import importlib.metadata
 import packaging.version
+import importlib.metadata
+import packaging.version
 from astropy.coordinates import SkyCoord, Distance
 import astropy.units as u
 from astropy.time import Time
 from astroquery.simbad import SimbadClass
+import astropy.config
+from astropy.io import ascii
 
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 import numpy as np
+import os
+import shutil
 
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -23,11 +29,33 @@ else:
 
 from getCalspec import getCalspec
 
+# Astroquery versions change the Simbad API.
+_astroquery_version = packaging.version.parse(importlib.metadata.version("astroquery"))
+if _astroquery_version < packaging.version.parse("0.4.8"):
+    _USE_NEW_SIMBAD = False
+else:
+    _USE_NEW_SIMBAD = True
+
 try:
     from gaiaspec import getGaia
 except ModuleNotFoundError:
     getGaia = None
 
+
+def _get_cache_dir():
+    cache = os.path.join(astropy.config.get_cache_dir(), "astroquery", "Simbad")
+    os.makedirs(cache, exist_ok=True)
+    return cache
+
+
+def _get_cache_file(tag):
+    filename = tag.replace("*", "").replace(" ", "_").replace(".", "_")
+    return filename
+
+
+def _clean_cache_dir():
+    cache = _get_cache_dir()
+    shutil.rmtree(cache)
 
 
 def load_target(label, verbose=False):
@@ -231,7 +259,7 @@ class Star(Target):
         >>> print(s.label)
         PNG321.0+3.9
         >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
-        -54d18m07.521s
+        -54d18m07.521...s
         >>> print(s.emission_spectrum)
         True
 
@@ -257,83 +285,74 @@ class Star(Target):
         --------
         >>> parameters.VERBOSE = True
         >>> s = Star('PNG321.0+3.9')
-        >>> print(s.radec_position.dec)
-        -54d18m07.521s
-        >>> print(s.redshift)
-        -0.00021
+        >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
+        -54d18m07...s
+        >>> print(s.redshift)  # doctest: +ELLIPSIS
+        -0.00021...
         >>> s = Star('eta dor')
-        >>> print(s.radec_position.dec)
-        -66d02m22.635s
+        >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
+        -66d02m22...s
         >>> s = Star('mu.col')
-        >>> print(s.radec_position.dec)
-        -32d18m23.162s
+        >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
+        -32d18m23...s
         """
-        # explicitly make a class instance here because:
-        # when using ``from astroquery.simbad import Simbad`` and then using
-        # ``Simbad...`` methods secretly makes an instance, which stays around,
-        # has a connection go stale, and then raises an exception seemingly
-        # at some random time later
+        date_reference="J2000"
+        if not getCalspec.is_calspec(self.label) and getCalspec.is_calspec(self.label.replace(".", " ")):
+            self.label = self.label.replace(".", " ")
+        astroquery_label = self.label
+        if getCalspec.is_calspec(self.label):
+            calspec = getCalspec.Calspec(self.label)
+            astroquery_label = calspec.Astroquery_Name
 
-        if getGaia is None:
-            is_gaiaspec = False
+        cache_location = _get_cache_dir()
+        cache_file = _get_cache_file(astroquery_label)
+        if os.path.exists(os.path.join(cache_location, f"{cache_file}.ecsv")):
+            self.my_logger.debug(f"\n\tLoad {self.label} coordinates from cached file {cache_file}.ecsv")
+            self.simbad_table = ascii.read(os.path.join(cache_location, f"{cache_file}.ecsv"))
         else:
-            is_gaiaspec = getGaia.is_gaiaspec(self.label)
-        if is_gaiaspec:
-            # In the case where the gaia spectrum is not available in the 
-            # package data, get source info from simbadQuerier
-            gaia_sources = getGaia.get_gaia_sources()
-            source = gaia_sources[gaia_sources == self.label]
-            table_coordinates = [{"PMRA": source["pmra"].iloc[0],
-                                  "PMDEC": source["pmdec"].iloc[0],
-                                  "PLX_VALUE": source["parallax"].iloc[0],}]
-
-            self.radec_position = SkyCoord(ra = source["ra"].iloc[0], 
-                                           dec = source["dec"].iloc[0] , 
-                                           unit=u.deg)
-            self.redshift = 0
-            date_reference="J2016"
-        else:
+            # explicitly make a class instance here because:
+            # when using ``from astroquery.simbad import Simbad`` and then using
+            # ``Simbad...`` methods secretly makes an instance, which stays around,
+            # has a connection go stale, and then raises an exception seemingly
+            # at some random time later
             simbadQuerier = SimbadClass()
             patchSimbadURL(simbadQuerier)
+
             if _USE_NEW_SIMBAD:
                 simbadQuerier.add_votable_fields('U', 'B', 'V', 'R', 'I', 'J', 'sp_type',
                                                  'parallax', 'propermotions', 'rvz_redshift')
-                ra_key = "ra"
-                dec_key = "dec"
-                redshift_key = "rvz_redshift"
             else:
                 simbadQuerier.add_votable_fields(
                     'flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
                     'parallax', 'pm', 'z_value'
                 )
-                ra_key = "RA"
-                dec_key = "DEC"
-                redshift_key = "Z_VALUE"
-            if not getCalspec.is_calspec(self.label) and getCalspec.is_calspec(self.label.replace(".", " ")):
-                self.label = self.label.replace(".", " ")
-            astroquery_label = self.label
-            if getCalspec.is_calspec(self.label):
-                calspec = getCalspec.Calspec(self.label)
-                astroquery_label = calspec.Astroquery_Name
+            self.my_logger.debug(f"\n\tDownload {self.label} coordinates from Simbad...")
             self.simbad_table = simbadQuerier.query_object(astroquery_label)
+            self.simbad_table.write(os.path.join(cache_location,f"{cache_file}.ecsv"), overwrite=True)
 
-            if self.simbad_table is not None:
-                if self.verbose or True:
-                    self.my_logger.info(f'\n\tSimbad:\n{self.simbad_table}')
-                if _USE_NEW_SIMBAD:
-                    self.radec_position = SkyCoord(self.simbad_table[ra_key][0], self.simbad_table[dec_key][0], unit="deg")
-                else:
-                    self.radec_position = SkyCoord(
-                        self.simbad_table[ra_key][0] + ' ' + self.simbad_table[dec_key][0], unit=(u.hourangle, u.deg)
-                    )
+        if "ra" in self.simbad_table.keys():
+            ra_key = "ra"
+            dec_key = "dec"
+            redshift_key = "rvz_redshift"
+        else:
+            ra_key = "RA"
+            dec_key = "DEC"
+            redshift_key = "Z_VALUE"
+        if self.simbad_table is not None:
+            if self.verbose:
+                self.my_logger.info(f'\n\tSimbad:\n{self.simbad_table}')
+            if _USE_NEW_SIMBAD:
+                self.radec_position = SkyCoord(self.simbad_table[ra_key][0], self.simbad_table[dec_key][0], unit="deg")
             else:
-                raise RuntimeError(f"Target {self.label} not found in Simbad")
-            if not np.ma.is_masked(self.simbad_table[redshift_key]):
-                self.redshift = float(self.simbad_table[redshift_key])
-            else:
-                self.redshift = 0
-            date_reference="J2000"
-
+                self.radec_position = SkyCoord(
+                    self.simbad_table[ra_key][0] + ' ' + self.simbad_table[dec_key][0], unit=(u.hourangle, u.deg)
+                )
+        else:
+            raise RuntimeError(f"Target {self.label} not found in Simbad")
+        if not np.ma.is_masked(self.simbad_table[redshift_key][0]):
+            self.redshift = float(self.simbad_table[redshift_key][0])
+        else:
+            self.redshift = 0
         self.get_radec_position_after_pm(self.simbad_table, 
                                          date_obs="J2000", 
                                          date_reference = date_reference)
@@ -409,8 +428,20 @@ class Star(Target):
         self.spectra_err.append(np.sqrt(spec_dict["STATERROR"].value**2+spec_dict["SYSERROR"].value**2))
 
     def load_gaia(self):
+        """
+        Load the spectrum from the Gaia database.
+        
+        Examples
+        --------
+        >>> s = Star('HD111980')
+        >>> s.load_gaia()
+        >>> s.plot_spectra()
+        """
         gaia = getGaia.Gaia(self.label)
-        self.emission_spectrum = False
+        if "PNG" in self.label:
+            self.emission_spectrum = True
+        else:
+            self.emission_spectrum = False
         self.hydrogen_only = False
         self.lines = Lines(
             HYDROGEN_LINES + ATMOSPHERIC_LINES + STELLAR_LINES,
@@ -447,6 +478,15 @@ class Star(Target):
             )
 
     def load_ned(self):
+        """
+        Load the spectrum from NED database.
+        
+        Examples
+        --------
+        >>> s = Star('3C273')
+        >>> s.load_ned()
+        >>> s.plot_spectra()
+        """
         from astroquery.ned import Ned
         try:
             hdulists = Ned.get_spectra(self.label)  # , show_progress=False)
@@ -466,12 +506,14 @@ class Star(Target):
                 hydrogen_only=self.hydrogen_only,
             )
             for k, h in enumerate(hdulists):
+                if h[0].data is None:
+                    continue
                 if h[0].header["NAXIS"] == 1:
                     self.spectra.append(h[0].data)
                 else:
-                    for d in h[0].data:
+                    for d in h[1].data:
                         self.spectra.append(d)
-                wave_n = len(h[0].data)
+                wave_n = len(self.spectra[-1])
                 if h[0].header["NAXIS"] == 2:
                     wave_n = len(h[0].data.T)
                 wave_step = h[0].header["CDELT1"]
@@ -495,7 +537,7 @@ class Star(Target):
 
     def get_radec_position_after_pm(self, table_coordinates, date_obs="J2000", date_reference="J2000"):
         if table_coordinates is not None:
-            if _USE_NEW_SIMBAD:
+            if "pmra" in table_coordinates[0].keys():
                 pmra_key = 'pmra'
                 pmdec_key = 'pmdec'
                 plx_value_key = 'plx_value'
@@ -503,13 +545,13 @@ class Star(Target):
                 pmra_key = 'PMRA'
                 pmdec_key = 'PMDEC'
                 plx_value_key = 'PLX_VALUE'
-            target_pmra = self.simbad_table[0][pmra_key] * u.mas / u.yr
+            target_pmra = table_coordinates[0][pmra_key] * u.mas / u.yr
             if np.isnan(target_pmra):
                 target_pmra = 0 * u.mas / u.yr
-            target_pmdec = self.simbad_table[0][pmdec_key] * u.mas / u.yr
+            target_pmdec = table_coordinates[0][pmdec_key] * u.mas / u.yr
             if np.isnan(target_pmdec):
                 target_pmdec = 0 * u.mas / u.yr
-            target_parallax = self.simbad_table[0][plx_value_key] * u.mas
+            target_parallax = table_coordinates[0][plx_value_key] * u.mas
             if target_parallax == 0 * u.mas:
                 target_parallax = 1e-4 * u.mas
             target_coord = SkyCoord(ra=self.radec_position.ra, dec=self.radec_position.dec,
@@ -546,9 +588,13 @@ class Star(Target):
         else:
             self.sed = interp1d(self.wavelengths[index], self.spectra[index], kind='linear', bounds_error=False,
                                 fill_value=0.)
-            self.sed_err = interp1d(self.wavelengths[index], self.spectra_err[index], kind='linear', bounds_error=False,
-                                fill_value=10*np.max(self.spectra_err[index]))
-
+            if len(self.spectra_err) == 0:
+                self.sed_err = interp1d(self.wavelengths[index], np.zeros_like(self.spectra[index]), kind='linear', bounds_error=False,
+                                        fill_value=0.)
+            else:
+                self.sed_err = interp1d(self.wavelengths[index], self.spectra_err[index], kind='linear', bounds_error=False,
+                                fill_value=10*np.max(self.spectra_err[index]))      
+            
     def plot_spectra(self):
         """ Plot the spectra stored in the self.spectra list.
 

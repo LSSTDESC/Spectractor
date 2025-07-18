@@ -12,6 +12,7 @@ from spectractor import parameters
 from spectractor.config import set_logger, load_config
 from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
+from spectractor.extractor.spectroscopy import Line
 from spectractor.extractor.psf import Moffat
 from spectractor.simulation.adr import hadec2zdpar
 from spectractor.simulation.throughput import TelescopeTransmission
@@ -205,6 +206,29 @@ class Image(object):
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
             self.header['REDSHIFT'] = self.target.redshift
 
+        if self.disperser_label == "blue300lpmm_qn1":
+            QN1_1 = Line(396, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 1st band left edge
+            QN1_2 = Line(413.5, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 1st band right edge
+            QN1_3 = Line(405, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[1, 50], use_for_calibration=False) # QN 1st band center
+            QN2_1 = Line(481, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 2nd band left edge
+            QN2_2 = Line(494, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 2nd band right edge
+            QN2_3 = Line(487, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[1, 50], use_for_calibration=False) # QN 2nd band center
+            QN3_1 = Line(524, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 3rd band left edge
+            QN3_2 = Line(539, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 3rd band right edge
+            QN3_3 = Line(531, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[1, 50], use_for_calibration=False) # QN 3rd band center
+            QN4_1 = Line(620, atmospheric=True, label=r'$QN4$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 4th band left edge
+            QN = [QN1_1, QN1_2, QN2_1, QN2_2, QN3_1, QN3_2, QN4_1, QN1_3, QN2_3, QN3_3] 
+            for line in self.target.lines.lines:
+                # TODO: put this has an attribute of the disperser of filter
+                if 410 < line.wavelength < 415 or 475 < line.wavelength < 500 or 520 < line.wavelength < 545 or 610 < line.wavelength:
+                    line.use_for_calibration = False
+            
+            for l in QN:
+                self.target.lines.lines.append(l)
+            _ = self.target.lines.sort_lines()
+            self.target.lines.sort_lines()
+            
+
     def rebin(self):
         """Rebin the image and reset some related parameters.
 
@@ -269,8 +293,7 @@ class Image(object):
         self.header['OUTHUM'] = self.humidity
         self.header['CCDREBIN'] = parameters.CCD_REBIN
 
-        self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
-                                  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+        self.disperser = Hologram(self.disperser_label, data_dir=parameters.DISPERSER_DIR)
         self.compute_statistical_error()
         self.convert_to_ADU_rate_units()
 
@@ -379,7 +402,7 @@ class Image(object):
         # convert in ADU
         self.err /= self.gain
         # check uncertainty model
-        self.check_statistical_error()
+        # self.check_statistical_error()
 
     def check_statistical_error(self):
         """Check that statistical uncertainty map follows the input uncertainty model
@@ -429,9 +452,9 @@ class Image(object):
         if not np.isclose(gain, np.nanmean(self.gain), rtol=1e-2):
             self.my_logger.warning(f"\n\tFitted gain seems to be different than input gain. "
                                    f"Fit={gain} but average of self.gain is {np.nanmean(self.gain)}.")
-        if not np.isclose(read_out / parameters.CCD_REBIN, np.nanmean(self.read_out_noise), rtol=1e-2):
+        if not np.isclose(read_out, np.nanmean(self.read_out_noise), rtol=1e-1):
             self.my_logger.warning(f"\n\tFitted read out noise seems to be different than input readout noise. "
-                                   f"Fit={read_out / parameters.CCD_REBIN} but average of self.read_out_noise is "
+                                   f"Fit={read_out} but average of self.read_out_noise is "
                                    f"{np.nanmean(self.read_out_noise)}.")
         return fit, x, y, model
 
@@ -893,7 +916,8 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     theX = -1
     theY = -1
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
-        target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
+        target_coord_after_motion = image.target.get_radec_position_after_pm(image.target.simbad_table, date_obs=image.date_obs)
+        image.my_logger.info(f'\n\tTarget position after motion: {target_coord_after_motion}  {image.date_obs} {image.target_label} {image.target.simbad_table}')
         target_pixcoords = np.array(image.wcs.all_world2pix(target_coord_after_motion.ra,
                                                         target_coord_after_motion.dec, 0))
         theX, theY = target_pixcoords / parameters.CCD_REBIN

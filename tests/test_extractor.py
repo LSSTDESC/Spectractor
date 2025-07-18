@@ -74,7 +74,7 @@ def test_extractor_ctio_planetary_nebula():
     output_directory = "./outputs"
 
     logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
-    load_config("./config/ctio.ini")
+    load_config("ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = False
     parameters.CCD_REBIN = 1  # do not work with other values

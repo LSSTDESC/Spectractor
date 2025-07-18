@@ -52,8 +52,8 @@ class SpectrumFitWorkspace(FitWorkspace):
         --------
 
         >>> from spectractor.config import load_config
-        >>> load_config("config/ctio.ini")
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
@@ -84,15 +84,20 @@ class SpectrumFitWorkspace(FitWorkspace):
         # fixed[-1] = True
         if not fit_angstrom_exponent:
             fixed[3] = True  # angstrom_exponent
-        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 1), (0, 3), (100, 700), (0, 20),
-                       (0.1, 20),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
+        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 10), (0, 3), (100, 700), (0, 20),
+                       (0.5, 20),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
                   (-2, 2), (-np.inf, np.inf)]
         params = FitParameters(p, labels=["A1", "A2", "VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]",
                                           "reso [nm]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],
                                axis_names=["$A_1$", "$A_2$", "VAOD", r'$\"a$', "ozone [db]", "PWV [mm]",
                                            "reso [nm]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"],
                                bounds=bounds, fixed=fixed, truth=truth, filename=spectrum.filename)
-        FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=spectrum.filename)
+        epsilon = 1e-4 * p
+        epsilon[epsilon == 0] = 1e-4
+        epsilon[-1] = 0.001 * np.max(self.spectrum.data)
+
+        FitWorkspace.__init__(self, params, data=self.spectrum.data, data_cov = self.spectrum.cov_matrix, epsilon=epsilon,
+                              verbose=verbose, plot=plot, live_fit=live_fit, file_name=spectrum.filename)
         if atmgrid_file_name == "":
             self.atmosphere = Atmosphere(self.spectrum.airmass, self.spectrum.pressure, self.spectrum.temperature)
             if self.atmosphere.emulator is not None:
@@ -109,9 +114,6 @@ class SpectrumFitWorkspace(FitWorkspace):
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
         self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
         self.lambdas = self.spectrum.lambdas
-        self.data = self.spectrum.data
-        self.err = self.spectrum.err
-        self.data_cov = self.spectrum.cov_matrix
         self.fit_angstrom_exponent = fit_angstrom_exponent
         self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
         self.simulation = SpectrumSimulation(self.spectrum, atmosphere=self.atmosphere, fast_sim=True, with_adr=True)
@@ -239,8 +241,9 @@ class SpectrumFitWorkspace(FitWorkspace):
 
         Examples
         --------
-        >>> parameters.VERBOSE = True
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.VERBOSE = True
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
@@ -263,6 +266,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         --------
         >>> parameters.VERBOSE = True
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
@@ -290,9 +294,15 @@ class SpectrumFitWorkspace(FitWorkspace):
         # main plot
         self.plot_spectrum_comparison_simple(ax3, title="", size=0.8)
         # zoom O2
-        self.plot_spectrum_comparison_simple(ax2, extent=[730, 800], title='Zoom $O_2$', size=0.8)
+        if np.max(self.spectrum.lambdas) > 800 and np.min(self.spectrum.lambdas) < 730:
+            self.plot_spectrum_comparison_simple(ax2, extent=[730, 800], title='Zoom $O_2$', size=0.8)
+        else:
+            ax2.remove()
         # zoom H2O
-        self.plot_spectrum_comparison_simple(ax1, extent=[870, 1000], title='Zoom $H_2 O$', size=0.8)
+        if np.max(self.spectrum.lambdas) > 1000 and np.min(self.spectrum.lambdas) < 870:
+            self.plot_spectrum_comparison_simple(ax1, extent=[870, 1000], title='Zoom $H_2 O$', size=0.8)
+        else:
+            ax1.remove()
         fig.tight_layout()
         if self.live_fit:  # pragma: no cover
             plt.draw()
@@ -357,6 +367,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
     --------
 
     >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+    >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
     >>> w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
     >>> parameters.VERBOSE = True
@@ -375,9 +386,6 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
 
         # params_table = np.array([guess])
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
-        epsilon = 1e-4 * guess
-        epsilon[epsilon == 0] = 1e-4
-        epsilon[-1] = 0.001 * np.max(fit_workspace.data)
 
         # fit_workspace.simulation.fast_sim = True
         # fit_workspace.simulation.fix_psf_cube = False
@@ -387,12 +395,11 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
 
         fit_workspace.simulation.fast_sim = False
         fixed = copy.copy(fit_workspace.params.fixed)
-        #fit_workspace.params.fixed = [True] * len(fit_workspace.params.values)
-        #fit_workspace.params.fixed[0] = False
-        #run_minimisation(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-3, ftol=100 / fit_workspace.data.size,
-        #                 verbose=False)
+        fit_workspace.params.fixed[6] = True
+        run_minimisation(fit_workspace, method="newton", xtol=1e-3, ftol=100 / fit_workspace.data.size,
+                         verbose=False)
         fit_workspace.params.fixed = fixed
-        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-6,
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
                                         ftol=1 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False)
 
         fit_workspace.params.plot_correlation_matrix()

@@ -84,6 +84,8 @@ def _build_test_sample(targets=["HD111980"]*3, zs=np.linspace(1, 2, 3), aerosols
     if len(targets) != len(zs):
         raise ValueError("Target and airmass list must have the same length.")
     spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+    if parameters.SPECTRACTOR_ATMOSPHERE_SIM == "none":
+        parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getobsatmo"
     pressure, temperature = 800, 10
     spectra = []
     nspectra = len(targets)
@@ -183,7 +185,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         params = FitParameters(p, labels=labels, axis_names=axis_names, fixed=fixed, bounds=bounds)
         self.atm_params_indices = [0, 1, 2, 3]
         self.fit_angstrom_exponent = fit_angstrom_exponent
-        FitWorkspace.__init__(self, params, output_file_name, verbose, plot, live_fit)
+        FitWorkspace.__init__(self, params, epsilon=1e-4, file_name=output_file_name, verbose=verbose, plot=plot, live_fit=live_fit)
         self.my_logger = set_logger(self.__class__.__name__)
         self.output_file_name = output_file_name
         self.bin_widths = bin_width
@@ -235,7 +237,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             # self.amplitude_priors = np.ones_like(self.data[0])
             self.amplitude_priors_cov_matrix = np.eye(self.lambdas[0].size)  # np.diag(np.ones_like(self.lambdas))
             self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[i, i]) for i in range(self.lambdas[0].size)])
-            self.Q = L.T @ np.linalg.inv(self.amplitude_priors_cov_matrix) @ L
+            self.Q = np.linalg.inv(self.amplitude_priors_cov_matrix)
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
 
     @property
@@ -265,7 +267,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         # mask
         lambdas_to_mask = [np.arange(300, 335, 1)]
         for line in [HALPHA, HBETA, HGAMMA, HDELTA, O2_1, O2_2, O2B]:
-            width = line.width_bounds[1]
+            width = 1  # line.width_bounds[1]
             lambdas_to_mask += [np.arange(line.wavelength - width, line.wavelength + width, 1)]
         lambdas_to_mask = np.concatenate(lambdas_to_mask).ravel()
         lambdas_to_mask_indices = []
@@ -804,15 +806,13 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                      throughput, throughput_err, tatm_binned], file_name,
                     names=["wl", "Tinst", "Tinst_err", "Ttel", "Ttel_err", "Tatm"], overwrite=True)
 
-    def jacobian(self, params, epsilon, model_input=None):
+    def jacobian(self, params, model_input=None):
         """Generic function to compute the Jacobian matrix of a model, with numerical derivatives.
 
         Parameters
         ----------
         params: array_like
             The array of model parameters.
-        epsilon: array_like
-            The array of small steps to compute the partial derivatives of the model.
         model_input: array_like, optional
             A model input as a list with (x, model, model_err) to avoid an additional call to simulate().
 
@@ -835,12 +835,12 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             else:
                 self.fix_atm_sim = True
             tmp_p = np.copy(params)
-            if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
-                epsilon[ip] = - epsilon[ip]
-            tmp_p[ip] += epsilon[ip]
+            if tmp_p[ip] + self.epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + self.epsilon[ip] > self.params.bounds[ip][1]:
+                self.epsilon[ip] = - self.epsilon[ip]
+            tmp_p[ip] += self.epsilon[ip]
             tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
             for s in range(model.shape[0]):
-                J[ip].append((tmp_model[s] - model[s]) / epsilon[ip])
+                J[ip].append((tmp_model[s] - model[s]) / self.epsilon[ip])
         self.fix_atm_sim = False
         return np.asarray(J, dtype=object)
 
@@ -859,7 +859,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             return chisq + penalty
 
 
-def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False, sigma_clip=5, niter_clip=3):
+def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False, sigma_clip=5, niter_clip=3, with_line_search=False):
     """Interface function to fit spectrum simulation parameters to data.
 
     Parameters
@@ -891,13 +891,11 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False,
         run_minimisation(fit_workspace, method=method)
     else:
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
-        epsilon = 1e-4 * guess
-        epsilon[epsilon == 0] = 1e-4
 
-        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon,
+        run_minimisation_sigma_clipping(fit_workspace, method="newton",
                                         xtol=1e-6, ftol=1e-4 / fit_workspace.data.size,
                                         sigma_clip=sigma_clip, niter_clip=niter_clip,
-                                        verbose=verbose, with_line_search=True)
+                                        verbose=verbose, with_line_search=with_line_search)
 
         # w_reg = RegFitWorkspace(fit_workspace, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=parameters.VERBOSE)
         # run_minimisation(w_reg, method="minimize", ftol=1e-4, xtol=1e-2, verbose=parameters.VERBOSE, epsilon=[1e-1],

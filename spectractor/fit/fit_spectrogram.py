@@ -54,6 +54,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Examples
         --------
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrogramFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
@@ -102,7 +103,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                        r"$P_{\mathrm{atm}}$ [hPa]"]
         for order in self.diffraction_orders:
             axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
-        bounds = [[0, 2], [0, 2], [0, 2], [0, 1], [0, 3], [100, 700], [0, 20], [0.8, 1.2], [0, np.inf],
+        bounds = [[0, 2], [0, 2], [0, 2], [0, 10], [0, 3], [100, 700], [0, 20], [0.8, 1.2], [0, np.inf],
                   [D2CCD - 5 * parameters.DISTANCE2CCD_ERR, D2CCD + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
                   [-10, 10], [-90, 90], [0, np.inf]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
@@ -128,7 +129,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         params = FitParameters(p, labels=input_labels, axis_names=axis_names, bounds=bounds, fixed=fixed,
                                truth=truth, filename=self.filename)
-        params.fixed[params.get_index(f"A{self.diffraction_orders[0]}")] = True  # A1
+        params.fixed[params.get_index(f"A{self.diffraction_orders[0]}")] = False  # A1
         self.atm_params_indices = np.array([params.get_index(label) for label in ["VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]"]])
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
         if "A2" in params.labels:
@@ -141,7 +142,11 @@ class SpectrogramFitWorkspace(FitWorkspace):
         params.fixed[params.get_index("B")] = True  # B
         params.fixed[params.get_index("P [hPa]")] = False  # pressure for ADR
 
-        FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=self.filename)
+        if self.spectrum.spectrogram_Ny > 2 * parameters.PIXDIST_BACKGROUND:
+            self.crop_spectrogram()
+        FitWorkspace.__init__(self, params, data=self.spectrum.spectrogram_data.flatten(),
+                              err=self.spectrum.spectrogram_err.flatten(), epsilon=1e-4,
+                              verbose=verbose, plot=plot, live_fit=live_fit, file_name=self.filename)
         self.my_logger = set_logger(self.__class__.__name__)
         if atmgrid_file_name == "":
             self.atmosphere = Atmosphere(self.spectrum.airmass, self.spectrum.pressure, self.spectrum.temperature)
@@ -156,12 +161,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.params.bounds[self.params.get_index("PWV [mm]")] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
             self.params.fixed[self.params.get_index("angstrom_exp")] = True  # angstrom exponent
             self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
-        if self.spectrum.spectrogram_Ny > 2 * parameters.PIXDIST_BACKGROUND:
-            self.crop_spectrogram()
         self.lambdas = self.spectrum.lambdas
         self.Ny, self.Nx = self.spectrum.spectrogram_data.shape
-        self.data = self.spectrum.spectrogram_data.flatten()
-        self.err = self.spectrum.spectrogram_err.flatten()
         self.bgd = self.spectrum.spectrogram_bgd.flatten()
         if self.spectrum.spectrogram_flat is not None:
             self.flat = self.spectrum.spectrogram_flat.flatten()
@@ -220,8 +221,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.spectrum.chromatic_psf.y0 -= bgd_width
         self.spectrum.spectrogram_Ny, self.spectrum.spectrogram_Nx = self.spectrum.spectrogram_data.shape
         self.spectrum.chromatic_psf.table["y_c"] -= bgd_width
-        self.my_logger.debug(f'\n\tSize of the spectrogram region after cropping: '
-                             f'({self.spectrum.spectrogram_Nx},{self.spectrum.spectrogram_Ny})')
 
     def set_mask(self, params=None):
         """
@@ -236,6 +235,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Examples
         --------
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> w = SpectrogramFitWorkspace(spec, verbose=True)
         >>> _ = w.simulate(*w.params.values)
         >>> w.plot_fit()
@@ -255,9 +255,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
                                                                                             apply_bounds=True)
             if order == self.diffraction_orders[0]:  # only first diffraction order
                 self.spectrum.chromatic_psf.from_profile_params_to_shape_params(profile_params)
-            dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
-                                                                             niter=5, with_adr=True,
-                                                                             order=order)
+            dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, D, shift_x, shift_y, angle,
+                                                                             with_adr=True, order=order)
             profile_params[:, 0] = 1
             profile_params[:, 1] = dispersion_law.real + self.spectrogram_simulation.r0.real
             profile_params[:, 2] += dispersion_law.imag # - self.bgd_width
@@ -319,7 +318,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Parameters
         ----------
         ax: Axes
-            Axes instance of shape (4, 2).
+            Axes instance of shape (3, 2).
         title: str, optional
             Title for the simulation plot (default: '').
         extent: array_like, optional
@@ -379,13 +378,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
-            ax[3, 1].remove()
-            ax[3, 0].plot(self.lambdas[sub], np.nansum(data, axis=0)[sub], label='Data')
-            ax[3, 0].plot(self.lambdas[sub], np.nansum(model, axis=0)[sub], label='Model')
-            ax[3, 0].set_ylabel('Cross spectrum')
-            ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
-            ax[3, 0].legend(fontsize=7)
-            ax[3, 0].grid(True)
 
     def simulate(self, *params):
         """Interface method to simulate a spectrogram.
@@ -408,6 +400,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         --------
 
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> w = SpectrogramFitWorkspace(spec, verbose=True)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
@@ -430,7 +423,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.model *= self.flat
         return self.lambdas, self.model, self.model_err
 
-    def jacobian(self, params, epsilon, model_input=None):
+    def jacobian(self, params, model_input=None):
         start = time.time()
         if model_input is not None:
             lambdas, model, model_err = model_input
@@ -454,13 +447,13 @@ class SpectrogramFitWorkspace(FitWorkspace):
             if ip >= self.psf_params_start_index[0]:
                 continue
             tmp_p = np.copy(params)
-            if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
-                epsilon[ip] = - epsilon[ip]
-            tmp_p[ip] += epsilon[ip]
+            if tmp_p[ip] + self.epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + self.epsilon[ip] > self.params.bounds[ip][1]:
+                self.epsilon[ip] = - self.epsilon[ip]
+            tmp_p[ip] += self.epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
             if self.spectrogram_simulation.fix_atm_sim is False:
                 self.spectrogram_simulation.atmosphere_sim = atmosphere
-            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+            J[ip] = (tmp_model.flatten() - model) / self.epsilon[ip]
         self.spectrogram_simulation.fix_atm_sim = True
         self.spectrogram_simulation.fix_psf_cube = False
         for k, order in enumerate(self.diffraction_orders):
@@ -483,6 +476,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         --------
 
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> w = SpectrogramFitWorkspace(spec, verbose=True)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
@@ -503,8 +497,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
             fit_workspace.plot_fit()
 
         """
-        gs_kw = dict(width_ratios=[3, 0.01, 1, 0.01, 1, 0.15], height_ratios=[1, 1, 1, 1])
-        fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(10, 8), gridspec_kw=gs_kw)
+        gs_kw = dict(width_ratios=[3, 0.01, 1, 0.01, 1, 0.15], height_ratios=[1, 1, 1])
+        fig, ax = plt.subplots(nrows=3, ncols=6, figsize=(10, 8), gridspec_kw=gs_kw)
 
         # A1, A2, aerosols, ozone, pwv, D, shift_x, shift_y, shift_t, B,  *psf = self.p
         # plt.suptitle(f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f}, '
@@ -512,13 +506,15 @@ class SpectrogramFitWorkspace(FitWorkspace):
         # main plot
         self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=True)
         # zoom O2
-        self.plot_spectrogram_comparison_simple(ax[:, 2:4], extent=[730, 800], title='Zoom $O_2$', dispersion=True)
+        if np.max(self.spectrum.lambdas) > 800 and np.min(self.spectrum.lambdas) < 730:
+            self.plot_spectrogram_comparison_simple(ax[:, 2:4], extent=[730, 800], title='Zoom $O_2$', dispersion=True)
         # zoom H2O
-        self.plot_spectrogram_comparison_simple(ax[:, 4:6], extent=[870, 1000], title='Zoom $H_2 O$', dispersion=True)
+        if np.max(self.spectrum.lambdas) > 1000 and np.min(self.spectrum.lambdas) < 870:
+            self.plot_spectrogram_comparison_simple(ax[:, 4:6], extent=[870, 1000], title='Zoom $H_2 O$', dispersion=True)
         for i in range(3):  # clear middle colorbars
             for j in range(2):
                 plt.delaxes(ax[i, 2*j+1])
-        for i in range(4):  # clear middle y axis labels
+        for i in range(3):  # clear middle y axis labels
             for j in range(1, 3):
                 ax[i, 2*j].set_ylabel("")
         fig.tight_layout()
@@ -571,6 +567,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
     Examples
     --------
     >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+    >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     >>> w = SpectrogramFitWorkspace(spec, verbose=True, atmgrid_file_name='tests/data/reduc_20170530_134_atmsim.fits')
     >>> parameters.VERBOSE = True
     >>> run_spectrogram_minimisation(w, method="newton")
@@ -589,8 +586,6 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         # params_table = np.array([guess])
         start = time.time()
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
-        epsilon = 1e-4 * guess
-        epsilon[epsilon == 0] = 1e-4
         fixed_default = np.copy(fit_workspace.params.fixed)
 
         # fit_workspace.simulation.fast_sim = True
@@ -617,7 +612,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         # fit_workspace.params.fixed[fit_workspace.params.get_index(r"A1")] = False  # A1
         fit_workspace.params.fixed[fit_workspace.params.get_index(r"shift_y [pix]")] = False  # shift y
         fit_workspace.params.fixed[fit_workspace.params.get_index(r"angle [deg]")] = False  # angle
-        run_minimisation(fit_workspace, "newton", epsilon, xtol=1e-2, ftol=0.01, with_line_search=False)
+        run_minimisation(fit_workspace, "newton", xtol=1e-2, ftol=0.01, with_line_search=False)
         fit_workspace.params.fixed = fixed_default
 
         fit_workspace.spectrogram_simulation.fast_sim = False
@@ -627,7 +622,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
         #                                            fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
         #                                            niter=40)
-        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon,  xtol=1e-6,
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
                                         ftol=1 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=verbose,
                                         with_line_search=True)
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")

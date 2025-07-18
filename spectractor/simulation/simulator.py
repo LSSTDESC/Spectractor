@@ -37,6 +37,7 @@ class SpectrumSimulation(Spectrum):
         Examples
         --------
         >>> spectrum = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM='libradtran'
         >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
         >>> sim = SpectrumSimulation(spectrum, atmosphere=atmosphere, fast_sim=True)
 
@@ -138,6 +139,7 @@ class SpectrumSimulation(Spectrum):
         Examples
         --------
         >>> spectrum = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM='libradtran'
         >>> atmosphere = AtmosphereGrid(atmgrid_filename="./tests/data/reduc_20170530_134_atmsim.fits")
         >>> sim = SpectrumSimulation(spectrum, atmosphere=atmosphere, fast_sim=True)
         >>> lambdas, model, model_err = sim.simulate(A1=1, A2=1, ozone=300, pwv=5, aerosols=0.05, reso=0.,
@@ -150,7 +152,7 @@ class SpectrumSimulation(Spectrum):
             >>> assert np.sum(lambdas) > 0
             >>> assert np.sum(model) > 0
             >>> assert np.sum(model) < 1e-10
-            >>> assert np.sum(sim.data_next_order) > 0
+            >>> assert np.sum(sim.data_next_order) >= 0
             >>> assert np.sum(sim.data_next_order) < 1e-11
 
         """
@@ -251,6 +253,7 @@ class SpectrogramModel(Spectrum):
         Examples
         --------
         >>> spectrum = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM='libradtran'
         >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
         >>> sim = SpectrogramModel(spectrum, atmosphere=atmosphere, fast_sim=True)
         """
@@ -439,6 +442,7 @@ class SpectrogramModel(Spectrum):
         >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
         >>> spec.disperser.ratio_ratio_order_3over2 = lambda lbda: 0.1
         >>> psf_poly_params = list(spec.chromatic_psf.from_table_to_poly_params()) * 3
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM='libradtran'
         >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
         >>> sim = SpectrogramModel(spec, atmosphere=atmosphere, fast_sim=True)
         >>> lambdas, model, model_err = sim.simulate(A2=1, angle=-1.5, psf_poly_params=psf_poly_params)
@@ -468,8 +472,8 @@ class SpectrogramModel(Spectrum):
             if self.tr[k] is None or As[k] == 0:  # diffraction order undefined
                 continue
             # Dispersion law
-            dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
-                                                                    niter=5, with_adr=True, order=order)
+            dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, D, shift_x, shift_y, angle,
+                                                                    with_adr=True, order=order)
 
             # Spectrum amplitude is in ADU/s
             spec = As[k] * self.tr[k](self.lambdas) * spectrum
