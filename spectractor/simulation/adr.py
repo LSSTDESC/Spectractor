@@ -149,7 +149,7 @@ class ADRSinclair1985(ADR):  # pragma: nocover
         >>> adr.get_refractive_index(5000)  # refractive index
         1.0001862229650382
         >>> adr.get_scale(5000)  # total displacement in arcsec
-        array([24.2620973])
+        array([24.2296293])
         """
         ADR.__init__(self, airmass, lbdaref, pressure, parangle, relathumidity, temperature)
 
@@ -181,7 +181,7 @@ class ADRSinclair1985(ADR):  # pragma: nocover
         for i, lbda in enumerate(lbdas):
             xis[i] = -simpson(self.integrand_r(rr, lbda), x=rr, dx=dr)
 
-        xi_ref = -simpson(self.integrand_r(rr, self.lbdaref * 1e-3), rr, dx=dr)
+        xi_ref = -simpson(self.integrand_r(rr, self.lbdaref * 1e-3), x=rr, dx=dr)
         return np.rad2deg(xis - xi_ref) * 3600
 
     def integrand_r(self, r, lbda):

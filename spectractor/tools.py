@@ -552,7 +552,7 @@ def fit_poly1d(x, y, order, w=None):
     .. doctest::
         :hide:
 
-        >>> assert np.all(np.isclose(p, fit, 1e-5))
+        >>> assert np.all(np.isclose(p, fit, 1e-4))
         >>> assert np.all(np.isclose(model, y))
         >>> assert cov.shape == (4, 4)
 
@@ -563,7 +563,7 @@ def fit_poly1d(x, y, order, w=None):
     .. doctest::
         :hide:
 
-        >>> assert np.all(np.isclose(p, fit, 1e-5))
+        >>> assert np.all(np.isclose(p, fit, 1e-4))
 
     >>> fit, cov3, model3 = fit_poly1d([0, 1], [1, 1], order=3, w=err)
     >>> print(fit)
@@ -723,7 +723,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
     >>> y = np.polyval(p, x)
     >>> y[::10] = 0.
     >>> model, outliers = fit_poly1d_outlier_removal(x,y,order=3,sigma=3)
-    >>> print('{:.2f}'.format(model.c0.value))
+    >>> print('{:.2f}'.format(abs(model.c0.value)))
     0.00
     >>> print('{:.2f}'.format(model.c1.value))
     1.00

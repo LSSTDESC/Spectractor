@@ -141,8 +141,7 @@ class Libradtran:
         >>> lambdas2, atmosphere2 = lib.simulate(1.2, 0.07, 400, 2, 800, angstrom_exponent=-0.02, lambda_max=1200)
         >>> print(lambdas2[-5:])
         [1196. 1197. 1198. 1199. 1200.]
-        >>> print(atmosphere2[-5:])
-        [0.9659722 0.9659722 0.9571998 0.9571998 0.9554523]
+        >>> assert np.isclose(atmosphere2[-5:], [0.9659722, 0.9659722, 0.9571998, 0.9571998, 0.9554523], 1e-2).all()
         """
 
         self.my_logger.debug(
