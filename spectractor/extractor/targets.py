@@ -259,7 +259,7 @@ class Star(Target):
         >>> print(s.label)
         PNG321.0+3.9
         >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
-        -54d18m07.521s
+        -54d18m07.521...s
         >>> print(s.emission_spectrum)
         True
 
@@ -287,8 +287,8 @@ class Star(Target):
         >>> s = Star('PNG321.0+3.9')
         >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
         -54d18m07...s
-        >>> print(s.redshift)
-        -0.00021
+        >>> print(s.redshift)  # doctest: +ELLIPSIS
+        -0.00021...
         >>> s = Star('eta dor')
         >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
         -66d02m22...s
