@@ -229,9 +229,9 @@ class FitParameters:
         >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> params.cov = np.array([[1, -0.5], [-0.5, 4]])
         >>> params
-        x: 1.0 (fixed)
+        x: 1.0 (fixed=True)
         y: 2 +1 -1 bounds=[-inf, inf]
-        z: 3.0 (fixed)
+        z: 3.0 (fixed=True)
         t: 4 +2 -2 bounds=[-inf, inf]
 
         """
