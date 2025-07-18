@@ -334,7 +334,7 @@ class Astrometry():  # pragma: no cover
         self.quad_stars_pixel_positions = None
         self.dist_ra = 0 * u.arcsec
         self.dist_dec = 0 * u.arcsec
-        self.image.target_radec_position_after_pm = self.image.target.get_radec_position_after_pm(date_obs=self.image.date_obs)
+        self.image.target_radec_position_after_pm = self.image.target.get_radec_position_after_pm(self.image.target.simbad_table, date_obs=self.image.date_obs)
         if os.path.isfile(self.match_file_name):
             self.quad_stars_pixel_positions = self.get_quad_stars_pixel_positions()
 

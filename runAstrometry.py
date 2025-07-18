@@ -2,6 +2,7 @@ from spectractor import parameters
 from spectractor.astrometry import Astrometry
 from spectractor.logbook import LogBook
 from spectractor.config import load_config, apply_rebinning_to_parameters
+from spectractor.extractor.images import Image
 
 
 if __name__ == "__main__":
@@ -66,8 +67,9 @@ if __name__ == "__main__":
                 ypos = float(ypos)
                 guess = [xpos, ypos]
             target_label = args.target_label
-        a = Astrometry(file_name, target_label=target_label, disperser_label=disperser_label,
-                       output_directory=args.output_directory)
+        im = Image(file_name, target_label=target_label, guess=guess,
+                  disperser_label=disperser_label, config=args.config)
+        a = Astrometry(im, output_directory=args.output_directory)
         extent = ((int(max(0, xpos - radius)), int(min(xpos + radius, parameters.CCD_IMSIZE))),
                   (int(max(0, ypos - radius)), int(min(ypos + radius, parameters.CCD_IMSIZE))))
         gaia_min_residuals = a.run_full_astrometry(extent=extent, maxiter=int(args.maxiter))
