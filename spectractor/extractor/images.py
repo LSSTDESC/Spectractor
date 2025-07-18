@@ -444,14 +444,8 @@ class Image(object):
             raise AttributeError(f"Noise map must be in ADU units to be plotted and analyzed. "
                                  f"Currently self.units={self.units}.")
         data = np.copy(self.data)
-        self.my_logger.warning(f"{self.data.shape} data shape, {self.err.shape} uncertainty shape.")
-        self.my_logger.warning(f"Data min={np.min(data)}, max={np.max(data)}, mean={np.mean(data)}")
         y = self.err[data > 0].flatten() ** 2
         x = data[data > 0].flatten()
-        self.my_logger.warning(f"Uncertainty min={np.min(y)}, max={np.max(y)}, mean={np.mean(y)}, shape={y.shape}")
-        self.my_logger.warning(f"Data min={np.min(x)}, max={np.max(x)}, mean={np.mean(x)} shape={x.shape}")
-        self.my_logger.warning(f"{x}    ")
-        self.my_logger.warning(f"{y}    ")
         fit, cov, model = fit_poly1d(x, y, order=1)
         gain = 1 / fit[0]
         read_out = np.sqrt(fit[1]) * gain
