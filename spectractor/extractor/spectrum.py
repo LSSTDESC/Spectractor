@@ -499,14 +499,14 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits', config="ctio.ini")
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
         >>> s.plot_spectrogram()
         >>> if parameters.DISPLAY: plt.show()
 
         .. plot::
 
             from spectractor.extractor.spectrum import Spectrum
-            s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+            s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
             s.plot_spectrogram()
 
         """
@@ -848,7 +848,7 @@ class Spectrum:
             :hide:
 
             >>> assert parameters.OBS_CAMERA_ROTATION == s.header["CAM_ROT"]
-            >>> assert parameters.CCD_REBIN == s.header["REBIN"]
+            >>> assert parameters.CCD_REBIN == s.header["CCD_REBIN"]
             >>> assert s.parallactic_angle == s.header["PARANGLE"]
 
         Spectractor output format older than version <=2.3: must give the config file
@@ -956,8 +956,7 @@ class Spectrum:
         if self.header.get('TARGETX') and self.header.get('TARGETY'):
             self.x0 = [self.header.get('TARGETX'), self.header.get('TARGETY')]  # should be a tuple not a list
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
-        self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
-                                  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+        self.disperser = Hologram(self.disperser_label, data_dir=parameters.DISPERSER_DIR)
         self.my_logger.info(f'\n\tSpectrum loaded from {input_file_name}')
         if parameters.OBS_OBJECT_TYPE == "STAR":
             self.adr_params = [self.dec, self.hour_angle, self.temperature,
@@ -1037,7 +1036,7 @@ class Spectrum:
             :hide:
 
             >>> assert parameters.OBS_CAMERA_ROTATION == s.header["CAM_ROT"]
-            >>> assert parameters.CCD_REBIN == s.header["REBIN"]
+            >>> assert parameters.CCD_REBIN == s.header["CCD_REBIN"]
             >>> assert parameters.OBS_OBJECT_TYPE == "STAR"
             >>> assert s.parallactic_angle == s.header["PARANGLE"]
 
@@ -1941,7 +1940,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
 
     >>> lines = Lines([HALPHA, HBETA, O2_1], hydrogen_only=True,
     ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
-    >>> global_chisq, _, _ = detect_and_fit_lines(lines, lambdas, spectrum, spectrum_err, cov, fwhm_func=fwhm_func)
+    >>> global_chisq, _, _ = detect_lines(lines, lambdas, spectrum, spectrum_err, cov, fwhm_func=fwhm_func)
 
     .. doctest::
         :hide:
@@ -1999,21 +1998,14 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
 
     Examples
     --------
-    #>>> spectrum = Spectrum('tests/data/reduc_20170530_134_spectrum.fits', config="")
-    #>>> spectrum = Spectrum('./outputs/reduc_20170530_134_spectrum.fits', config="")
-    >>> spectrum = Spectrum('./tests/data/IMG_0046555_spectrum.fits', config="")
-    #>>> spectrum = Spectrum('./tests/data/sim_20170530_134_spectrum.fits', config="")
-    #>>> spectrum = Spectrum("./outputs/reduc_20170605_028_spectrum.fits", config="")
+    >>> spectrum = Spectrum('tests/data/reduc_20170530_134_spectrum.fits', config="")
     >>> parameters.LAMBDA_MIN = 350
     >>> parameters.LAMBDA_MAX = 800
     >>> parameters.DEBUG = True
     >>> parameters.PIXSHIFT_PRIOR = 2
     >>> parameters.DISTANCE2CCD_ERR = 0.05
-    #>>> spectrum.header["D2CCD_T"]
     >>> lambdas = calibrate_spectrum(spectrum, with_adr=True, grid_search=True)
     >>> spectrum.plot_spectrum()
-    #>>> spectrum.save_spectrum("./outputs/test_2.fits", overwrite=True)
-
     """
     with_adr = int(with_adr)
     if spectrum.units != "ADU/s":  # go back in ADU/s to remove previous lambda*dlambda normalisation
@@ -2130,20 +2122,18 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
                                                                       x0=[x0[0] + shift, x0[1]],
                                                                       D=D, order=spectrum.order)
         spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
-        print(spectrum.lambdas[:5])
         spectrum.convert_from_ADUrate_to_flam()
         for w in fitworkspaces:
             w.reset_x(spectrum.lambdas[w.indices])
         chisq, res = _fit_lines(fitworkspaces, ax=None)
         res = np.concatenate([res, [(shift / parameters.PIXSHIFT_PRIOR) ** 2]])
-        print(params, res)
+        #print(params, res)
         spectrum.convert_from_flam_to_ADUrate()
-        print(D, shift, chisq, res)
+        #print(D, shift, chisq, res)
         return res
 
     # start = np.array([D, pixel_shift])
     x, cov = optimize.leastsq(res_minimizer, start, epsfcn=1e-8)
-    print("leastsq", x, cov)
 
     # error = [parameters.DISTANCE2CCD_ERR, pixel_shift_step, 0.1]  # 1*parameters.DISTANCE2CCD_ERR
     # fix = [False, False, False]

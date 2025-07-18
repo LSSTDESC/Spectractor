@@ -783,11 +783,9 @@ class Disperser:
         >>> x0 = [800,800]
         >>> deltaX = np.arange(0,1000,1).astype(float)
         >>> lambdas = disperser.grating_pixel_to_lambda(deltaX, x0, D=55, order=1)
-        >>> print(lambdas[:5])
-        [0.         1.45454532 2.90909063 4.36363511 5.81817793]
+        >>> assert np.isclose(lambdas[:5],  [0., 1.45454532, 2.90909063, 4.36363511, 5.81817793]).all()
         >>> pixels = disperser.grating_lambda_to_pixel(lambdas, x0, D=55, order=1)
-        >>> print(pixels[:5])
-        [0. 1. 2. 3. 4.]
+        >>> assert np.isclose(pixels[:5], [0., 1., 2., 3., 4.]).all()
         """
         theta = self.refraction_angle(deltaX, x0, D=D)
         theta0 = get_theta0(x0)
@@ -816,11 +814,9 @@ class Disperser:
         >>> x0 = [800,800]
         >>> deltaX = np.arange(0,1000,1).astype(float)
         >>> lambdas = disperser.grating_pixel_to_lambda(deltaX, x0, D=55, order=1)
-        >>> print(lambdas[:5])
-        [0.         1.45454532 2.90909063 4.36363511 5.81817793]
+        >>> assert np.isclose(lambdas[:5],  [0., 1.45454532, 2.90909063, 4.36363511, 5.81817793]).all()
         >>> pixels = disperser.grating_lambda_to_pixel(lambdas, x0, D=55, order=1)
-        >>> print(pixels[:5])
-        [0. 1. 2. 3. 4.]
+        >>> assert np.isclose(pixels[:5], [0., 1., 2., 3., 4.]).all()
         """
         lambdas = np.copy(lambdas)
         theta0 = get_theta0(x0)
