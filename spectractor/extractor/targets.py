@@ -428,6 +428,15 @@ class Star(Target):
         self.spectra_err.append(np.sqrt(spec_dict["STATERROR"].value**2+spec_dict["SYSERROR"].value**2))
 
     def load_gaia(self):
+        """
+        Load the spectrum from the Gaia database.
+        
+        Examples
+        --------
+        >>> s = Star('HD111980')
+        >>> s.load_gaia()
+        >>> s.plot_spectra()
+        """
         gaia = getGaia.Gaia(self.label)
         if "PNG" in self.label:
             self.emission_spectrum = True
@@ -469,6 +478,15 @@ class Star(Target):
             )
 
     def load_ned(self):
+        """
+        Load the spectrum from NED database.
+        
+        Examples
+        --------
+        >>> s = Star('3C273')
+        >>> s.load_ned()
+        >>> s.plot_spectra()
+        """
         from astroquery.ned import Ned
         try:
             hdulists = Ned.get_spectra(self.label)  # , show_progress=False)
@@ -488,12 +506,14 @@ class Star(Target):
                 hydrogen_only=self.hydrogen_only,
             )
             for k, h in enumerate(hdulists):
+                if h[0].data is None:
+                    continue
                 if h[0].header["NAXIS"] == 1:
                     self.spectra.append(h[0].data)
                 else:
-                    for d in h[0].data:
+                    for d in h[1].data:
                         self.spectra.append(d)
-                wave_n = len(h[0].data)
+                wave_n = len(self.spectra[-1])
                 if h[0].header["NAXIS"] == 2:
                     wave_n = len(h[0].data.T)
                 wave_step = h[0].header["CDELT1"]
@@ -568,9 +588,13 @@ class Star(Target):
         else:
             self.sed = interp1d(self.wavelengths[index], self.spectra[index], kind='linear', bounds_error=False,
                                 fill_value=0.)
-            self.sed_err = interp1d(self.wavelengths[index], self.spectra_err[index], kind='linear', bounds_error=False,
-                                fill_value=10*np.max(self.spectra_err[index]))
-
+            if len(self.spectra_err) == 0:
+                self.sed_err = interp1d(self.wavelengths[index], np.zeros_like(self.spectra[index]), kind='linear', bounds_error=False,
+                                        fill_value=0.)
+            else:
+                self.sed_err = interp1d(self.wavelengths[index], self.spectra_err[index], kind='linear', bounds_error=False,
+                                fill_value=10*np.max(self.spectra_err[index]))      
+            
     def plot_spectra(self):
         """ Plot the spectra stored in the self.spectra list.
 
