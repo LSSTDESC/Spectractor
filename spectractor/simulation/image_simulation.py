@@ -106,6 +106,8 @@ class StarFieldModel:
         >>> im = Image('tests/data/reduc_20170530_134.fits', target_label="HD111980")
         >>> x0, y0 = find_target(im, guess=(740, 680))
         >>> s = StarFieldModel(im)
+        >>> xx, yy = np.mgrid[0:1000:1, 0:1000:1]
+        >>> s.field = s.model(xx, yy)
         >>> s.plot_model()
 
         """
@@ -254,8 +256,7 @@ class BackgroundModel:
         >>> model = bgd.model()
         >>> np.all(model==10)
         True
-        >>> model.shape
-        (200, 200)
+        >>> assert model.shape == (Ny, Nx)
         >>> bgd = BackgroundModel(Nx, Ny, 10, frame=(160, 180, 3))
         >>> bgd.plot_model()
         """
@@ -353,8 +354,7 @@ class FlatModel:
         >>> model = flat.model()
         >>> print(f"{np.mean(model):.4f}")
         1.0000
-        >>> model.shape
-        (200, 200)
+        >>> assert model.shape == (Ny, Nx)
         >>> flat.plot_model()
         """
         self.my_logger = set_logger(self.__class__.__name__)
