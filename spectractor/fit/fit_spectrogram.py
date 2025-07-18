@@ -54,6 +54,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Examples
         --------
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrogramFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
@@ -234,6 +235,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Examples
         --------
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> w = SpectrogramFitWorkspace(spec, verbose=True)
         >>> _ = w.simulate(*w.params.values)
         >>> w.plot_fit()
@@ -398,6 +400,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         --------
 
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> w = SpectrogramFitWorkspace(spec, verbose=True)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
@@ -473,6 +476,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         --------
 
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> w = SpectrogramFitWorkspace(spec, verbose=True)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
@@ -563,6 +567,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
     Examples
     --------
     >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+    >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     >>> w = SpectrogramFitWorkspace(spec, verbose=True, atmgrid_file_name='tests/data/reduc_20170530_134_atmsim.fits')
     >>> parameters.VERBOSE = True
     >>> run_spectrogram_minimisation(w, method="newton")
