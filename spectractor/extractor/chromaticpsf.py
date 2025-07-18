@@ -1913,7 +1913,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         for k, par in enumerate(params.labels):
             if "x_c" in par or "saturation" in par:
                 params.fixed[k] = True
-        FitWorkspace.__init__(self, params, data=data, err=data_errors,
+        FitWorkspace.__init__(self, params, epsilon=1e-4, data=data, err=data_errors,
                               file_name=file_name, verbose=verbose, plot=plot, live_fit=live_fit)
         self.my_logger = set_logger(self.__class__.__name__)
         self.chromatic_psf = chromatic_psf
@@ -2662,7 +2662,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         method = copy.copy(self.amplitude_priors_method)
         self.amplitude_priors_method = "keep"
         if not self.analytical:
-            J = super().jacobian(params, epsilon=epsilon, model_input=model_input)
+            J = super().jacobian(params, epsilon=self.epsilon, model_input=model_input)
         else:
             profile_params = np.copy(self.profile_params)
             amplitude_params = np.copy(self.amplitude_params)
