@@ -624,11 +624,11 @@ class Disperser:
             if type(d["transmissions"]["transmission"]) == str:
                 tr_filename = os.path.join(self.data_dir, self.label, d["transmissions"]["transmission"].rstrip('\n'))
                 a = np.loadtxt(tr_filename)
-                l, t, e = a.T
-                self.transmission = interpolate.interp1d(l, t, bounds_error=False, fill_value=0.)
+                l, tr, e = a.T
+                self.transmission = interpolate.interp1d(l, tr, bounds_error=False, fill_value=0.)
                 self.transmission_err = interpolate.interp1d(l, e, bounds_error=False, fill_value=0.)
             elif type(d["transmissions"]["transmission"]) == float:
-                t = d["transmissions"]["transmission"] * np.ones_like(parameters.LAMBDAS).astype(float)
+                tr = d["transmissions"]["transmission"] * np.ones_like(parameters.LAMBDAS).astype(float)
                 self.transmission = interpolate.interp1d(parameters.LAMBDAS, tr, bounds_error=False,
                                                          fill_value=0.)
                 self.transmission_err = interpolate.interp1d(parameters.LAMBDAS, 0 * tr, bounds_error=False,
