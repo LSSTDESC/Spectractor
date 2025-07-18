@@ -52,8 +52,8 @@ class SpectrumFitWorkspace(FitWorkspace):
         --------
 
         >>> from spectractor.config import load_config
-        >>> load_config("config/ctio.ini")
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
@@ -241,8 +241,9 @@ class SpectrumFitWorkspace(FitWorkspace):
 
         Examples
         --------
-        >>> parameters.VERBOSE = True
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.VERBOSE = True
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
@@ -265,6 +266,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         --------
         >>> parameters.VERBOSE = True
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
@@ -365,6 +367,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
     --------
 
     >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+    >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
     >>> w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
     >>> parameters.VERBOSE = True
