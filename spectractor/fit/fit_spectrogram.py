@@ -103,7 +103,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                        r"$P_{\mathrm{atm}}$ [hPa]"]
         for order in self.diffraction_orders:
             axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
-        bounds = [[0, 2], [0, 2], [0, 2], [0, 1], [0, 3], [100, 700], [0, 20], [0.8, 1.2], [0, np.inf],
+        bounds = [[0, 2], [0, 2], [0, 2], [0, 10], [0, 3], [100, 700], [0, 20], [0.8, 1.2], [0, np.inf],
                   [D2CCD - 5 * parameters.DISTANCE2CCD_ERR, D2CCD + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
                   [-10, 10], [-90, 90], [0, np.inf]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
