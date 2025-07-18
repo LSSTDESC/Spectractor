@@ -84,6 +84,8 @@ def _build_test_sample(targets=["HD111980"]*3, zs=np.linspace(1, 2, 3), aerosols
     if len(targets) != len(zs):
         raise ValueError("Target and airmass list must have the same length.")
     spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+    if parameters.SPECTRACTOR_ATMOSPHERE_SIM == "none":
+        parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getobsatmo"
     pressure, temperature = 800, 10
     spectra = []
     nspectra = len(targets)
