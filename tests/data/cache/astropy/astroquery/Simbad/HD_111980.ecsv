@@ -1,0 +1,214 @@
+# %ECSV 1.0
+# ---
+# datatype:
+# - name: main_id
+#   datatype: string
+#   description: Main identifier for an object
+#   meta: !!omap
+#   - {ucd: meta.id;meta.main}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: ra
+#   unit: deg
+#   datatype: float64
+#   description: Right ascension
+#   meta: !!omap
+#   - {ucd: pos.eq.ra;meta.main}
+# - name: dec
+#   unit: deg
+#   datatype: float64
+#   description: Declination
+#   meta: !!omap
+#   - {ucd: pos.eq.dec;meta.main}
+# - name: coo_err_maj
+#   unit: mas
+#   datatype: float32
+#   description: Coordinate error major axis
+#   meta: !!omap
+#   - {ucd: phys.angSize.smajAxis;pos.errorEllipse;pos.eq}
+# - name: coo_err_min
+#   unit: mas
+#   datatype: float32
+#   description: Coordinate error minor axis
+#   meta: !!omap
+#   - {ucd: phys.angSize.sminAxis;pos.errorEllipse;pos.eq}
+# - name: coo_err_angle
+#   unit: deg
+#   datatype: int16
+#   description: Coordinate error angle
+#   meta: !!omap
+#   - {ucd: pos.posAng;pos.errorEllipse;pos.eq}
+#   - values: {'null': -32768}
+# - name: coo_wavelength
+#   datatype: string
+#   description: Wavelength class for the origin of the coordinates (R,I,V,U,X,G)
+#   meta: !!omap
+#   - {ucd: instr.bandpass;pos.eq}
+#   - {_votable_string_dtype: char}
+# - name: coo_bibcode
+#   datatype: string
+#   description: Coordinate reference
+#   meta: !!omap
+#   - {ucd: meta.bib.bibcode;pos.eq}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: J
+#   datatype: float64
+#   description: J magnitude
+#   meta: !!omap
+#   - {ucd: phot.mag;em.IR.J}
+# - name: V
+#   datatype: float64
+#   description: V magnitude
+#   meta: !!omap
+#   - {ucd: phot.mag;em.opt.V}
+# - name: R
+#   datatype: float64
+#   description: R magnitude
+#   meta: !!omap
+#   - {ucd: phot.mag;em.opt.R}
+# - name: I
+#   datatype: float64
+#   description: I magnitude
+#   meta: !!omap
+#   - {ucd: phot.mag;em.opt.I}
+# - name: U
+#   datatype: float64
+#   description: U magnitude
+#   meta: !!omap
+#   - {ucd: phot.mag;em.opt.U}
+# - name: B
+#   datatype: float64
+#   description: B magnitude
+#   meta: !!omap
+#   - {ucd: phot.mag;em.opt.B}
+# - name: rvz_redshift
+#   datatype: float64
+#   description: redshift
+#   meta: !!omap
+#   - {ucd: src.redshift}
+# - name: sp_type
+#   datatype: string
+#   description: MK spectral type
+#   meta: !!omap
+#   - {ucd: src.spType}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: pm_err_min
+#   unit: mas / yr
+#   datatype: float32
+#   description: Proper motion error minor axis
+#   meta: !!omap
+#   - {ucd: phys.angSize.sminAxis;pos.errorEllipse;pos.pm}
+# - name: pmra_prec
+#   datatype: int16
+#   description: Proper motion in RA precision
+#   meta: !!omap
+#   - values: {'null': -32768}
+# - name: pm_err_min_prec
+#   datatype: int16
+#   description: Proper motion error minor axis precision
+#   meta: !!omap
+#   - values: {'null': -32768}
+# - name: pmdec_prec
+#   datatype: int16
+#   description: Proper motion in DEC precision
+#   meta: !!omap
+#   - values: {'null': -32768}
+# - name: pm_err_maj_prec
+#   datatype: int16
+#   description: Proper motion error major axis precision
+#   meta: !!omap
+#   - values: {'null': -32768}
+# - name: pmdec
+#   unit: mas / yr
+#   datatype: float64
+#   description: Proper motion in DEC
+#   meta: !!omap
+#   - {ucd: pos.pm;pos.eq.dec}
+# - name: pmra
+#   unit: mas / yr
+#   datatype: float64
+#   description: Proper motion in RA
+#   meta: !!omap
+#   - {ucd: pos.pm;pos.eq.ra}
+# - name: pm_err_maj
+#   unit: mas / yr
+#   datatype: float32
+#   description: Proper motion error major axis
+#   meta: !!omap
+#   - {ucd: phys.angSize.smajAxis;pos.errorEllipse;pos.pm}
+# - name: pm_err_angle
+#   unit: deg
+#   datatype: int16
+#   description: Proper motion error angle
+#   meta: !!omap
+#   - {ucd: pos.posAng;pos.errorEllipse;pos.pm}
+#   - values: {'null': -32768}
+# - name: pm_qual
+#   datatype: string
+#   description: Proper motion quality
+#   meta: !!omap
+#   - {ucd: meta.code.qual;pos.pm}
+#   - {_votable_string_dtype: char}
+# - name: pm_bibcode
+#   datatype: string
+#   description: Proper motion reference
+#   meta: !!omap
+#   - {ucd: meta.bib.bibcode;pos.pm}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: plx_bibcode
+#   datatype: string
+#   description: Parallax reference
+#   meta: !!omap
+#   - {ucd: meta.bib.bibcode;pos.parallax.trig}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: plx_err_prec
+#   datatype: int16
+#   description: Parallax error precision
+#   meta: !!omap
+#   - values: {'null': -32768}
+# - name: plx_value
+#   unit: mas
+#   datatype: float64
+#   description: Parallax
+#   meta: !!omap
+#   - {ucd: pos.parallax.trig}
+# - name: plx_err
+#   unit: mas
+#   datatype: float32
+#   description: Parallax error
+#   meta: !!omap
+#   - {ucd: stat.error;pos.parallax.trig}
+# - name: plx_qual
+#   datatype: string
+#   description: Parallax quality
+#   meta: !!omap
+#   - {ucd: meta.code.qual;pos.parallax.trig}
+#   - {_votable_string_dtype: char}
+# - name: plx_prec
+#   datatype: int16
+#   description: Parallax precision
+#   meta: !!omap
+#   - values: {'null': -32768}
+# - name: matched_id
+#   datatype: string
+#   description: Identifier
+#   meta: !!omap
+#   - {ucd: meta.id}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# meta: !!omap
+# - {ID: result_S1760532565529}
+# - {name: result_S1760532565529}
+# schema: astropy-2.0
+main_id ra dec coo_err_maj coo_err_min coo_err_angle coo_wavelength coo_bibcode J V R I U B rvz_redshift sp_type pm_err_min pmra_prec pm_err_min_prec pmdec_prec pm_err_maj_prec pmdec pmra pm_err_maj pm_err_angle pm_qual pm_bibcode plx_bibcode plx_err_prec plx_value plx_err plx_qual plx_prec matched_id
+"""HD 111980""" 193.31272069229124 -18.522225886039166 0.0225 0.0183 90 O """2020yCat.1350....0G""" 7.176000118255615 8.380000114440918 "" "" 8.800000190734863 8.90999984741211 0.0005171580737759474 """F7V""" 0.026 3 3 3 3 -795.843 299.359 0.032 90 A """2020yCat.1350....0G""" """2020yCat.1350....0G""" 4 12.9277 0.0261 A 4 """HD 111980"""
