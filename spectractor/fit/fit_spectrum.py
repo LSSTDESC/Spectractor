@@ -137,8 +137,8 @@ class SpectrumFitWorkspace(FitWorkspace):
             B_truth = 0
             self.truth = (A1_truth, A2_truth, aerosols_truth, ozone_truth, pwv_truth,
                           reso_truth, D_truth, shift_truth, B_truth)
-            self.lambdas_truth = np.fromstring(self.spectrum.header['LBDAS_T'][1:-1], sep=' ', dtype=float)
-            self.amplitude_truth = np.fromstring(self.spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+            self.lambdas_truth = np.array(self.spectrum.header['LBDAS_T'][1:-1].split(), dtype=float)
+            self.amplitude_truth = np.array(self.spectrum.header['AMPLIS_T'][1:-1].split(), dtype=float)
         else:
             self.truth = None
 
