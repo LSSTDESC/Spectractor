@@ -62,7 +62,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.psf_poly_params = self.psf_poly_params[length:]
         psf_poly_params_labels = np.copy(spectrum.chromatic_psf.params.labels[length:])
         psf_poly_params_names = np.copy(spectrum.chromatic_psf.params.axis_names[length:])
-        spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=spectrum.spectrogram_Ny)
         psf_poly_params_bounds = spectrum.chromatic_psf.set_bounds()
         D2CCD = np.copy(spectrum.header['D2CCD'])
         p = np.array([1, 1, 0, D2CCD, np.copy(spectrum.header['PIXSHIFT']), 0,
@@ -953,8 +952,9 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         # Optimize the regularisation parameter only if it was not done before
         if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
             my_logger.info("\n\tStart regularization parameter estimation...")
+            my_logger.info(f"\n\tExpected Ndof: {w.spectrum.chromatic_psf.Nx / weighted_mean_fwhm}")
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=True)
-            w_reg.run_regularisation(Ndof=w.trace_r)
+            w_reg.run_regularisation(Ndof=w.spectrum.chromatic_psf.Nx / weighted_mean_fwhm)
             w.opt_reg = w_reg.opt_reg
             w.reg = np.copy(w_reg.opt_reg)
             w.trace_r = np.trace(w_reg.resolution)
@@ -1133,6 +1133,8 @@ def SpectractorRun(image, output_directory, guess=None):
     -------
     spectrum: Spectrum
         The extracted spectrum object.
+    w: FullForwardModelFitWorkspace
+        The FFM wrokspace.
 
     Examples
     --------
@@ -1152,7 +1154,7 @@ def SpectractorRun(image, output_directory, guess=None):
         ...         continue
         ...     image = SpectractorInit(file_name, target_label=target_label,
         ...                             disperser_label=disperser_label, config='./config/ctio.ini')
-        ...     spectrum = SpectractorRun(image, './tests/data/', guess=[xpos, ypos])
+        ...     spectrum, w = SpectractorRun(image, './tests/data/', guess=[xpos, ypos])
 
     .. doctest::
         :hide:
@@ -1241,7 +1243,7 @@ def SpectractorRun(image, output_directory, guess=None):
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
 
-    return spectrum
+    return spectrum, w
 
 
 def Spectractor(file_name, output_directory, target_label='', guess=None, disperser_label="", config=''):
@@ -1296,7 +1298,7 @@ def Spectractor(file_name, output_directory, target_label='', guess=None, disper
 
     """
     image = SpectractorInit(file_name, target_label=target_label, disperser_label=disperser_label, config=config)
-    spectrum = SpectractorRun(image, guess=guess, output_directory=output_directory)
+    spectrum, w = SpectractorRun(image, guess=guess, output_directory=output_directory)
     return spectrum
 
 

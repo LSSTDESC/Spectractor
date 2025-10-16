@@ -280,8 +280,10 @@ class Image(object):
             load_LPNHE_image(self)
         elif parameters.OBS_NAME == "AUXTEL":
             load_AUXTEL_image(self)
-        elif parameters.OBS_NAME == "STARDICE":
+        elif parameters.OBS_NAME == "STARDICE" or parameters.OBS_NAME == "OHP":
             load_STARDICE_image(self)
+        else:
+            raise ValueError(f"Unknown observatory {parameters.OBS_NAME=}.")
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.header["GRATING"] = self.disperser_label
@@ -833,6 +835,7 @@ def load_STARDICE_image(image):  # pragma: no cover
     elif image.header['MOUNTTAU'] >= 90:
         parameters.OBS_CAMERA_ROTATION = 0
 
+    image.target_label = image.header['mountTARGET']
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['cameraexptime'])
     image.filter_label = 'EMPTY'
