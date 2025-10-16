@@ -1225,7 +1225,7 @@ class Astrometry():  # pragma: no cover
 
         # update coordinates with proper motion data
         self.my_logger.info(f"\n\tUpdate object coordinates with proper motion at time={self.image.date_obs}.")
-        self.image.target_radec_position_after_pm = self.image.target.get_radec_position_after_pm(self.image.date_obs)
+        self.image.target_radec_position_after_pm = self.image.target.get_radec_position_after_pm(self.image.target.simbad_table, date_obs=self.image.date_obs)
         self.gaia_radec_positions_after_pm = get_gaia_coords_after_proper_motion(self.gaia_catalog, self.image.date_obs)
         if parameters.DEBUG:
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_radec_positions_after_pm,
