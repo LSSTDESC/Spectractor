@@ -1,6 +1,6 @@
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.tools import (pixel_rotation, set_wcs_file_name, set_sources_file_name,
+from spectractor.tools import (rebin, pixel_rotation, set_wcs_file_name, set_sources_file_name,
                                set_gaia_catalog_file_name, load_wcs_from_file, ensure_dir,
                                plot_image_simple, iraf_source_detection)
 from spectractor.extractor.images import Image, find_target
@@ -15,7 +15,8 @@ from astropy.io import fits, ascii
 import astropy.units as units
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
-from scipy.signal import fftconvolve, gaussian
+from scipy.signal import fftconvolve
+from scipy.signal.windows import gaussian
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import numpy as np
@@ -69,11 +70,10 @@ class StarModel:
         self.x0 = centroid_coords[0]
         self.y0 = centroid_coords[1]
         self.amplitude = amplitude
-        # self.target = target
         self.psf = copy.deepcopy(psf)
         self.psf.params.values[1] = self.x0
         self.psf.params.values[2] = self.y0
-        self.psf.params.values[0] = amplitude
+        self.psf.params.values[0] = self.amplitude
         # to be realistic, usually fitted fwhm is too big, divide gamma by 2
         self.fwhm = self.psf.params.values[3]
         # self.sigma = self.model.stddev / 2
@@ -106,6 +106,8 @@ class StarFieldModel:
         >>> im = Image('tests/data/reduc_20170530_134.fits', target_label="HD111980")
         >>> x0, y0 = find_target(im, guess=(740, 680))
         >>> s = StarFieldModel(im)
+        >>> xx, yy = np.mgrid[0:1000:1, 0:1000:1]
+        >>> s.field = s.model(xx, yy)
         >>> s.plot_model()
 
         """
@@ -123,51 +125,62 @@ class StarFieldModel:
     def set_star_list(self):
         x0, y0 = self.image.target_pixcoords
         sources_file_name = set_sources_file_name(self.image.file_name)
-        if os.path.isfile(sources_file_name):
+        wcs_file_name = set_wcs_file_name(self.image.file_name)
+        gaia_catalog_file_name = set_gaia_catalog_file_name(self.image.file_name)
+        if os.path.isfile(wcs_file_name) and os.path.isfile(gaia_catalog_file_name):
+            # load gaia catalog
+            gaia_catalog = ascii.read(gaia_catalog_file_name, format="ecsv")
+            gaia_coord_after_motion = get_gaia_coords_after_proper_motion(gaia_catalog, self.image.date_obs)
+            # load WCS
+            wcs = load_wcs_from_file(wcs_file_name)
+            # catalog matching to set star positions using Gaia
+            target_coord = wcs.all_pix2world([x0 * parameters.CCD_REBIN], [y0 * parameters.CCD_REBIN], 0)
+            target_coord = SkyCoord(ra=target_coord[0] * units.deg, dec=target_coord[1] * units.deg,
+                                    frame="icrs", obstime=self.image.date_obs, equinox="J2000")
+            gaia_target_index, dist_2d, dist_3d = target_coord.match_to_catalog_sky(gaia_coord_after_motion)
+            dx, dy = 0, 0
+            for gaia_i in range(len(gaia_catalog)):
+                x, y = np.array(wcs.all_world2pix(gaia_coord_after_motion[gaia_i].ra,
+                                                  gaia_coord_after_motion[gaia_i].dec, 0)) / parameters.CCD_REBIN
+                if gaia_i == gaia_target_index[0]:
+                    dx = x0 - x
+                    dy = y0 - y
+                A = 10 ** (-gaia_catalog['phot_g_mean_mag'][gaia_i] / 2.5)
+                self.stars.append(StarModel([x, y], self.image.target_star2D, A))
+                self.pixcoords.append([x, y])
+            # rescale using target fitted amplitude
+            amplitudes = np.array([star.amplitude for star in self.stars])
+            target_flux = self.image.target_star2D.params.values[0]
+            amplitudes *= target_flux / self.stars[gaia_target_index[0]].amplitude * self.flux_factor
+            for k, star in enumerate(self.stars):
+                star.amplitude = amplitudes[k]
+                # shift x,y star positions according to target position
+                star.x0 += dx
+                star.y0 += dy
+                star.psf.params.values[1] += dx
+                star.psf.params.values[2] += dy
+                star.psf.params.values[0] = amplitudes[k]
+        elif os.path.isfile(sources_file_name):
             # load sources positions and flux
             sources = Table.read(sources_file_name)
             sources['X'].name = "xcentroid"
             sources['Y'].name = "ycentroid"
             sources['FLUX'].name = "flux"
-            # test presence of WCS and gaia catalog files
-            wcs_file_name = set_wcs_file_name(self.image.file_name)
-            gaia_catalog_file_name = set_gaia_catalog_file_name(self.image.file_name)
-            if os.path.isfile(wcs_file_name) and os.path.isfile(gaia_catalog_file_name):
-                # load gaia catalog
-                gaia_catalog = ascii.read(gaia_catalog_file_name, format="ecsv")
-                gaia_coord_after_motion = get_gaia_coords_after_proper_motion(gaia_catalog, self.image.date_obs)
-                # load WCS
-                wcs = load_wcs_from_file(wcs_file_name)
-                # catalog matching to set star positions using Gaia
-                sources_coord = wcs.all_pix2world(sources['xcentroid'], sources['ycentroid'], 0)
-                sources_coord = SkyCoord(ra=sources_coord[0] * units.deg, dec=sources_coord[1] * units.deg,
-                                         frame="icrs", obstime=self.image.date_obs, equinox="J2000")
-                gaia_index, dist_2d, dist_3d = sources_coord.match_to_catalog_sky(gaia_coord_after_motion)
-                for k, gaia_i in enumerate(gaia_index):
-                    x, y = wcs.all_world2pix(gaia_coord_after_motion[gaia_i].ra, gaia_coord_after_motion[gaia_i].dec, 0)
-                    A = sources['flux'][k] * self.flux_factor
-                    self.stars.append(StarModel([x, y], self.image.target_star2D, A))
-                    self.pixcoords.append([x, y])
-            else:
-                for k, source in enumerate(sources):
-                    x, y = sources['xcentroid'][k], sources['ycentroid'][k]
-                    A = sources['flux'][k] * self.flux_factor
-                    self.stars.append(StarModel([x, y], self.image.target_star2D, A))
-                    self.pixcoords.append([x, y])
+            for k, source in enumerate(sources):
+                x, y = np.array([sources['xcentroid'][k], sources['ycentroid'][k]]) / parameters.CCD_REBIN
+                A = sources['flux'][k] * self.flux_factor
+                self.stars.append(StarModel([x, y], self.image.target_star2D, A))
+                self.pixcoords.append([x, y])
         else:
+            # try extraction using iraf source detection
             # mask background, faint stars, and saturated pixels
             data = np.copy(self.image.data)
-            # self.saturation = 0.99 * parameters.CCD_MAXADU / base_image.expo
-            # self.saturated_pixels = np.where(image_thresholded > self.saturation)
-            # image_thresholded[self.saturated_pixels] = 0.
-            # image_thresholded -= threshold
-            # image_thresholded[np.where(image_thresholded < 0)] = 0.
             # mask order0 and spectrum
             margin = 30
             mask = np.zeros(data.shape, dtype=bool)
             for y in range(int(y0) - 100, int(y0) + 100):
-                for x in range(parameters.CCD_IMSIZE):
-                    u, v = pixel_rotation(x, y, self.image.disperser.theta(x0, y0) * np.pi / 180., x0, y0)
+                for x in range(self.image.data.shape[1]):
+                    u, v = pixel_rotation(x, y, self.image.disperser.theta([x0, y0]) * np.pi / 180., x0, y0)
                     if margin > v > -margin:
                         mask[y, x] = True
             # remove background and detect sources
@@ -186,9 +199,9 @@ class StarFieldModel:
             self.field = self.stars[0].psf.evaluate(np.array([x, y]))
             for k in range(1, len(self.stars)):
                 left = max(0, int(self.pixcoords[0][k]) - window)
-                right = min(parameters.CCD_IMSIZE, int(self.pixcoords[0][k]) + window)
+                right = min(np.max(x), int(self.pixcoords[0][k]) + window)
                 low = max(0, int(self.pixcoords[1][k]) - window)
-                up = min(parameters.CCD_IMSIZE, int(self.pixcoords[1][k]) + window)
+                up = min(np.max(y), int(self.pixcoords[1][k]) + window)
                 if up < low or left > right:
                     continue
                 yy, xx = np.mgrid[low:up, left:right]
@@ -196,21 +209,8 @@ class StarFieldModel:
         return self.field
 
     def plot_model(self):
-        xx, yy = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
-        starfield = self.model(xx, yy)
         fig, ax = plt.subplots(1, 1)
-        plot_image_simple(ax, starfield, scale="log10", target_pixcoords=self.pixcoords)
-        # im = plt.imshow(starfield, origin='lower', cmap='jet')
-        # ax.grid(color='white', ls='solid')
-        # ax.grid(True)
-        # ax.set_xlabel('X [pixels]')
-        # ax.set_ylabel('Y [pixels]')
-        # ax.set_title(f'Star field model: fwhm={self.fwhm.value:.2f}')
-        # cb = plt.colorbar(im, ax=ax)
-        # cb.formatter.set_powerlimits((0, 0))
-        # cb.locator = MaxNLocator(7, prune=None)
-        # cb.update_ticks()
-        # cb.set_label('Arbitrary units')  # ,fontsize=16)
+        plot_image_simple(ax, self.field, scale="log10", target_pixcoords=self.pixcoords)
         if parameters.DISPLAY:
             plt.show()
         if parameters.PdfPages:
@@ -220,10 +220,12 @@ class StarFieldModel:
 class BackgroundModel:
     """Class to model the background of the simulated image.
 
-    The background model size is set with the parameters.CCD_IMSIZE global keyword.
-
     Attributes
     ----------
+    Nx: int
+        Size of the background along X axis in pixels.
+    Ny: int
+        Size of the background along Y axis in pixels.
     level: float
         The mean level of the background in image units.
     frame: array_like
@@ -231,13 +233,15 @@ class BackgroundModel:
         and the smoothing gaussian width (default: None).
     """
 
-    def __init__(self, level, frame=None):
+    def __init__(self, Nx, Ny, level, frame=None):
         """Create a BackgroundModel instance.
-
-        The background model size is set with the parameters.CCD_IMSIZE global keyword.
 
         Parameters
         ----------
+        Nx: int
+            Size of the background along X axis in pixels.
+        Ny: int
+            Size of the background along Y axis in pixels.
         level: float
             The mean level of the background in image units.
         frame: array_like, None
@@ -247,17 +251,18 @@ class BackgroundModel:
         Examples
         --------
         >>> from spectractor import parameters
-        >>> parameters.CCD_IMSIZE = 200
-        >>> bgd = BackgroundModel(10)
+        >>> Nx, Ny = 200, 300
+        >>> bgd = BackgroundModel(Nx, Ny, 10)
         >>> model = bgd.model()
         >>> np.all(model==10)
         True
-        >>> model.shape
-        (200, 200)
-        >>> bgd = BackgroundModel(10, frame=(160, 180, 3))
+        >>> assert model.shape == (Ny, Nx)
+        >>> bgd = BackgroundModel(Nx, Ny, 10, frame=(160, 180, 3))
         >>> bgd.plot_model()
         """
         self.my_logger = set_logger(self.__class__.__name__)
+        self.Nx = Nx
+        self.Ny = Ny
         self.level = level
         if self.level <= 0:
             self.my_logger.warning('\n\tBackground level must be strictly positive.')
@@ -269,7 +274,6 @@ class BackgroundModel:
         """Compute the background model for the image simulation in image units.
 
         A shadowing vignetting frame is roughly simulated if self.frame is set.
-        The background model size is set with the parameters.CCD_IMSIZE global keyword.
 
         Returns
         -------
@@ -277,7 +281,7 @@ class BackgroundModel:
             The array of the background model.
 
         """
-        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
+        xx, yy = np.mgrid[0:self.Ny:1, 0:self.Nx:1]
         bkgd = self.level * np.ones_like(xx)
         if self.frame is None:
             return bkgd
@@ -285,9 +289,9 @@ class BackgroundModel:
             xlim, ylim, width = self.frame
             bkgd[ylim:, :] = self.level / 100
             bkgd[:, xlim:] = self.level / 100
-            kernel = np.outer(gaussian(parameters.CCD_IMSIZE, width), gaussian(parameters.CCD_IMSIZE, width))
+            kernel = np.outer(gaussian(self.Nx, width), gaussian(self.Ny, width))
             bkgd = fftconvolve(bkgd, kernel, mode='same')
-            bkgd *= self.level / bkgd[parameters.CCD_IMSIZE // 2, parameters.CCD_IMSIZE // 2]
+            bkgd *= self.level / bkgd[self.Ny // 2, self.Nx // 2]
             return bkgd
 
     def plot_model(self):
@@ -313,6 +317,107 @@ class BackgroundModel:
             parameters.PdfPages.savefig()
 
 
+class FlatModel:
+    """Class to model the pixel flat of the simulated image. Flat is dimensionless and its average must be one.
+
+    Attributes
+    ----------
+    Nx: int
+        Size of the background along X axis in pixels.
+    Ny: int
+        Size of the background along Y axis in pixels.
+    gains: array_like
+        The list of gains to apply. The average must be one.
+    randomness_level: float
+        Level of random quantum efficiency to apply to pixels (default: 0.).
+    """
+
+    def __init__(self, Nx, Ny, gains, randomness_level=0.):
+        """Create a FlatModel instance. Flat is dimensionless and its average must be one.
+
+        Parameters
+        ----------
+        Nx: int
+            Size of the background along X axis in pixels.
+        Ny: int
+            Size of the background along Y axis in pixels.
+        gains: array_like
+            The list of gains to apply. The average must be one.
+        randomness_level: float
+            Level of random quantum efficiency to apply to pixels (default: 0.).
+
+        Examples
+        --------
+        >>> from spectractor import parameters
+        >>> Nx, Ny = 200, 300
+        >>> flat = FlatModel(Nx, Ny, gains=[[1, 2, 3, 4], [4, 3, 2, 1]])
+        >>> model = flat.model()
+        >>> print(f"{np.mean(model):.4f}")
+        1.0000
+        >>> assert model.shape == (Ny, Nx)
+        >>> flat.plot_model()
+        """
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.Nx = Nx
+        self.Ny = Ny
+        self.gains = np.atleast_2d(gains).astype(float)
+        if len(self.gains) <= 0:
+            raise ValueError(f"Gains list is empty")
+        if np.any(self.gains <= 0):
+            raise ValueError(f"One the gain values is negative. Got {self.gains}.")
+        if np.mean(self.gains) != 1.:
+            self.my_logger.warning(f"\n\tGains list average is not one but {np.mean(self.gains)}. "
+                                   "I scaled them to have an average of one.")
+            self.gains /= np.mean(self.gains)
+        self.my_logger.warning(f'\n\tRelative gains are set to {self.gains}.')
+        self.randomness_level = randomness_level
+
+    def model(self):
+        """Compute the flat model for the image simulation (no units).
+
+        Returns
+        -------
+        flat: array_like
+            The array of the flat model.
+        """
+        yy, xx = np.mgrid[0:self.Nx:1, 0:self.Ny:1]
+        flat = np.ones_like(xx, dtype=float)
+        hflats = np.array_split(flat, self.gains.shape[0])
+        for h in range(self.gains.shape[0]):
+            vflats = np.array_split(hflats[h].T, self.gains.shape[1])
+            for v in range(self.gains.shape[1]):
+                vflats[v] *= self.gains[h,v]
+            hflats[h] = np.concatenate(vflats).T
+        flat = np.concatenate(hflats).T
+        if self.randomness_level != 0:
+            flat += np.random.uniform(-self.randomness_level, self.randomness_level, size=flat.shape)
+
+        return flat
+
+    def plot_model(self):
+        """Plot the flat model.
+
+        """
+        flat = self.model()
+        fig, ax = plt.subplots(1, 1)
+        im = plt.imshow(flat, origin='lower', cmap='jet')
+        ax.grid(color='white', ls='solid')
+        ax.grid(True)
+        ax.set_xlabel('X [pixels]')
+        ax.set_ylabel('Y [pixels]')
+        ax.set_title('Flat model')
+        cb = plt.colorbar(im, ax=ax)
+        cb.formatter.set_powerlimits((0, 0))
+        cb.locator = MaxNLocator(7, prune=None)
+        cb.update_ticks()
+        cb.set_label('Dimensionless')  # ,fontsize=16)
+        if parameters.DISPLAY:
+            plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
+
+
+
 class ImageModel(Image):
 
     def __init__(self, filename, target_label=None):
@@ -321,17 +426,27 @@ class ImageModel(Image):
         self.true_lambdas = None
         self.true_spectrum = None
 
-    def compute(self, star, background, spectrogram, starfield=None):
+    def compute(self, star, background, spectrogram, starfield=None, flat=None):
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
-        self.data = star.psf.evaluate(np.array([xx, yy])) + background.model()
+        if starfield is not None:
+            starfield_mod = starfield.model(xx, yy)
+            self.data = starfield_mod
+            self.starfield = np.copy(starfield_mod)
+            if parameters.DEBUG:
+                self.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
+                starfield.plot_model()
+        else:
+            self.data = star.psf.evaluate(np.array([xx, yy]))
+        self.data += background.model()
         if spectrogram.full_image:
-            self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax, :] += spectrogram.spectrogram
+            self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax, :] += spectrogram.spectrogram_data
         else:
             self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
-                      spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.spectrogram
-        # - spectrogram.spectrogram_bgd)
-        if starfield is not None:
-            self.data += starfield.model(xx, yy)
+                      spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.spectrogram_data
+        if flat is not None:
+            flat_mod = flat.model()
+            self.data *= flat_mod
+            self.flat = flat_mod
 
     def add_poisson_and_read_out_noise(self):  # pragma: no cover
         if self.units != 'ADU':
@@ -367,7 +482,7 @@ class ImageModel(Image):
 
 
 def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1, A3=1, angstrom_exponent=None,
-             psf_poly_params=None, psf_type=None,  diffraction_orders=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True):
+             psf_poly_params=None, psf_type=None, diffraction_orders=None, with_rotation=True, with_starfield=True, with_adr=True, with_noise=True, with_flat=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
@@ -382,17 +497,25 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     - with_rotation: rotate the spectrum according to the disperser characteristics (True by default)
     - with_stars: include stars in the image field (True by default)
     - with_adr: include ADR effect (True by default)
+    - with_flat: include flat (True by default)
     """
     my_logger = set_logger(__name__)
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
     # Load reduced image
     spectrum = Spectrum(spectrum_filename)
+    parameters.CALLING_CODE = ""
     if diffraction_orders is None:
         diffraction_orders = np.arange(spectrum.order, spectrum.order + 3 * np.sign(spectrum.order), np.sign(spectrum.order))
     image = ImageModel(image_filename, target_label=spectrum.target.label)
     guess = np.array([spectrum.header['TARGETX'], spectrum.header['TARGETY']])
-    if "CCDREBIN" in spectrum.header:
-        guess *= spectrum.header["CCDREBIN"]
+    if parameters.CCD_REBIN != 1:
+        # these lines allow to simulate images using rebinned spectrum files
+        guess *= parameters.CCD_REBIN
+        new_shape = np.asarray((parameters.CCD_IMSIZE, parameters.CCD_IMSIZE))
+        old_edge = parameters.CCD_IMSIZE * parameters.CCD_REBIN
+        image.gain = rebin(image.gain[:old_edge, :old_edge], new_shape, FLAG_MAKESUM=False)
+        image.read_out_noise = rebin(image.read_out_noise[:old_edge, :old_edge], new_shape, FLAG_MAKESUM=False)
+
     if parameters.DEBUG:
         image.plot_image(scale='symlog', target_pixcoords=guess)
     # Fit the star 2D profile
@@ -401,25 +524,31 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Background model
     my_logger.info('\n\tBackground model...')
     bgd_level = float(np.mean(spectrum.spectrogram_bgd))
-    background = BackgroundModel(level=bgd_level, frame=None)  # (1600, 1650, 100))
+    background = BackgroundModel(parameters.CCD_IMSIZE, parameters.CCD_IMSIZE, level=bgd_level, frame=None)
     if parameters.DEBUG:
         background.plot_model()
 
     # Target model
     my_logger.info('\n\tStar model...')
-    # Spectrogram is simulated with spectrum.x0 target position: must be this position to simualte the target.
-    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.params.values[0])
+    # Spectrogram is simulated with spectrum.x0 target position: must be this position to simulate the target.
+    star = StarModel(np.array(image.target_pixcoords) / parameters.CCD_REBIN, image.target_star2D, image.target_star2D.params.values[0])
     # reso = star.fwhm
     if parameters.DEBUG:
         star.plot_model()
+
     # Star field model
     starfield = None
-    if with_stars:
+    if with_starfield:
         my_logger.info('\n\tStar field model...')
-        starfield = StarFieldModel(image)
+        starfield = StarFieldModel(image, flux_factor=1)
+
+    # Flat model
+    flat = None
+    if with_flat:
+        my_logger.info('\n\tFlat model...')
+        flat = FlatModel(parameters.CCD_IMSIZE, parameters.CCD_IMSIZE, gains=[[1, 2, 3, 4], [4, 3, 2, 1]], randomness_level=1e-2)
         if parameters.DEBUG:
-            image.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
-            starfield.plot_model()
+            flat.plot_model()
 
     # Spectrum model
     my_logger.info('\n\tSpectrum model...')
@@ -455,14 +584,14 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # Simulate spectrogram
     atmosphere = Atmosphere(airmass, pressure, temperature)
-    spectrogram = SpectrogramModel(spectrum, atmosphere=atmosphere, with_background=False, fast_sim=False,
-                                   full_image=True, with_adr=with_adr, diffraction_orders=diffraction_orders)
+    spectrogram = SpectrogramModel(spectrum, atmosphere=atmosphere, fast_sim=False, full_image=True,
+                                   with_adr=with_adr, diffraction_orders=diffraction_orders)
     spectrogram.simulate(A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv,
-                         spectrum.disperser.D, 0, 0, rotation_angle, 1, psf_poly_params)
+                         parameters.DISTANCE2CCD, 0, 0, rotation_angle, psf_poly_params)
 
     # Image model
     my_logger.info('\n\tImage model...')
-    image.compute(star, background, spectrogram, starfield=starfield)
+    image.compute(star, background, spectrogram, starfield=starfield, flat=flat)
 
     # Recover true spectrum
     spectrogram.set_true_spectrum(spectrogram.lambdas, aerosols, ozone, pwv, shift_t=0)
@@ -470,11 +599,11 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     true_spectrum = np.copy(spectrogram.true_spectrum)
 
     # Saturation effects
-    saturated_pixels = np.where(spectrogram.spectrogram > image.saturation)[0]
+    saturated_pixels = np.where(spectrogram.spectrogram_data > image.saturation)[0]
     if len(saturated_pixels) > 0:
         my_logger.warning(f"\n\t{len(saturated_pixels)} saturated pixels detected above saturation "
                           f"level at {image.saturation} ADU/s in the spectrogram."
-                          f"\n\tSpectrogram maximum is at {np.max(spectrogram.spectrogram)} ADU/s.")
+                          f"\n\tSpectrogram maximum is at {np.max(spectrogram.spectrogram_data)} ADU/s.")
     image.data[image.data > image.saturation] = image.saturation
 
     # Convert data from ADU/s in ADU
@@ -486,6 +615,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # Round float ADU into closest integers
     # image.data = np.around(image.data)
+    if parameters.OBS_NAME == "AUXTEL":
+        image.data = image.data.T[::-1, ::-1]
 
     # Plot
     if parameters.VERBOSE and parameters.DISPLAY:  # pragma: no cover
@@ -496,7 +627,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Set output path
     ensure_dir(outputdir)
     output_filename = image_filename.split('/')[-1]
-    output_filename = (output_filename.replace('reduc', 'sim')).replace('trim', 'sim')
+    output_filename = (output_filename.replace('reduc', 'sim')).replace('trim', 'sim').replace('exposure', 'sim')
     output_filename = os.path.join(outputdir, output_filename)
 
     # Save images and parameters
@@ -505,22 +636,22 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['A3_T'] = A3
     image.header['X0_T'] = spectrum.x0[0]
     image.header['Y0_T'] = spectrum.x0[1]
-    image.header['D2CCD_T'] = float(spectrum.disperser.D)
+    image.header['D2CCD_T'] = float(parameters.DISTANCE2CCD)
     image.header['OZONE_T'] = ozone
     image.header['PWV_T'] = pwv
     image.header['VAOD_T'] = aerosols
     image.header['ROT_T'] = rotation_angle
     image.header['ROTATION'] = int(with_rotation)
-    image.header['STARS'] = int(with_stars)
+    image.header['STARS'] = int(with_starfield)
     image.header['BKGD_LEV'] = background.level
     image.header['PSF_DEG'] = spectrogram.chromatic_psf.deg
     image.header['PSF_TYPE'] = parameters.PSF_TYPE
     psf_poly_params_truth = np.array(psf_poly_params)
     if psf_poly_params_truth.size > spectrum.spectrogram_Nx:
         psf_poly_params_truth = psf_poly_params_truth[spectrum.spectrogram_Nx:]
-    image.header['LBDAS_T'] = np.array_str(true_lambdas, max_line_width=1000000, precision=2)
-    image.header['AMPLIS_T'] = np.array_str(true_spectrum, max_line_width=1000000, precision=2)
-    image.header['PSF_P_T'] = np.array_str(psf_poly_params_truth, max_line_width=1000000, precision=4)
+    image.header['LBDAS_T'] = str(np.round(true_lambdas, decimals=2).tolist())
+    image.header['AMPLIS_T'] = str(true_spectrum.tolist())
+    image.header['PSF_P_T'] = str(psf_poly_params_truth.tolist())
     image.save_image(output_filename, overwrite=True)
     return image
 

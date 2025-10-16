@@ -1,3 +1,5 @@
 FELH0600.txt from multispectra_FELH0600_holo4_003_HD142331_AuxTel_throughput.txt file, fit from 20220630 end of night Auxtel data
 BG40 is from vendor
 BG40_65mm_1 and OG550_65mm_1 are copied from BG40.txt
+
+- multispectra_holo4_003_HD142331_20230802_348-594_HD146233_AuxTel_v3.1.0_doSensorFlat_FreePressure_BG40ReScaled1.09_throughput.txt was created using v3.1.0 1a65d73cddf078472e7df082552cb75b6f39a9a4 commit, with 20230802 HD142331 data extracted with ratio 2/1 where BG40 data were rescaled by a factor 1.09, fixed A1s, binning=1, free angstrom exponent, free ozone, masking of curve edges and absorption lines

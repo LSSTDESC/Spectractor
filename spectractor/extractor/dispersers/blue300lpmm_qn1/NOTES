@@ -1,0 +1,4 @@
+Blue quad notch filter
+- ratio_order_2over1.txt: fake data
+- transmission.txt: from multispectra_blue300lpmm_qn1_HD142331_20230802_HD146233_AuxTel_v3.1.0_doSensorFlat_FreePressure_BG40ReScaled1.09_throughput.txt obtained with airmass regression on 20230802 night using multispectra_holo4_003_HD142331_20230802_348-594_HD146233_AuxTel_v3.1.0_doSensorFlat_FreePressure_BG40ReScaled1.09_throughput.txt as the AuxTel empty throughput (must be used together)
+# - transmission.txt: adapted from ShiftedT.dat file on confluence https://rubinobs.atlassian.net/wiki/spaces/LTS/pages/50075815/AuxTel+Filters and multiplied by Edmund 300lpmm blazed grating transmission curve from their spreadsheet; added an arbitrary 1% uncertainty
