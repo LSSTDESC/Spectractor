@@ -323,7 +323,7 @@ class Astrometry():  # pragma: no cover
         self.gaia_radec_positions_after_pm = None
         if os.path.isfile(self.gaia_file_name):
             self.my_logger.info(f"\n\tLoad Gaia catalog from {self.gaia_file_name}.")
-            self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
+            self.gaia_catalog = Table(ascii.read(self.gaia_file_name, format="ecsv"), masked=True)
             self.gaia_radec_positions_after_pm = get_gaia_coords_after_proper_motion(self.gaia_catalog, self.image.date_obs)
         self.sources = None
         self.sources_radec_positions = None
