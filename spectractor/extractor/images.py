@@ -12,6 +12,7 @@ from spectractor import parameters
 from spectractor.config import set_logger, load_config
 from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
+from spectractor.extractor.spectroscopy import Line
 from spectractor.extractor.psf import Moffat
 from spectractor.simulation.adr import hadec2zdpar
 from spectractor.simulation.throughput import TelescopeTransmission
@@ -34,14 +35,26 @@ class Image(object):
         Units of the image.
     data: array
         Image 2D array in self.units units.
-    stat_errors: array
+    err: array
         Image 2D uncertainty array in self.units units.
     target_pixcoords: array
         Target position [x,y] in the image in pixels.
     data_rotated: array
         Rotated image 2D array in self.units units.
-    stat_errors_rotated: array
+    err_rotated: array
         Rotated image 2D uncertainty array in self.units units.
+    flat: array
+        Flat 2D array without units and median of 1.
+    starfield: array
+        Star field simulation, no units needed but better in ADU/s.
+    mask: array
+        Boolean array to mask defects.
+    flat_rotated: array
+        Rotated flat 2D array without units and median of 1.
+    starfield_rotated: array
+        Rotated star field simulation, no units needed but better in ADU/s.
+    mask_rotated: array
+        Rotated boolean array to mask defects.
     target_pixcoords_rotated: array
         Target position [x,y] in the rotated image in pixels.
     date_obs: str
@@ -116,7 +129,7 @@ class Image(object):
             :hide:
 
             >>> assert im.data is not None and np.mean(im.data) > 0
-            >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
+            >>> assert im.err is not None and np.mean(im.err) > 0
             >>> assert im.header is not None
             >>> assert im.gain is not None and np.mean(im.gain) > 0
 
@@ -140,8 +153,8 @@ class Image(object):
         self.data_rotated = None
         self.gain = None  # in e-/ADU
         self.read_out_noise = None
-        self.stat_errors = None
-        self.stat_errors_rotated = None
+        self.err = None
+        self.err_rotated = None
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.saturation = None
@@ -153,6 +166,13 @@ class Image(object):
         self.temperature = 0
         self.pressure = 0
         self.humidity = 0
+
+        self.flat = None
+        self.flat_rotated = None
+        self.starfield = None
+        self.starfield_rotated = None
+        self.mask = None
+        self.mask_rotated = None
 
         if parameters.CALLING_CODE != 'LSST_DM' and file_name != "":
             self.load_image(file_name)
@@ -186,6 +206,29 @@ class Image(object):
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
             self.header['REDSHIFT'] = self.target.redshift
 
+        if self.disperser_label == "blue300lpmm_qn1":
+            QN1_1 = Line(396, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 1st band left edge
+            QN1_2 = Line(413.5, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 1st band right edge
+            QN1_3 = Line(405, atmospheric=True, label=r'$QN1$', label_pos=[0.007, 0.02], width_bounds=[1, 50], use_for_calibration=False) # QN 1st band center
+            QN2_1 = Line(481, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 2nd band left edge
+            QN2_2 = Line(494, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 2nd band right edge
+            QN2_3 = Line(487, atmospheric=True, label=r'$QN2$', label_pos=[0.007, 0.02], width_bounds=[1, 50], use_for_calibration=False) # QN 2nd band center
+            QN3_1 = Line(524, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 3rd band left edge
+            QN3_2 = Line(539, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 3rd band right edge
+            QN3_3 = Line(531, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[1, 50], use_for_calibration=False) # QN 3rd band center
+            QN4_1 = Line(620, atmospheric=True, label=r'$QN4$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 4th band left edge
+            QN = [QN1_1, QN1_2, QN2_1, QN2_2, QN3_1, QN3_2, QN4_1, QN1_3, QN2_3, QN3_3] 
+            for line in self.target.lines.lines:
+                # TODO: put this has an attribute of the disperser of filter
+                if 410 < line.wavelength < 415 or 475 < line.wavelength < 500 or 520 < line.wavelength < 545 or 610 < line.wavelength:
+                    line.use_for_calibration = False
+            
+            for l in QN:
+                self.target.lines.lines.append(l)
+            _ = self.target.lines.sort_lines()
+            self.target.lines.sort_lines()
+            
+
     def rebin(self):
         """Rebin the image and reset some related parameters.
 
@@ -193,20 +236,28 @@ class Image(object):
         --------
         >>> parameters.CCD_REBIN = 2
         >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im.mask = np.zeros_like(im.data).astype(bool)
+        >>> im.mask[700:750, 800:850] = True
         >>> im.target_guess = [810, 590]
         >>> im.data.shape
         (2048, 2048)
         >>> im.rebin()
         >>> im.data.shape
         (1024, 1024)
-        >>> im.stat_errors.shape
+        >>> im.err.shape
         (1024, 1024)
         >>> im.target_guess
         array([405., 295.])
         """
         new_shape = np.asarray(self.data.shape) // parameters.CCD_REBIN
         self.data = rebin(self.data, new_shape)
-        self.stat_errors = np.sqrt(rebin(self.stat_errors ** 2, new_shape))
+        self.err = np.sqrt(rebin(self.err ** 2, new_shape))
+        if self.mask is not None:
+            self.mask = rebin(self.mask, new_shape, FLAG_MAKESUM=True).astype(bool)
+        if self.flat is not None:
+            self.flat = rebin(self.flat, new_shape, FLAG_MAKESUM=False)
+        if self.starfield is not None:
+            self.starfield = rebin(self.starfield, new_shape)
         if self.target_guess is not None:
             self.target_guess = np.asarray(self.target_guess) / parameters.CCD_REBIN
 
@@ -244,8 +295,7 @@ class Image(object):
         self.header['OUTHUM'] = self.humidity
         self.header['CCDREBIN'] = parameters.CCD_REBIN
 
-        self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
-                                  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+        self.disperser = Hologram(self.disperser_label, data_dir=parameters.DISPERSER_DIR)
         self.compute_statistical_error()
         self.convert_to_ADU_rate_units()
 
@@ -284,9 +334,9 @@ class Image(object):
             >>> assert np.all(np.isclose(data_before, im.data * im.expo))
         """
         self.data = self.data.astype(np.float64) / self.expo
-        self.stat_errors /= self.expo
-        if self.stat_errors_rotated is not None:
-            self.stat_errors_rotated /= self.expo
+        self.err /= self.expo
+        if self.err_rotated is not None:
+            self.err_rotated /= self.expo
         self.units = 'ADU/s'
 
     def convert_to_ADU_units(self):
@@ -308,9 +358,9 @@ class Image(object):
             >>> assert np.all(np.isclose(data_before, im.data))
         """
         self.data *= self.expo
-        self.stat_errors *= self.expo
-        if self.stat_errors_rotated is not None:
-            self.stat_errors_rotated *= self.expo
+        self.err *= self.expo
+        if self.err_rotated is not None:
+            self.err_rotated *= self.expo
         self.units = 'ADU'
 
     def compute_statistical_error(self):
@@ -350,11 +400,11 @@ class Image(object):
         # remove negative values (due to dead columns for instance
         min_noz = np.min(err2[err2 > 0])
         err2[err2 <= 0] = min_noz
-        self.stat_errors = np.sqrt(err2)
+        self.err = np.sqrt(err2)
         # convert in ADU
-        self.stat_errors /= self.gain
+        self.err /= self.gain
         # check uncertainty model
-        self.check_statistical_error()
+        # self.check_statistical_error()
 
     def check_statistical_error(self):
         """Check that statistical uncertainty map follows the input uncertainty model
@@ -396,19 +446,17 @@ class Image(object):
             raise AttributeError(f"Noise map must be in ADU units to be plotted and analyzed. "
                                  f"Currently self.units={self.units}.")
         data = np.copy(self.data)
-        min_noz = np.min(data[data > 0])
-        data[data <= 0] = min_noz
-        y = self.stat_errors.flatten() ** 2
-        x = data.flatten()
+        y = self.err[data > 0].flatten() ** 2
+        x = data[data > 0].flatten()
         fit, cov, model = fit_poly1d(x, y, order=1)
         gain = 1 / fit[0]
         read_out = np.sqrt(fit[1]) * gain
         if not np.isclose(gain, np.nanmean(self.gain), rtol=1e-2):
             self.my_logger.warning(f"\n\tFitted gain seems to be different than input gain. "
                                    f"Fit={gain} but average of self.gain is {np.nanmean(self.gain)}.")
-        if not np.isclose(read_out / parameters.CCD_REBIN, np.nanmean(self.read_out_noise), rtol=1e-2):
+        if not np.isclose(read_out, np.nanmean(self.read_out_noise), rtol=1e-1):
             self.my_logger.warning(f"\n\tFitted read out noise seems to be different than input readout noise. "
-                                   f"Fit={read_out / parameters.CCD_REBIN} but average of self.read_out_noise is "
+                                   f"Fit={read_out} but average of self.read_out_noise is "
                                    f"{np.nanmean(self.read_out_noise)}.")
         return fit, x, y, model
 
@@ -446,7 +494,7 @@ class Image(object):
         ax[0].grid()
         ax[0].set_ylabel(r"$\sigma_{\mathrm{ADU}}^2$ [ADU$^2$]")
         ax[0].set_xlabel(r"Data pixel values [ADU]")
-        plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Statistical uncertainty map",
+        plot_image_simple(ax[1], data=self.err, scale="log10", title="Statistical uncertainty map",
                           units=self.units, target_pixcoords=None, aspect="auto", cmap=None)
         fig.tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
@@ -471,7 +519,7 @@ class Image(object):
 
     def plot_image(self, ax=None, scale="lin", title="", units="", plot_stats=False,
                    target_pixcoords=None, figsize=(7.3, 6), aspect=None, vmin=None, vmax=None,
-                   cmap=None, cax=None):
+                   cmap=None, cax=None, use_flat=True):
         """Plot image.
 
         Parameters
@@ -500,10 +548,14 @@ class Image(object):
             Figure size (default: [9.3, 8]).
         plot_stats: bool
             If True, plot the uncertainty map instead of the image (default: False).
+        use_flat: bool
+            If True and self.flat exists, divide the image by the flat (default: True).
 
         Examples
         --------
         >>> im = Image('tests/data/reduc_20170605_028.fits', config="./config/ctio.ini")
+        >>> im.mask = np.zeros_like(im.data).astype(bool)
+        >>> im.mask[700:705, 1250:1260] = True  # test masking of some pixels like cosmic rays
         >>> im.plot_image(target_pixcoords=[820, 580], scale="symlog")
         >>> if parameters.DISPLAY: plt.show()
         """
@@ -512,10 +564,12 @@ class Image(object):
             ax = plt.gca()
         data = np.copy(self.data)
         if plot_stats:
-            data = np.copy(self.stat_errors)
+            data = np.copy(self.err)
         if units == "":
             units = self.units
-        plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
+        if self.flat is not None and use_flat:
+            data /= self.flat
+        plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax, mask=self.mask,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         if parameters.OBS_OBJECT_TYPE == "STAR":
             plot_compass_simple(ax, self.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
@@ -527,6 +581,16 @@ class Image(object):
             plt.show()
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
+
+    def simulate_starfield_with_gaia(self):
+        from spectractor.simulation.image_simulation import StarFieldModel
+        starfield = StarFieldModel(self, flux_factor=1)
+        yy, xx = np.mgrid[0:self.data.shape[1]:1, 0:self.data.shape[0]:1]
+        starfield.model(xx, yy)
+        if parameters.DEBUG:
+            self.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
+            starfield.plot_model()
+        return starfield.field
 
 
 def load_CTIO_image(image):
@@ -566,6 +630,8 @@ def load_CTIO_image(image):
     # compute CCD gain map
     build_CTIO_gain_map(image)
     build_CTIO_read_out_noise_map(image)
+    image.flat = image.gain / np.mean(image.gain)
+    # parallactic angle
     image.compute_parallactic_angle()
     # WCS
     wcs_file_name = set_wcs_file_name(image.file_name)
@@ -679,7 +745,10 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.my_logger.info(f'\n\tLoading AUXTEL image {image.file_name}...')
     with fits.open(image.file_name) as hdu_list:
         image.header = hdu_list[0].header
-        image.data = hdu_list[1].data.astype(np.float64)
+        if hdu_list[0].data is not None:
+            image.data = hdu_list[0].data.astype(np.float64)
+        else:
+            image.data = hdu_list[1].data.astype(np.float64)
     image.date_obs = image.header['DATE']
     image.expo = float(image.header['EXPTIME'])
     if "empty" not in image.header['FILTER'].lower():
@@ -722,7 +791,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     if parameters.OBS_CAMERA_ROTATION < -360:
         parameters.OBS_CAMERA_ROTATION += 360
     image.header["CAM_ROT"] = parameters.OBS_CAMERA_ROTATION
-    if "CD2_1" in hdu_list[1].header:
+    if len(hdu_list) > 1 and "CD2_1" in hdu_list[1].header:
         rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[1].header["CD2_1"], hdu_list[1].header["CD1_1"]) + 90
         if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=2):
             image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degree while "
@@ -850,7 +919,8 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     theX = -1
     theY = -1
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
-        target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
+        target_coord_after_motion = image.target.get_radec_position_after_pm(image.target.simbad_table, date_obs=image.date_obs)
+        image.my_logger.info(f'\n\tTarget position after motion: {target_coord_after_motion}  {image.date_obs} {image.target_label} {image.target.simbad_table}')
         target_pixcoords = np.array(image.wcs.all_world2pix(target_coord_after_motion.ra,
                                                         target_coord_after_motion.dec, 0))
         theX, theY = target_pixcoords / parameters.CCD_REBIN
@@ -916,7 +986,7 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
             sub_image_y0 = target_pixcoords[1] - y0 + Dy
     elif parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "guess":
         Dx, Dy = widths
-        sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=target_pixcoords,
+        sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess,
                                                                             rotated=rotated, widths=(Dx, Dy))
         theX, theY = guess
         sub_image_x0 = theX - x0 + Dx
@@ -934,6 +1004,8 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
         image.target.image_x0 = sub_image_x0
         image.target.image_y0 = sub_image_y0
         image.target_pixcoords = [theX, theY]
+        if image.starfield is not None:
+            image.target.starfield = np.copy(image.starfield[int(theY) - Dy:int(theY) + Dy, int(theX) - Dx:int(theX) + Dx])
         image.header['TARGETX'] = theX
         image.header.comments['TARGETX'] = 'target position on X axis'
         image.header['TARGETY'] = theY
@@ -982,12 +1054,30 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     x0 = int(guess[0])
     y0 = int(guess[1])
     Dx, Dy = widths
+    
+    # crop parameters
+    subYmin, subYmax = y0 - Dy, y0 + Dy
+    subXmin, subXmax = x0 - Dx, x0 + Dx
+
+    sizeY, sizeX = np.shape(image.data) if not rotated else np.shape(image.data_rotated)
+
+    # verify if the sub image is out of bounds
+    if subYmin < 0 or subXmin < 0 or subYmax >= sizeY or subXmax >= sizeX:
+        
+        old_subYmin, old_subYmax, old_subXmin, old_subXmax = subYmin, subYmax, subXmin, subXmax
+
+        subYmin, subXmin = max(0,       subYmin), max(0,       subXmin)
+        subYmax, subXmax = min(sizeY-1, subYmax), min(sizeX-1, subXmax)
+
+        image.my_logger.warning(f'\tSub image is out of bounds : [{old_subYmin}:{old_subYmax}, {old_subXmin}:{old_subXmax}] to [{subYmin}:{subYmax}, {subXmin}:{subXmax}]')
+
+
     if rotated:
-        sub_image = np.copy(image.data_rotated[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
-        sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
+        sub_image = np.copy(image.data_rotated[subYmin:subYmax, subXmin:subXmax])
+        sub_errors = np.copy(image.err[subYmin:subYmax, subXmin:subXmax])
     else:
-        sub_image = np.copy(image.data[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
-        sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
+        sub_image = np.copy(image.data[subYmin:subYmax, subXmin:subXmax])
+        sub_errors = np.copy(image.err[subYmin:subYmax, subXmin:subXmax])
 
     # usually one rebin by adding pixel contents
     image.saturation = parameters.CCD_MAXADU / image.expo *parameters.CCD_REBIN**2
@@ -1411,11 +1501,21 @@ def turn_image(image):
     if not np.isnan(image.rotation_angle):
         image.data_rotated = ndimage.rotate(image.data, image.rotation_angle,
                                             prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
-        image.stat_errors_rotated = np.sqrt(
-            np.abs(ndimage.rotate(image.stat_errors ** 2, image.rotation_angle,
+        image.err_rotated = np.sqrt(
+            np.abs(ndimage.rotate(image.err ** 2, image.rotation_angle,
                                   prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)))
-        min_noz = np.min(image.stat_errors_rotated[image.stat_errors_rotated > 0])
-        image.stat_errors_rotated[image.stat_errors_rotated <= 0] = min_noz
+        min_noz = np.min(image.err_rotated[image.err_rotated > 0])
+        image.err_rotated[image.err_rotated <= 0] = min_noz
+        if image.flat is not None:
+            image.flat_rotated = ndimage.rotate(image.flat, image.rotation_angle,
+                                                prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
+        if image.starfield is not None:
+            image.starfield_rotated = ndimage.rotate(image.starfield, image.rotation_angle,
+                                                     prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
+        if image.mask is not None:
+            image.mask_rotated = ndimage.rotate(image.mask, image.rotation_angle,
+                                                prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
+
     if parameters.DEBUG:
         margin = 100 // parameters.CCD_REBIN
         y0 = int(image.target_pixcoords[1])

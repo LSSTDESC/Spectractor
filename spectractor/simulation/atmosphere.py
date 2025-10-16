@@ -34,6 +34,7 @@ class Atmosphere:
 
         Examples
         --------
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM='libradtran'
         >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
         >>> print(a.airmass)
         1.2
@@ -99,6 +100,7 @@ class Atmosphere:
 
         Examples
         --------
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM='libradtran'
         >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5, lambda_min=350, lambda_max=1000)
         >>> a.lambda_min
         350
@@ -160,8 +162,7 @@ class Atmosphere:
 
         >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> transmission_ang_exp2 = a.simulate(aerosols=0.05, ozone=400, pwv=5, angstrom_exponent=2)
-        >>> transmission_ang_exp2([350, 550, 600, 800, 950])
-        array([0.4846117, 0.8323524, 0.8426985, 0.9465884, 0.71872  ])
+        >>> assert np.isclose(transmission_ang_exp2([350, 550, 600, 800, 950]), [0.4846117, 0.8323524, 0.8426985, 0.9465884, 0.71872], 1e-5).all()
 
         .. doctest::
             :hide:
@@ -213,6 +214,7 @@ class Atmosphere:
 
         Examples
         --------
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM='libradtran'
         >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
         >>> transmission = a.simulate(ozone=400, pwv=5, aerosols=0.05)
         >>> a.plot_transmission()

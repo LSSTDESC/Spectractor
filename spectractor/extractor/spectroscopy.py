@@ -14,7 +14,7 @@ class Line:
     """Class modeling the emission or absorption lines."""
 
     def __init__(self, wavelength, label, atmospheric=False, emission=False, label_pos=[0.007, 0.02],
-                 width_bounds=[0.5, 6], use_for_calibration=False):
+                 width_bounds=[1, 6], use_for_calibration=False):
         """Class modeling the emission or absorption lines. lines attributes contains main spectral lines
         sorted in wavelength.
 
@@ -155,7 +155,7 @@ class Lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES, redshift=0, atmospheric_lines=False, hydrogen_only=False, emission_spectrum=False)
         >>> print([lines.lines[i].wavelength for i in range(5)])
-        [353.1, 388.8, 397.0, 410.2, 434.0]
+        [353.1, 375.0, 377.1, 379.8, 383.5]
 
         The four hydrogen lines only:
 
@@ -175,12 +175,12 @@ class Lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(5)])
-        [687.472, 706.2, 760.3, 763.1, 777.6]
-
+        [687.472, 706.2, 750.0, 754.2, 759.6]
+        
         Hydrogen lines at order 1 and 2:
         >>> lines = Lines(HYDROGEN_LINES, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True, orders=[1, 2])
         >>> print([lines.lines[i].wavelength for i in range(len(lines.lines))])
-        [397.0, 410.2, 434.0, 486.3, 656.3, 794.0, 820.4, 868.0, 972.6, 1312.6]
+        [375.0, 377.1, 379.8, 383.5, 388.9, 397.0, 410.2, 434.0, 486.3, 656.3, 750.0, 754.2, 759.6, 767.0, 777.8, 794.0, 820.4, 868.0, 972.6, 1312.6]
 
         Negative redshift:
 
@@ -224,7 +224,7 @@ class Lines:
         >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=0)
         >>> sorted_lines = lines.sort_lines()
         >>> print([l.wavelength for l in sorted_lines][:5])
-        [397.0, 410.2, 434.0, 486.3, 656.3]
+        [375.0, 377.1, 379.8, 383.5, 388.9]
         """
         sorted_lines = []
         import copy
@@ -353,12 +353,12 @@ class Lines:
 
         >>> lines = Lines([HALPHA, HBETA, O2_1], hydrogen_only=True,
         ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
-        >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
+        >>> global_chisq, res, ws = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
 
         .. doctest::
             :hide:
 
-            >>> assert(global_chisq < 1)
+            >>> assert(global_chisq < 1.)
 
         Plot the result:
 
@@ -386,7 +386,7 @@ class Lines:
             spec.err = spectrum_err
             fwhm_func = interp1d(lambdas, 0.01 * lambdas)
             lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True, atmospheric_lines=True, redshift=0, emission_spectrum=True)
-            global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
+            global_chisq, res, ws = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
             spec.lines = lines
             fig = plt.figure()
             plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)
@@ -448,8 +448,8 @@ class Lines:
 
         >>> lines = Lines([HALPHA, HBETA, O2_1], hydrogen_only=True,
         ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
-        >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
-        >>> assert(global_chisq < 1)
+        >>> global_chisq, res, ws = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
+        >>> assert(global_chisq < 1.)
 
         Print the result
 
@@ -501,10 +501,15 @@ class Lines:
 # Hydrogen lines
 HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.02, 0.02], use_for_calibration=True)
 HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
-HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=False)
-HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=False)
-HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.02, 0.02], use_for_calibration=False)
-HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON]
+HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=True)
+HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=True)
+HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.02, 0.02], use_for_calibration=True)
+H8 = Line(388.9, atmospheric=False, label='$H8$', label_pos=[-0.02, 0.02], use_for_calibration=True)
+H9 = Line(383.5, atmospheric=False, label='$H9$', label_pos=[-0.02, 0.02], use_for_calibration=False)
+H10 = Line(379.8, atmospheric=False, label='$H10$', label_pos=[-0.02, 0.02], use_for_calibration=False)
+H11 = Line(377.1, atmospheric=False, label='$H11$', label_pos=[-0.02, 0.02], use_for_calibration=False)
+H12 = Line(375.0, atmospheric=False, label='$H12$', label_pos=[-0.02, 0.02], use_for_calibration=False)
+HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON, H8, H9, H10, H11, H12]
 
 # Stellar lines (Fraunhofer lines) https://en.wikipedia.org/wiki/Fraunhofer_lines
 FE1 = Line(382.044, atmospheric=False, label=r'$Fe_{I}$', label_pos=[-0.016, 0.02])
