@@ -1097,7 +1097,7 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
             f'to {image.saturation} {image.units}.')
         sub_errors[sub_image >= 0.99 * image.saturation] = 10 * image.saturation  # np.min(np.abs(sub_errors))
     # sub_image = clean_target_spikes(sub_image, image.saturation)
-    return sub_image_subtracted, x0, y0, Dx, Dy, sub_errors
+    return sub_image_subtracted, x0, y0, x0-subXmin, y0-subYmin, sub_errors
 
 
 def find_target_1Dprofile(image, sub_image, guess):
