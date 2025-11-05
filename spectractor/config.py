@@ -1,7 +1,7 @@
 import configparser
 import os
-import shutil
 import re
+import shutil
 
 import astropy.units.quantity
 import numpy as np
@@ -10,6 +10,7 @@ import astropy.units as units
 from astropy import constants as const
 
 from spectractor import parameters
+
 if not parameters.CALLING_CODE:
     import coloredlogs
 
@@ -18,27 +19,27 @@ logging.getLogger("numba").setLevel(logging.ERROR)
 logging.getLogger("h5py").setLevel(logging.ERROR)
 
 
-def from_config_to_parameters(config):
-    """Convert config file keywords into spectractor.parameters parameters.
+def from_config_to_dict(path):
+    """Convert config file keywords into dictionnary.
 
     Parameters
     ----------
-    config: ConfigParser
-        The ConfigParser instance to convert
+    path: str
+        The path to the config file.
 
     Examples
     --------
-
-    >>> config = configparser.ConfigParser()
     >>> mypath = os.path.dirname(__file__)
-    >>> config.read(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini"))  # doctest: +ELLIPSIS
-    ['/.../config/default.ini']
-    >>> from_config_to_parameters(config)
-    >>> assert parameters.OBS_NAME == "DEFAULT"
+    >>> out = from_config_to_dict(os.path.join(mypath, "../config/", "default.ini"))
+    >>> assert type(out) == dict
 
     """
     # List all contents
+    config = configparser.ConfigParser()
+    config.read(path)
+    out = {}
     for section in config.sections():
+        out[section] = {}
         for options in config.options(section):
             value = config.get(section, options)
             if re.match(r"[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?", value):
@@ -52,7 +53,31 @@ def from_config_to_parameters(config):
                 value = config.getboolean(section, options)
             else:
                 value = str(value)
-            setattr(parameters, options.upper(), value)
+            out[section][options] = value
+    return out
+
+
+def from_config_to_parameters(path):
+    """Convert config file keywords into spectractor.parameters parameters.
+
+    Parameters
+    ----------
+    path: str
+        The path to the config file.
+
+    Examples
+    --------
+
+    >>> mypath = os.path.dirname(__file__)
+    >>> from_config_to_parameters(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini"))
+    >>> assert parameters.OBS_NAME == "DEFAULT"
+
+    """
+    # List all contents
+    d = from_config_to_dict(path)
+    for section in d.keys():
+        for options in d[section].keys():
+            setattr(parameters, options.upper(), d[section][options])
 
 
 def load_config(config_filename, rebin=True):
@@ -88,9 +113,7 @@ def load_config(config_filename, rebin=True):
     if not os.path.isfile(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini")):
         raise FileNotFoundError('Config file default.ini does not exist.')
     # Load the configuration file
-    config = configparser.ConfigParser()
-    config.read(os.path.join(parameters.CONFIG_DIR, "default.ini"))
-    from_config_to_parameters(config)
+    from_config_to_parameters(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini"))
 
     if not os.path.isfile(config_filename):
         if not os.path.isfile(os.path.join(mypath, parameters.CONFIG_DIR, config_filename)):
@@ -99,9 +122,7 @@ def load_config(config_filename, rebin=True):
             config_filename = os.path.join(mypath, parameters.CONFIG_DIR, config_filename)
     # Load the configuration file
     my_logger.info(f"\n\tLoading {config_filename} with {parameters.VERBOSE=}...")
-    config = configparser.ConfigParser()
-    config.read(config_filename)
-    from_config_to_parameters(config)
+    from_config_to_parameters(config_filename)
 
     # Derive other parameters
     update_derived_parameters()
@@ -115,6 +136,10 @@ def load_config(config_filename, rebin=True):
     # check consistency
     if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:
         raise ValueError(f'parameters.PIXWIDTH_BOXSIZE must be smaller than parameters.PIXWIDTH_BACKGROUND (or equal).')
+
+    # check consistency
+    if parameters.PSF_POLY_TYPE not in ["polynomial", "legendre"]:
+        raise ValueError(f'parameters.PSF_POLY_TYPE must be either "polynomial" or "legendre". Got {parameters.PSF_POLY_TYPE=}')
 
     # check presence of atmospheric simulation packages
     if parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() not in ["none", "libradtran", "getobsatmo"]:
@@ -133,6 +158,9 @@ def load_config(config_filename, rebin=True):
     # verbosity
     if parameters.VERBOSE or parameters.DEBUG:
         txt = ""
+        # default.ini should be the config file with the most parameters
+        config = configparser.ConfigParser()
+        config.read(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini"))
         for section in config.sections():
             txt += f"Section: {section}\n"
             for options in config.options(section):
@@ -145,17 +173,12 @@ def update_derived_parameters():
     # Derive other parameters
     parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
     parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, parameters.LAMBDA_STEP)
-    parameters.CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
     if not isinstance(parameters.OBS_SURFACE, astropy.units.quantity.Quantity):
         parameters.OBS_SURFACE *= units.cm ** 2  # Surface of telescope
-    # Conversion factor
     # Units of SEDs in flam (erg/s/cm2/nm) :
-    parameters.hc = const.h * const.c  # h.c product of fundamental constants c and h
-    parameters.SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
-    parameters.TIME_UNIT = 1 * units.s  # flux for 1 second
-    parameters.wl_dwl_unit = units.nanometer ** 2  # lambda.dlambda  in wavelength in nm
-    parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * parameters.SED_UNIT * parameters.TIME_UNIT
-                                   * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
+    SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
+    parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * SED_UNIT * units.s
+                                   * units.nanometer ** 2 / (const.h * const.c) / parameters.CCD_GAIN).decompose()).value
 
 
 def apply_rebinning_to_parameters():

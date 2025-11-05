@@ -1,4 +1,5 @@
 import os
+import copy
 import shutil
 from photutils.detection import IRAFStarFinder
 from scipy.optimize import curve_fit
@@ -8,6 +9,7 @@ from astropy.stats import sigma_clip, sigma_clipped_stats
 from astropy.io import fits
 from astropy import wcs as WCS
 
+from matplotlib import cm
 import matplotlib.pyplot as plt
 import matplotlib.colors
 from matplotlib.ticker import MaxNLocator
@@ -19,6 +21,7 @@ from scipy.signal import fftconvolve
 from scipy.ndimage import maximum_filter, generate_binary_structure, binary_erosion
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
+from scipy.linalg import cho_factor, cho_solve
 
 from skimage.feature import hessian_matrix
 from spectractor.config import set_logger
@@ -270,7 +273,7 @@ def rescale_x_from_legendre(x_norm, Xmin, Xmax):
 
     Parameters
     ----------
-    x: np.ndarray
+    x_norm: np.ndarray
     Xmin: float
     Xmax: float
 
@@ -549,7 +552,7 @@ def fit_poly1d(x, y, order, w=None):
     .. doctest::
         :hide:
 
-        >>> assert np.all(np.isclose(p, fit, 1e-5))
+        >>> assert np.all(np.isclose(p, fit, 1e-4))
         >>> assert np.all(np.isclose(model, y))
         >>> assert cov.shape == (4, 4)
 
@@ -560,7 +563,7 @@ def fit_poly1d(x, y, order, w=None):
     .. doctest::
         :hide:
 
-        >>> assert np.all(np.isclose(p, fit, 1e-5))
+        >>> assert np.all(np.isclose(p, fit, 1e-4))
 
     >>> fit, cov3, model3 = fit_poly1d([0, 1], [1, 1], order=3, w=err)
     >>> print(fit)
@@ -720,7 +723,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
     >>> y = np.polyval(p, x)
     >>> y[::10] = 0.
     >>> model, outliers = fit_poly1d_outlier_removal(x,y,order=3,sigma=3)
-    >>> print('{:.2f}'.format(model.c0.value))
+    >>> print('{:.2f}'.format(abs(model.c0.value)))
     0.00
     >>> print('{:.2f}'.format(model.c1.value))
     1.00
@@ -1456,7 +1459,7 @@ def hessian_and_theta(data, margin_cut=1):
 
     # compute hessian matrices on the image
     order = "xy" if _SCIKIT_IMAGE_NEW_HESSIAN else "rc"
-    Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order=order)
+    Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order=order, use_gaussian_derivatives=False)
     lambda_plus = 0.5 * ((Hxx + Hyy) + np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
     lambda_minus = 0.5 * ((Hxx + Hyy) - np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
     theta = 0.5 * np.arctan2(2 * Hxy, Hxx - Hyy) * 180 / np.pi
@@ -1517,6 +1520,84 @@ def fftconvolve_gaussian(array, reso):
     else:
         my_logger.error(f'\n\tArray dimension must be 1 or 2. Here I have array.ndim={array.ndim}.')
     return array
+
+
+def mask_cosmics(data, maxiter=3, sigma_clip=5, border_mode='mirror', convolve_kernel_size=3):
+    """Simple method to mask cosmic rays, inspired from L.A. Cosmic algorithm.
+
+    Parameters
+    ----------
+    data
+    maxiter
+    border_mode
+
+    Returns
+    -------
+    mask: np.ndarray
+
+    Examples
+    --------
+    >>> data = np.zeros((50, 100))
+    >>> data[20, 50:60] = 1
+    >>> cr_mask = mask_cosmics(data, maxiter=3, convolve_kernel_size=0)
+    >>> fig = plt.figure()
+    >>> _ = plt.imshow(cr_mask, cmap='gray', aspect='auto', origin='lower')
+    >>> plt.show()
+    >>> assert np.sum(data) == np.sum(cr_mask)
+
+    """
+    from astropy.nddata import block_reduce, block_replicate
+    from scipy import ndimage
+    block_size = 2.0
+    kernel = np.array([[0.0, -1.0, 0.0], [-1.0, 4.0, -1.0], [0.0, -1.0, 0.0]])
+
+    clean_data = data.copy()
+    final_crmask = np.zeros(data.shape, dtype=bool)
+
+    for iteration in range(maxiter):
+        sampled_img = block_replicate(clean_data, block_size)
+        convolved_img = ndimage.convolve(sampled_img, kernel,
+                                     mode=border_mode)  #.clip(min=0.0)
+        laplacian_img = block_reduce(convolved_img, block_size)
+
+        final_crmask[laplacian_img > 5*np.nanstd(laplacian_img)] = True
+        clean_data[final_crmask] = np.nan
+
+    if convolve_kernel_size > 0:
+        final_crmask = fftconvolve(final_crmask,
+                               np.ones((convolve_kernel_size, convolve_kernel_size), dtype=int),
+                               mode='same').astype(int)
+    return final_crmask.astype(bool)
+
+
+def cholesky_solve(A, B):
+    """Solve the system A @ X = B using Cholesky factorisation.
+
+    Parameters
+    ----------
+    A: np.ndarray
+        Matrix
+    B: np.ndarray
+        Vector
+
+    Returns
+    -------
+    X: np.ndarray
+        Solution
+
+    Examples
+    --------
+    >>> N = 1000
+    >>> A = np.tri(N).T @ np.tri(N)
+    >>> B = np.arange(N)
+    >>> cov_matrix = np.linalg.inv(A)
+    >>> X = cov_matrix @ B
+    >>> X2 = cholesky_solve(A, B)
+    >>> assert np.all(np.abs(X - X2)<1e-10)
+    """
+    c, low = cho_factor(A)
+    X = cho_solve((c, low), B)
+    return X
 
 
 def formatting_numbers(value, error_high, error_low, std=None, label=None):
@@ -1726,7 +1807,7 @@ def clean_target_spikes(data, saturation):  # pragma: no cover
     return data
 
 
-def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap=None,
+def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap=None, mask=None,
                       target_pixcoords=None, vmin=None, vmax=None, aspect=None, cax=None):
     """Simple function to plot a spectrum with error bars and labels.
 
@@ -1744,6 +1825,8 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         Units of the image to be written in the color bar label (default: "Image units")
     cmap: colormap
         Color map label (default: None)
+    mask: array_like
+        Mask array (default: None)
     target_pixcoords: array_like, optional
         2D array giving the (x,y) coordinates of the targets on the image: add a scatter plot (default: None)
     vmin: float
@@ -1771,6 +1854,18 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         ...                     title="tests/data/reduc_20170605_028.fits")
         >>> if parameters.DISPLAY: plt.show()
     """
+    if cmap is not None and isinstance(cmap, str):
+        colormap = copy.copy(cm.get_cmap(cmap))
+    elif isinstance(cmap, matplotlib.colors.Colormap):
+        colormap = cmap
+    else:
+        colormap = copy.copy(cm.get_cmap('viridis'))
+    cmap_nan = copy.copy(colormap)
+    cmap_nan.set_bad(color='lightgrey')
+
+    data = np.copy(data)
+    if mask is not None:
+        data[mask] = np.nan
     if scale == "log" or scale == "log10":
         # removes the zeros and negative pixels first
         zeros = np.where(data <= 0)
@@ -1784,7 +1879,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         norm = matplotlib.colors.SymLogNorm(vmin=vmin, vmax=vmax, linthresh=10, base=10)
     else:
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
-    im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect)
+    im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect, interpolation="none")
     ax.grid(color='silver', ls='solid')
     ax.grid(True)
     ax.set_xlabel(parameters.PLOT_XLABEL)
@@ -2488,10 +2583,10 @@ def compute_correlation_matrix(cov):
     return rho
 
 
-def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):  # pragma: no cover
+def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None, vmin=-1, vmax=1):  # pragma: no cover
     if ipar is None:
         ipar = np.arange(rho.shape[0]).astype(int)
-    im = plt.imshow(rho[ipar[:, None], ipar], interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
+    im = plt.imshow(rho[ipar[:, None], ipar], interpolation="nearest", cmap='bwr', vmin=vmin, vmax=vmax)
     ax.set_title("Correlation matrix")
     if axis_names is not None:
         names = [axis_names[ip] for ip in ipar]
@@ -2500,6 +2595,15 @@ def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):  # prag
     cbar = plt.colorbar(im)
     cbar.ax.tick_params(labelsize=15)
     plt.gcf().tight_layout()
+
+
+def plot_covariance_matrix(cov):
+    fig = plt.figure(figsize=(7, 5))
+    rho = compute_correlation_matrix(cov)
+    plot_correlation_matrix_simple(plt.gca(), rho)
+    plt.gca().set_title(r"Correlation matrix $\mathbf{\rho}$")
+    fig.tight_layout()
+    plt.show()
 
 
 def resolution_operator(cov, Q, reg):

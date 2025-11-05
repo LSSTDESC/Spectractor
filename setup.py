@@ -4,6 +4,18 @@ import re
 
 reqs = []
 
+
+def package_files(directory):
+    paths = []
+    for (path, directories, filenames) in os.walk(directory):
+        for filename in filenames:
+            paths.append( os.path.join("..", path, filename))
+    return paths
+
+
+disperser_files = package_files('./spectractor/extractor/dispersers')
+
+
 # skip using requirements.txt in a CONDA environment
 if os.getenv('CONDA_PREFIX') is None:
     reqs = open('requirements.txt', 'r').read().strip().splitlines()
@@ -30,19 +42,13 @@ setup(
     version=current_version,
     packages=['spectractor', 'spectractor.extractor', 'spectractor.simulation', 'spectractor.fit'],
     install_requires=reqs,
-    test_suite='nose.collector',
-    tests_require=['nose'],
     package_dir={'spectractor': './spectractor'},
-    package_data={'spectractor': ['../config/*.ini'],
-                  'spectractor.extractor': ['dispersers/HoloPhAg/*.txt', 'dispersers/HoloPhP/*.txt',
-                                            'dispersers/HoloAmAg/*.txt', 'dispersers/Thor300/*.txt',
-                                            'dispersers/Ron200/*.txt', 'dispersers/Ron400/*.txt',
-                                            'dispersers/holo4_003/*.txt','dispersers/ronchi170lpmm/*.txt',
-                                            'dispersers/ronchi90lpmm/*.txt', 'dispersers/star_analyzer_200/*.txt'],
+    package_data={'': disperser_files,
+                  'spectractor': ['../config/*.ini'],
                   'spectractor.simulation': ['CTIOThroughput/*.txt', 'AuxTelThroughput/*.txt', 'StarDiceThroughput/*.txt']},
     url='https://github.com/LSSTDESC/Spectractor',
     license='BSD',
-    python_requires='>=3.7',
+    python_requires='>=3.9',
     author='J. Neveu, S. Dagoret-Campagne',
     author_email='jeremy.neveu@universite-paris-saclay.fr',
     description='',

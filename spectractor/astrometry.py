@@ -323,7 +323,7 @@ class Astrometry():  # pragma: no cover
         self.gaia_radec_positions_after_pm = None
         if os.path.isfile(self.gaia_file_name):
             self.my_logger.info(f"\n\tLoad Gaia catalog from {self.gaia_file_name}.")
-            self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
+            self.gaia_catalog = Table(ascii.read(self.gaia_file_name, format="ecsv"), masked=True)
             self.gaia_radec_positions_after_pm = get_gaia_coords_after_proper_motion(self.gaia_catalog, self.image.date_obs)
         self.sources = None
         self.sources_radec_positions = None
@@ -334,7 +334,7 @@ class Astrometry():  # pragma: no cover
         self.quad_stars_pixel_positions = None
         self.dist_ra = 0 * u.arcsec
         self.dist_dec = 0 * u.arcsec
-        self.image.target_radec_position_after_pm = self.image.target.get_radec_position_after_pm(date_obs=self.image.date_obs)
+        self.image.target_radec_position_after_pm = self.image.target.get_radec_position_after_pm(self.image.target.simbad_table, date_obs=self.image.date_obs)
         if os.path.isfile(self.match_file_name):
             self.quad_stars_pixel_positions = self.get_quad_stars_pixel_positions()
 
@@ -1225,7 +1225,7 @@ class Astrometry():  # pragma: no cover
 
         # update coordinates with proper motion data
         self.my_logger.info(f"\n\tUpdate object coordinates with proper motion at time={self.image.date_obs}.")
-        self.image.target_radec_position_after_pm = self.image.target.get_radec_position_after_pm(self.image.date_obs)
+        self.image.target_radec_position_after_pm = self.image.target.get_radec_position_after_pm(self.image.target.simbad_table, date_obs=self.image.date_obs)
         self.gaia_radec_positions_after_pm = get_gaia_coords_after_proper_motion(self.gaia_catalog, self.image.date_obs)
         if parameters.DEBUG:
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_radec_positions_after_pm,
