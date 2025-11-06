@@ -281,7 +281,10 @@ class Image(object):
         elif parameters.OBS_NAME == "AUXTEL":
             load_AUXTEL_image(self)
         elif parameters.OBS_NAME == "STARDICE" or parameters.OBS_NAME == "OHP":
-            load_STARDICE_image(self)
+            if self.target_label.upper() == "WHITELAMP":
+                load_WHITELAMP_image(self)
+            else:
+                load_STARDICE_image(self)
         else:
             raise ValueError(f"Unknown observatory {parameters.OBS_NAME=}.")
         # Load the disperser
@@ -835,7 +838,9 @@ def load_STARDICE_image(image):  # pragma: no cover
     elif image.header['MOUNTTAU'] >= 90:
         parameters.OBS_CAMERA_ROTATION = 0
 
-    image.target_label = image.header['mountTARGET']
+    if not image.target_label:
+        image.target_label = image.header['mountTARGET']
+
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['cameraexptime'])
     image.filter_label = 'EMPTY'
@@ -870,6 +875,63 @@ def load_STARDICE_image(image):  # pragma: no cover
 
     image.read_out_noise = 8.5 * np.ones_like(image.data)
     image.compute_parallactic_angle()
+
+def load_WHITELAMP_image(image):
+    """Specific routine to load MONODICE fits files and load their data and properties for Spectractor.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance to fill with file data and header.
+    """
+    
+    image.my_logger.info(f'\n\tLoading MONODICE image {image.file_name}...')
+    with fits.open(image.file_name) as hdu_list:
+        image.header = hdu_list[0].header
+        image.data = hdu_list[0].data.astype(np.float64)
+    if "BZERO" in image.header:
+        del image.header["BZERO"]
+    if "BSCALE" in image.header:
+        del image.header["BSCALE"]
+
+    image.target_label = "MONODICE"
+    image.date_obs = image.header['DATE-OBS']
+    image.expo = float(image.header['cameraexptime'])
+    image.filter_label = 'EMPTY'
+    # transformations so that stars are like in Stellarium up to a rotation
+    # with spectrogram nearly horizontal and on the right of central star
+    image.data = image.data[::-1, ::-1]
+    #image.airmass = 1/np.cos(np.radians(90-image.header['MOUNTALT']))
+       
+    image.my_logger.info('\n\tImage loaded')
+    # compute CCD gain map
+    image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
+    parameters.CCD_IMSIZE = image.data.shape[1] // parameters.CCD_REBIN
+    image.disperser_label = "star_analyzer_200"
+    # image.ra = Angle(image.header['MOUNTRA'], unit="deg")
+    # image.dec = Angle(image.header['MOUNTDEC'], unit="deg")
+    # image.hour_angle = Angle(image.header['MOUNTHA'], unit="deg")
+    # if image.header['MOUNTTAU'] >= 90:
+    #     image.hour_angle = image.hour_angle - 180*units.deg
+    #     image.dec = 180*units.deg - image.dec
+    image.temperature = 10
+    image.pressure = 1000
+    image.humidity = 87
+    image.units = 'ADU'
+    if "PC2_1" in image.header:
+        rotation_wcs = 180 / np.pi * np.arctan2(-hdu_list[0].header["PC2_1"]/hdu_list[0].header["CDELT2"], hdu_list[0].header["PC1_1"]/hdu_list[0].header["CDELT1"])
+        atol = 0.02
+        print("RORATION WCS :", rotation_wcs)
+        if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=atol):
+            image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degrees while "
+                                    f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degrees. "
+                                    f"\nBoth differs by more than {atol} degrees... bug ?")
+
+    image.read_out_noise = 8.5 * np.ones_like(image.data)
+    #image.compute_parallactic_angle()
+
+    parameters.OBS_OBJECT_TYPE = "WHITELAMP"
+
 
 
 def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
