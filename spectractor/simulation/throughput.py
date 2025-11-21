@@ -8,7 +8,7 @@ from spectractor.config import set_logger
 import spectractor.parameters as parameters
 
 
-def load_transmission(file_name):
+def load_transmission_file(file_name):
     """Load the transmission files and crop in wavelength using LAMBDA_MIN and LAMBDA_MAX.
 
     The input file must have two or three columns:
@@ -28,7 +28,7 @@ def load_transmission(file_name):
     Examples
     --------
     >>> parameters.LAMBDA_MIN = 500
-    >>> lambdas, transmissions, errors = load_transmission(os.path.join(parameters.THROUGHPUT_DIR, "qecurve.txt"))
+    >>> lambdas, transmissions, errors = load_transmission_file(os.path.join(parameters.THROUGHPUT_DIR, "qecurve.txt"))
     >>> print(lambdas[:3])
     [500.81855389 508.18553888 519.23601637]
     >>> print(transmissions[:3])
@@ -50,8 +50,9 @@ def load_transmission(file_name):
     err = np.zeros_like(y)
     if data.shape[0] == 3:
         err = data[2][sorted_indices]
-    indexes = np.logical_and(lambdas > parameters.LAMBDA_MIN, lambdas < parameters.LAMBDA_MAX)
-    return lambdas[indexes], y[indexes], err[indexes]
+    # indexes = np.logical_and(lambdas > parameters.LAMBDA_MIN, lambdas < parameters.LAMBDA_MAX)
+    # return lambdas[indexes], y[indexes], err[indexes]
+    return lambdas, y, err
 
 
 def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, label="", title="", lw=2):
@@ -85,15 +86,15 @@ def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, la
         >>> fig = plt.figure()
         >>> ax = plt.gca()
         >>> parameters.LAMBDA_MIN = 500
-        >>> lambdas, transmissions, errors = load_transmission(os.path.join(parameters.THROUGHPUT_DIR, "qecurve.txt"))
+        >>> lambdas, transmissions, errors = load_transmission_file(os.path.join(parameters.THROUGHPUT_DIR, "qecurve.txt"))
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Quantum efficiency")
-        >>> lambdas, transmissions, errors = load_transmission(os.path.join(parameters.THROUGHPUT_DIR, "lsst_mirrorthroughput.txt"))
+        >>> lambdas, transmissions, errors = load_transmission_file(os.path.join(parameters.THROUGHPUT_DIR, "lsst_mirrorthroughput.txt"))
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Mirror 1")
-        >>> lambdas, transmissions, errors = load_transmission(os.path.join(parameters.THROUGHPUT_DIR, "FGB37.txt"))
+        >>> lambdas, transmissions, errors = load_transmission_file(os.path.join(parameters.THROUGHPUT_DIR, "FGB37.txt"))
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="FGB37")
-        >>> lambdas, transmissions, errors = load_transmission(os.path.join(parameters.THROUGHPUT_DIR, "RG715.txt"))
+        >>> lambdas, transmissions, errors = load_transmission_file(os.path.join(parameters.THROUGHPUT_DIR, "RG715.txt"))
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="RG715")
-        >>> lambdas, transmissions, errors = load_transmission(os.path.join(parameters.THROUGHPUT_DIR, parameters.OBS_FULL_INSTRUMENT_TRANSMISSON))
+        >>> lambdas, transmissions, errors = load_transmission_file(os.path.join(parameters.THROUGHPUT_DIR, parameters.OBS_FULL_INSTRUMENT_TRANSMISSON))
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Full instrument")
         >>> if parameters.DISPLAY: plt.show()
 
@@ -165,7 +166,7 @@ class TelescopeTransmission:
             >>> assert np.sum(t.transmission(parameters.LAMBDAS)) > np.sum(t2.transmission(parameters.LAMBDAS))
 
         """
-        wl, trm, err = load_transmission(os.path.join(parameters.THROUGHPUT_DIR,
+        wl, trm, err = load_transmission_file(os.path.join(parameters.THROUGHPUT_DIR,
                                                       parameters.OBS_FULL_INSTRUMENT_TRANSMISSON))
         to = interp1d(wl, trm, kind='linear', bounds_error=False, fill_value=0.)
         err = np.sqrt(err ** 2 + parameters.OBS_TRANSMISSION_SYSTEMATICS ** 2)
@@ -178,7 +179,7 @@ class TelescopeTransmission:
                 filter_filename = self.filter_label
             else:
                 filter_filename = self.filter_label + ".txt"
-            wl, trb, err = load_transmission(os.path.join(parameters.THROUGHPUT_DIR, filter_filename))
+            wl, trb, err = load_transmission_file(os.path.join(parameters.THROUGHPUT_DIR, filter_filename))
             TF = interp1d(wl, trb, kind='linear', bounds_error=False, fill_value=0.)
             TF_err = interp1d(wl, err, kind='linear', bounds_error=False, fill_value=0.)
 
