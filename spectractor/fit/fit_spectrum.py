@@ -75,8 +75,8 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.spectrum = spectrum
         p = np.array([1, 0, 0.05, 1.2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size
-        fixed[0] = True
-        fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
+        fixed[0] = False
+        fixed[1] = False #"A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
         fixed[5] = False
         # fixed[6:8] = [True, True]
         fixed[8] = True
@@ -394,12 +394,12 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
         #                                 verbose=False)
 
         fit_workspace.simulation.fast_sim = False
-        #fixed = copy.copy(fit_workspace.params.fixed)
-        #fit_workspace.params.fixed = [True] * len(fit_workspace.params)
-        #fit_workspace.params.fixed[0] = False
-        #run_minimisation(fit_workspace, method="newton", xtol=1e-3, ftol=100 / fit_workspace.data.size,
-        #                 verbose=False)
-        #fit_workspace.params.fixed = fixed
+        fixed = copy.copy(fit_workspace.params.fixed)
+        fit_workspace.params.fixed = [True] * len(fit_workspace.params)
+        fit_workspace.params.fixed[0] = False
+        run_minimisation(fit_workspace, method="newton", xtol=1e-3, ftol=100 / fit_workspace.data.size,
+                         verbose=False)
+        fit_workspace.params.fixed = fixed
         run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
                                         ftol=1 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False)
 
