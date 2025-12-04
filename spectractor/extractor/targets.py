@@ -315,7 +315,7 @@ class Star(Target):
             simbadQuerier = SimbadClass()
             patchSimbadURL(simbadQuerier)
 
-            simbadQuerier.add_votable_fields(_SIMBAD_VOTABLE_FIELDS)
+            simbadQuerier.add_votable_fields(*_SIMBAD_VOTABLE_FIELDS)
             self.my_logger.debug(f"\n\tDownload {self.label} coordinates from Simbad...")
             self.simbad_table = simbadQuerier.query_object(astroquery_label)
             self.simbad_table.write(os.path.join(cache_location,f"{cache_file}.ecsv"), overwrite=True)
