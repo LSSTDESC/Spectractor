@@ -20,21 +20,19 @@ from spectractor.config import set_logger
 from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
                                                 ISM_LINES, STELLAR_LINES)
 
-# Astroquery versions change the Simbad API.
-_astroquery_version = packaging.version.parse(importlib.metadata.version("astroquery"))
-if _astroquery_version < packaging.version.parse("0.4.8"):
-    _USE_NEW_SIMBAD = False
-else:
-    _USE_NEW_SIMBAD = True
-
 from getCalspec import getCalspec
 
 # Astroquery versions change the Simbad API.
 _astroquery_version = packaging.version.parse(importlib.metadata.version("astroquery"))
 if _astroquery_version < packaging.version.parse("0.4.8"):
     _USE_NEW_SIMBAD = False
+    _SIMBAD_VOTABLE_FIELDS = ('U', 'B', 'V', 'R', 'I', 'J', 'sp_type',
+                              'parallax', 'propermotions', 'rvz_redshift', "IDS", "ids")
 else:
     _USE_NEW_SIMBAD = True
+    _SIMBAD_VOTABLE_FIELDS = ('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
+                              'parallax', 'pm', 'z_value', "IDS", "ids")
+                
 
 try:
     from gaiaspec import getGaia
@@ -318,14 +316,7 @@ class Star(Target):
             simbadQuerier = SimbadClass()
             patchSimbadURL(simbadQuerier)
 
-            if _USE_NEW_SIMBAD:
-                simbadQuerier.add_votable_fields('U', 'B', 'V', 'R', 'I', 'J', 'sp_type',
-                                                 'parallax', 'propermotions', 'rvz_redshift', "IDS", "ids")
-            else:
-                simbadQuerier.add_votable_fields(
-                    'flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
-                    'parallax', 'pm', 'z_value', "IDS", "ids"
-                )
+            simbadQuerier.add_votable_fields(_SIMBAD_VOTABLE_FIELDS)
             self.my_logger.debug(f"\n\tDownload {self.label} coordinates from Simbad...")
             self.simbad_table = simbadQuerier.query_object(astroquery_label)
             self.simbad_table.write(os.path.join(cache_location,f"{cache_file}.ecsv"), overwrite=True)
