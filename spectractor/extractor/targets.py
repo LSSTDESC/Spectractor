@@ -26,13 +26,12 @@ from getCalspec import getCalspec
 _astroquery_version = packaging.version.parse(importlib.metadata.version("astroquery"))
 if _astroquery_version < packaging.version.parse("0.4.8"):
     _USE_NEW_SIMBAD = False
-    _SIMBAD_VOTABLE_FIELDS = ('U', 'B', 'V', 'R', 'I', 'J', 'sp_type',
-                              'parallax', 'propermotions', 'rvz_redshift', "IDS", "ids")
-else:
-    _USE_NEW_SIMBAD = True
     _SIMBAD_VOTABLE_FIELDS = ('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
                               'parallax', 'pm', 'z_value', "IDS", "ids")
-                
+else:
+    _USE_NEW_SIMBAD = True
+    _SIMBAD_VOTABLE_FIELDS = ('U', 'B', 'V', 'R', 'I', 'J', 'sp_type',
+                              'parallax', 'propermotions', 'rvz_redshift', "IDS", "ids")                
 
 try:
     from gaiaspec import getGaia
