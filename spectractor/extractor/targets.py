@@ -320,11 +320,11 @@ class Star(Target):
 
             if _USE_NEW_SIMBAD:
                 simbadQuerier.add_votable_fields('U', 'B', 'V', 'R', 'I', 'J', 'sp_type',
-                                                 'parallax', 'propermotions', 'rvz_redshift')
+                                                 'parallax', 'propermotions', 'rvz_redshift', "IDS", "ids")
             else:
                 simbadQuerier.add_votable_fields(
                     'flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
-                    'parallax', 'pm', 'z_value'
+                    'parallax', 'pm', 'z_value', "IDS", "ids"
                 )
             self.my_logger.debug(f"\n\tDownload {self.label} coordinates from Simbad...")
             self.simbad_table = simbadQuerier.query_object(astroquery_label)
