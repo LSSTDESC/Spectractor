@@ -14,44 +14,49 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: conda-incubator/setup-miniconda@v3
+      - name: Setup micromamba
+        uses: mamba-org/setup-micromamba@v1
         with:
-          python-version: "3.11"
+          micromamba-version: 'latest'
+          environment-name: test
+          create-args: >-
+            python=3.11
           channels: conda-forge,defaults
-          show-channel-urls: true
-          activate-environment: test
+          cache-environment: true
+          cache-downloads: true
 
       - name: Install system dependencies
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: |
-          conda install -y astrometry rubin-libradtran mpi4py
+          micromamba install -y astrometry rubin-libradtran mpi4py
 
       - name: Install Spectractor with dependencies
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: |
-          pip install -v -e ".[dev]"
+          pip install -v -e ".[dev,mcmc]"
 
       - name: Download test data
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: |
           wget -r -q -nc http://data.astrometry.net/5000/index-5002-24.fits
           wget -r -q -nc http://data.astrometry.net/5000/index-5000-40.fits
-          mv data.astrometry.net/5000/index-*.fits $CONDA_PREFIX/data/
-          export ASTROMETRYNET_DIR=$CONDA_PREFIX
+          mkdir -p $MAMBA_ROOT_PREFIX/envs/test/data/
+          mv data.astrometry.net/5000/index-*.fits $MAMBA_ROOT_PREFIX/envs/test/data/
+          export ASTROMETRYNET_DIR=$MAMBA_ROOT_PREFIX/envs/test
 
       - name: List installed packages
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: |
-          conda list
+          micromamba list
           pip list -v
 
       - name: Run full chain test
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: |
           pytest tests/test_fullchain.py --log-cli-level=INFO --cov --cov-report lcov
 
       - name: Run pytests
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: |
           pytest tests/test_extractor.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
           pytest tests/test_simulator.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
@@ -60,7 +65,7 @@ jobs:
           pytest tests/test_multispectra.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
 
       - name: Run doctests and coverage
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: pytest spectractor tests/test_fullchain.py -v --cov --cov-append --cov-report lcov --doctest-modules spectractor --doctest-continue-on-failure --ignore=spectractor/parameters.py
         continue-on-error: true
         
