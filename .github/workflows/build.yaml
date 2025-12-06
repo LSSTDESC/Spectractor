@@ -28,7 +28,7 @@ jobs:
       - name: Install system dependencies
         shell: micromamba-shell {0}
         run: |
-          micromamba install -y astrometry rubin-libradtran mpi4py - conda-forge
+          micromamba install -y astrometry rubin-libradtran mpi4py -c conda-forge
           pip install lsst-utils
           pip install git+https://github.com/LSSTDESC/getObsAtmo.git@main
 
