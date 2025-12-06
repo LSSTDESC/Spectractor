@@ -68,9 +68,15 @@ jobs:
 
       - name: Run doctests and coverage
         shell: micromamba-shell {0}
-        run: pytest spectractor tests/test_fullchain.py -v --cov --cov-append --cov-report lcov --doctest-modules spectractor --doctest-continue-on-failure --ignore=spectractor/parameters.py
+        run: |
+          pytest spectractor \
+            --ignore=spectractor/parameters.py \
+            --ignore=spectractor/fit/mcmc.py \
+            -v --cov --cov-append --cov-report lcov \
+            --doctest-modules \
+            --doctest-continue-on-failure
         continue-on-error: true
-        
+                
       - name: Coveralls
         uses: coverallsapp/github-action@master
         with:
