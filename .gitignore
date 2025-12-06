@@ -29,3 +29,15 @@ tests/.tests/
 *__pycache__/
 *.pickle
 *.cache/*
+*.json
+*.txt
+*.ipynb
+*.csv
+*.ecsv
+*.list
+*.dat
+*lcov
+*bak*
+*backup*
+notebooks/*
+tests/data/*
