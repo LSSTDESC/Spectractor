@@ -1051,12 +1051,30 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     x0 = int(guess[0])
     y0 = int(guess[1])
     Dx, Dy = widths
+    
+    # crop parameters
+    subYmin, subYmax = y0 - Dy, y0 + Dy
+    subXmin, subXmax = x0 - Dx, x0 + Dx
+
+    sizeY, sizeX = np.shape(image.data) if not rotated else np.shape(image.data_rotated)
+
+    # verify if the sub image is out of bounds
+    if subYmin < 0 or subXmin < 0 or subYmax >= sizeY or subXmax >= sizeX:
+        
+        old_subYmin, old_subYmax, old_subXmin, old_subXmax = subYmin, subYmax, subXmin, subXmax
+
+        subYmin, subXmin = max(0,       subYmin), max(0,       subXmin)
+        subYmax, subXmax = min(sizeY-1, subYmax), min(sizeX-1, subXmax)
+
+        image.my_logger.warning(f'\tSub image is out of bounds : [{old_subYmin}:{old_subYmax}, {old_subXmin}:{old_subXmax}] to [{subYmin}:{subYmax}, {subXmin}:{subXmax}]')
+
+
     if rotated:
-        sub_image = np.copy(image.data_rotated[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
-        sub_errors = np.copy(image.err[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
+        sub_image = np.copy(image.data_rotated[subYmin:subYmax, subXmin:subXmax])
+        sub_errors = np.copy(image.err[subYmin:subYmax, subXmin:subXmax])
     else:
-        sub_image = np.copy(image.data[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
-        sub_errors = np.copy(image.err[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
+        sub_image = np.copy(image.data[subYmin:subYmax, subXmin:subXmax])
+        sub_errors = np.copy(image.err[subYmin:subYmax, subXmin:subXmax])
 
     # usually one rebin by adding pixel contents
     image.saturation = parameters.CCD_MAXADU / image.expo *parameters.CCD_REBIN**2
@@ -1079,7 +1097,7 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
             f'to {image.saturation} {image.units}.')
         sub_errors[sub_image >= 0.99 * image.saturation] = 10 * image.saturation  # np.min(np.abs(sub_errors))
     # sub_image = clean_target_spikes(sub_image, image.saturation)
-    return sub_image_subtracted, x0, y0, Dx, Dy, sub_errors
+    return sub_image_subtracted, x0, y0, x0-subXmin, y0-subYmin, sub_errors
 
 
 def find_target_1Dprofile(image, sub_image, guess):
