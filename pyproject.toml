@@ -73,3 +73,11 @@ docs = [
 
 [tool.setuptools.exclude-package-data]
 "*" = ["tests/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+# Exclure parameters.py de la collecte de tests
+addopts = "--ignore=spectractor/parameters.py"
