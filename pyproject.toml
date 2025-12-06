@@ -1,0 +1,105 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Spectractor"
+dynamic = ["version"]
+description = ""
+readme = "README.md"
+license = {text = "BSD"}
+authors = [
+    {name = "J. Neveu", email = "jeremy.neveu@universite-paris-saclay.fr"},
+    {name = "S. Dagoret-Campagne", email = "sylvie.dagoret-campagne@ijclab.in2p3.fr"}
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>1.15",
+    "scipy",
+    "matplotlib>3.1",
+    "pandas",
+    "llvmlite",
+    "numba",
+    "astropy>=3.2",
+    "photutils>=1.7.0",
+    "astroquery>=0.4.8",
+    "coloredlogs",
+    "scikit-image>=0.20",
+    "tqdm",
+    "configparser",
+    "deprecated",
+    "pyyaml",
+    "getCalspec>=2.0.0",
+    "lsst_utils",
+    "packaging"
+]
+
+[project.urls]
+Homepage = "https://github.com/LSSTDESC/Spectractor"
+Repository = "https://github.com/LSSTDESC/Spectractor"
+
+[tool.setuptools.dynamic]
+version = {attr = "spectractor._version.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["spectractor*"]
+
+[tool.setuptools.package-data]
+spectractor = [
+    "config/*.ini",
+    "extractor/dispersers/**/*",
+    "simulation/CTIOThroughput/*.txt",
+    "simulation/AuxTelThroughput/*.txt", 
+    "simulation/StarDiceThroughput/*.txt"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "coverage>=3.6",
+    "coveralls"
+]
+mcmc = [
+    "h5py",
+    "emcee",
+    "schwimmbad",
+]
+docs = [
+    "sphinx",
+    "sphinx-rtd-theme",
+    "sphinxcontrib-apidoc"
+]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["tests/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+# Exclure parameters.py et mcmc.py de la collecte de tests
+addopts = "--ignore=spectractor/parameters.py --ignore=spectractor/fit/mcmc.py --ignore=spectractor/fit/astrometry.py"
+norecursedirs = ["spectractor/fit"]
+
+[tool.coverage.run]
+omit = [
+    "spectractor/parameters.py",
+    "spectractor/fit/mcmc.py",
+    "*/tests/*",
+    "*/__pycache__/*"
+]
+source = ["spectractor"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if False:",
+    "if TYPE_CHECKING:",
+]
