@@ -630,8 +630,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         if fit_workspace.filename != "":
             fit_workspace.params.plot_correlation_matrix()
             write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params,
-                                    extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
-                                           "date-obs": fit_workspace.spectrum.date_obs})
+                                    extra=extra)
             # save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
 
