@@ -80,7 +80,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 # Exclure parameters.py et mcmc.py de la collecte de tests
-addopts = "--ignore=spectractor/parameters.py --ignore=spectractor/fit/mcmc.py"
+addopts = "--ignore=spectractor/parameters.py --ignore=spectractor/fit/mcmc.py --ignore=spectractor/fit/astrometry.py"
 norecursedirs = ["spectractor/fit"]
 
 [tool.coverage.run]
