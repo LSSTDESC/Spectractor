@@ -55,7 +55,7 @@ jobs:
       - name: Run full chain test
         shell: micromamba-shell {0}
         run: |
-          pytest tests/test_fullchain.py --log-cli-level=INFO --cov --cov-report lcov
+          pytest tests/test_fullchain.py --log-cli-level=INFO -v -rs --cov --cov-report lcov
 
       - name: Run pytests
         shell: micromamba-shell {0}
