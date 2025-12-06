@@ -24,6 +24,10 @@ def __getattr__(name):
     >>> print(parameters.DUMMY)
     False
     """
+    # Exclude pytest_plugins to avoid pytest trying to load this module as a plugin
+    if name == 'pytest_plugins':
+        raise AttributeError(f"module 'parameters' has no attribute '{name}'")
+    
     if name in locals():
         return locals()[name]
     else:
