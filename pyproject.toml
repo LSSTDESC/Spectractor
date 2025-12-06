@@ -81,3 +81,23 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 # Exclure parameters.py de la collecte de tests
 addopts = "--ignore=spectractor/parameters.py"
+
+[tool.coverage.run]
+omit = [
+    "spectractor/parameters.py",
+    "spectractor/fit/mcmc.py",
+    "*/tests/*",
+    "*/__pycache__/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if False:",
+    "if TYPE_CHECKING:",
+]
