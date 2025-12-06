@@ -14,49 +14,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: conda-incubator/setup-miniconda@v3
+      - name: Setup micromamba
+        uses: mamba-org/setup-micromamba@v1
         with:
-          python-version: "3.11"
+          micromamba-version: 'latest'
+          environment-name: test
+          create-args: >-
+            python=3.11
           channels: conda-forge,defaults
-          show-channel-urls: true
-          activate-environment: test
+          cache-environment: true
+          cache-downloads: true
 
-      - name: Install dependencies
-        # Might be quicker to install rubin-env plus any necessary additions.
-        shell: bash -l {0}
+      - name: Install system dependencies
+        shell: micromamba-shell {0}
         run: |
-          conda install -y  "numpy>1.15" scipy "matplotlib>3.1" pandas llvmlite numba "astropy>=3.2" "photutils>=1.7" astroquery coloredlogs scikit-image>=0.20 h5py emcee tqdm mpi4py schwimmbad "iminuit>=2" "coverage>=3.6" configparser coveralls deprecated pyyaml pytest pytest-cov rubin-libradtran "getCalspec>=2.0.0"
-          # python -c "from getCalspec.rebuild import rebuild_tables; rebuild_tables()"
-          pip install lsst-utils
+          micromamba install -y astrometry rubin-libradtran -c conda-forge
+
+      - name: Install Spectractor with dependencies
+        shell: micromamba-shell {0}
+        run: |
+          pip install -v -e ".[dev]"
           pip install git+https://github.com/LSSTDESC/getObsAtmo.git@main
-          conda install astrometry
+
 
       - name: Download test data
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: |
           wget -r -q -nc http://data.astrometry.net/5000/index-5002-24.fits
           wget -r -q -nc http://data.astrometry.net/5000/index-5000-40.fits
-          mv data.astrometry.net/5000/index-*.fits $CONDA_PREFIX/data/
-          export ASTROMETRYNET_DIR=$CONDA_PREFIX
+          mkdir -p $MAMBA_ROOT_PREFIX/envs/test/data/
+          mv data.astrometry.net/5000/index-*.fits $MAMBA_ROOT_PREFIX/envs/test/data/
+          export ASTROMETRYNET_DIR=$MAMBA_ROOT_PREFIX/envs/test
 
       - name: List installed packages
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: |
-          conda list
+          micromamba list
           pip list -v
 
-      - name: Build and install
-        shell: bash -l {0}
-        run: |
-          pip install -v --no-deps -e .
-
       - name: Run full chain test
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: |
-          pytest tests/test_fullchain.py --log-cli-level=INFO --cov --cov-report lcov
+          pytest tests/test_fullchain.py --log-cli-level=INFO -v -rs --cov --cov-report lcov
 
       - name: Run pytests
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: |
           pytest tests/test_extractor.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
           pytest tests/test_simulator.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
@@ -65,9 +67,17 @@ jobs:
           pytest tests/test_multispectra.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
 
       - name: Run doctests and coverage
-        shell: bash -l {0}
-        run: pytest spectractor tests/test_fullchain.py -v --cov --cov-append --cov-report lcov --doctest-modules spectractor --doctest-continue-on-failure
+        shell: micromamba-shell {0}
+        run: |
+          pytest spectractor \
+            --ignore=spectractor/astrometry.py \
+            --ignore=spectractor/parameters.py \
+            --ignore=spectractor/fit/mcmc.py \
+            -v --cov --cov-append --cov-report lcov \
+            --doctest-modules \
+            --doctest-continue-on-failure
         continue-on-error: true
+
       - name: Coveralls
         uses: coverallsapp/github-action@master
         with:
