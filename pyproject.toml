@@ -22,7 +22,7 @@ dependencies = [
     "numba",
     "astropy>=3.2",
     "photutils>=1.7.0",
-    "astroquery",
+    "astroquery>=0.4.8",
     "coloredlogs",
     "scikit-image>=0.20",
     "tqdm",
