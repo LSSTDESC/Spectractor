@@ -1328,12 +1328,12 @@ def gradient_descent(fit_workspace, niter=10, xtol=1e-3, ftol=1e-3, with_line_se
             if ip not in ipar:
                 continue
             # check for null vectors
-            if J_norms[ip] < 1e-20:
+            if J_norms[ip] < np.sqrt(J.shape[1])*np.finfo(np.float64).eps and len(np.where(J_vectors[ip]==0)[0]) > J_vectors[ip].size // 2:
                 ipar = np.delete(ipar, list(ipar).index(ip))
                 fit_workspace.params.fixed[ip] = True
                 my_logger.warning(
                     f"\n\tStep {i}: {fit_workspace.params.labels[ip]} has a null Jacobian; parameter is fixed "
-                    f"at its last known current value ({tmp_params[ip]}).")
+                    f"at its last known current value ({tmp_params[ip]}) because |J[par]|={J_norms[ip]:.3e}<{np.sqrt(J.shape[1])*np.finfo(np.float64).eps} with more than half values being zeros.")
                 continue
             # check for degeneracies using Cauchy-Schwartz inequality; fix the second parameter
             for jp in range(ip, J.shape[0]):

@@ -1595,8 +1595,12 @@ def cholesky_solve(A, B):
     >>> X2 = cholesky_solve(A, B)
     >>> assert np.all(np.abs(X - X2)<1e-10)
     """
-    c, low = cho_factor(A)
-    X = cho_solve((c, low), B)
+    try:
+        c, low = cho_factor(A)
+        X = cho_solve((c, low), B)
+    # In case A is not positive definite, fall back to np.linalg.solve
+    except np.linalg.LinAlgError:
+        X = np.linalg.solve(A, B)
     return X
 
 

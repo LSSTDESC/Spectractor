@@ -103,7 +103,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                        r"$P_{\mathrm{atm}}$ [hPa]"]
         for order in self.diffraction_orders:
             axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
-        bounds = [[0, 2], [0, 2], [0, 2], [0, 10], [0, 3], [100, 700], [0, 20], [0.8, 1.2], [0, np.inf],
+        bounds = [[0, 2], [0, 2], [0, 2], [0, 10], [0, 4], [100, 700], [0, 20], [0.8, 1.2], [0, np.inf],
                   [D2CCD - 5 * parameters.DISTANCE2CCD_ERR, D2CCD + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
                   [-10, 10], [-90, 90], [0, np.inf]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
@@ -626,12 +626,15 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
                                         ftol=1 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=verbose,
                                         with_line_search=True)
+        extra = {"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
+                 "date-obs": fit_workspace.spectrum.date_obs,
+                 "outliers": len(fit_workspace.outliers)}
+        fit_workspace.params.extra = extra
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
             fit_workspace.params.plot_correlation_matrix()
             write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params,
-                                    extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
-                                           "date-obs": fit_workspace.spectrum.date_obs})
+                                    extra=extra)
             # save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
 

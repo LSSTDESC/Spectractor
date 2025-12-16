@@ -84,7 +84,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         # fixed[-1] = True
         if not fit_angstrom_exponent:
             fixed[3] = True  # angstrom_exponent
-        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 10), (0, 3), (100, 700), (0, 20),
+        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 10), (0, 4), (100, 700), (0, 20),
                        (0.5, 20),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
                   (-2, 2), (-np.inf, np.inf)]
         params = FitParameters(p, labels=["A1", "A2", "VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]",
@@ -406,10 +406,12 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
 
         fit_workspace.params.plot_correlation_matrix()
         fit_workspace.plot_fit()
+        extra = {"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
+                 "date-obs": fit_workspace.spectrum.date_obs,
+                 "outliers": len(fit_workspace.outliers)}
+        fit_workspace.params.extra = extra
         if fit_workspace.filename != "":
-            write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params,
-                                    extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
-                                           "date-obs": fit_workspace.spectrum.date_obs})
+            write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params, extra=extra)
             # save_gradient_descent(fit_workspace, costs, params_table)
 
 
