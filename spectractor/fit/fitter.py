@@ -1328,7 +1328,7 @@ def gradient_descent(fit_workspace, niter=10, xtol=1e-3, ftol=1e-3, with_line_se
             if ip not in ipar:
                 continue
             # check for null vectors
-            if J_norms[ip] < np.sqrt(J.shape[1])*np.finfo(np.float64).eps and len(np.where(J_vectors[ip]==0)[0]) > J_vectors[ip].size // 2:
+            if J_norms[ip] < np.sqrt(len(J_vectors[ip]))*np.finfo(np.float64).eps and len(np.where(J_vectors[ip]==0)[0]) > J_vectors[ip].size // 2:
                 ipar = np.delete(ipar, list(ipar).index(ip))
                 fit_workspace.params.fixed[ip] = True
                 my_logger.warning(
