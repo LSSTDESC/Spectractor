@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
                         help="Write results in given output directory (default: ./outputs/).")
     parser.add_argument("-c", "--config", dest="config", default="",
-                        help="config file to be given for spectra extracted with Spectractor<2.4. (default: ''.")
+                        help="config file to be given for spectra extracted with Spectractor<2.4. (default: ''.)")
     args = parser.parse_args()
 
     parameters.VERBOSE = args.verbose
