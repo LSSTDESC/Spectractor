@@ -61,7 +61,7 @@ class Atmosphere:
         self.emulator = None
         self.angstrom_exponent_default = 1.2
         if parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "getobsatmo":
-            import getObsAtmo
+            from getObsAtmo import getObsAtmo
             if not getObsAtmo.is_obssite(parameters.OBS_NAME):
                 raise ValueError(f"getObsAtmo does not have observatory site {parameters.OBS_NAME}.")
             self.emulator = getObsAtmo.ObsAtmo(obs_str=parameters.OBS_NAME, pressure=self.pressure)

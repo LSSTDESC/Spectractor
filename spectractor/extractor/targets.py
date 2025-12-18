@@ -36,10 +36,12 @@ if _astroquery_version < packaging.version.parse("0.4.8"):
 else:
     _USE_NEW_SIMBAD = True
 
-try:
-    from gaiaspec import getGaia
-except ModuleNotFoundError:
-    getGaia = None
+# try:
+#     from gaiaspec import getGaia
+# except ModuleNotFoundError:
+#     getGaia = None
+
+getGaia = None
 
 
 def _get_cache_dir():

@@ -1426,7 +1426,7 @@ class Astrometry():  # pragma: no cover
                                        f"Stop the loop here and look for best solution.")
                 k -= 1
                 break
-        t.pprint_all()
+        #t.pprint_all()
         if len(t) == 0:
             raise IndexError(f"Astrometry has failed at every iteration, empty table {t=}.")
         best_iter = int(np.argmin(t["gaia_residuals_quad_sum"]))

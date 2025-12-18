@@ -1062,19 +1062,15 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     sizeY, sizeX = np.shape(image.data) if not rotated else np.shape(image.data_rotated)
 
     # verify if the sub image is out of bounds
-    if subYmin < 0 or subXmin < 0 or subYmax >= sizeY or subXmax >= sizeX:
-        
+    if subYmin < 0 or subXmin < 0 or subYmax >= sizeY or subXmax >= sizeX:        
         old_subYmin, old_subYmax, old_subXmin, old_subXmax = subYmin, subYmax, subXmin, subXmax
 
         subYmin, subXmin = max(0,       subYmin), max(0,       subXmin)
         subYmax, subXmax = min(sizeY-1, subYmax), min(sizeX-1, subXmax)
 
-        image.my_logger.warning(f'\tSub image is out of bounds : [{old_subYmin}:{old_subYmax}, {old_subXmin}:{old_subXmax}] to [{subYmin}:{subYmax}, {subXmin}:{subXmax}]')
-
-
     if rotated:
         sub_image = np.copy(image.data_rotated[subYmin:subYmax, subXmin:subXmax])
-        sub_errors = np.copy(image.err[subYmin:subYmax, subXmin:subXmax])
+        sub_errors = np.copy(image.err_rotated[subYmin:subYmax, subXmin:subXmax])
     else:
         sub_image = np.copy(image.data[subYmin:subYmax, subXmin:subXmax])
         sub_errors = np.copy(image.err[subYmin:subYmax, subXmin:subXmax])
@@ -1098,6 +1094,8 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
         image.my_logger.debug(
             f'\n\t{len(saturated_pixels[0])} saturated pixels: set saturation level '
             f'to {image.saturation} {image.units}.')
+
+        image.my_logger.warning(f"Size of sub_image: {sub_image.shape}, size of sub_errors: {sub_errors.shape}")
         sub_errors[sub_image >= 0.99 * image.saturation] = 10 * image.saturation  # np.min(np.abs(sub_errors))
     # sub_image = clean_target_spikes(sub_image, image.saturation)
     return sub_image_subtracted, x0, y0, Dx, Dy, sub_errors

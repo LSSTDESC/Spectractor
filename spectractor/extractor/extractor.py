@@ -1189,8 +1189,8 @@ def SpectractorRun(image, output_directory, guess=None):
     # Set output path
     ensure_dir(output_directory)
     output_filename = os.path.basename(image.file_name)
-    output_filename = output_filename.replace('.fits', '_spectrum.fits')
-    output_filename = output_filename.replace('.fz', '_spectrum.fits')
+    output_filename = output_filename.replace('.fits', f'_spectrum_{image.target_label}.fits')
+    output_filename = output_filename.replace('.fz', f'_spectrum_{image.target_label}.fits')
     output_filename = os.path.join(output_directory, output_filename)
 
     # Find the exact target position in the raw cut image: several methods
@@ -1243,7 +1243,7 @@ def SpectractorRun(image, output_directory, guess=None):
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
 
-    return spectrum, w
+    return spectrum
 
 
 def Spectractor(file_name, output_directory, target_label='', guess=None, disperser_label="", config=''):
@@ -1361,7 +1361,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
         xmax = min(right_edge, int(distance[lambda_max_index]) + 1)  # +1 to  include edges
     else:
         lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
-                                                          x0=image.target_pixcoords,
+                                                          x0=image.target_pixcoords,    
                                                           D=parameters.DISTANCE2CCD, order=spectrum.order)
         xmin = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MIN)))
         xmax = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MAX)))
@@ -1369,6 +1369,10 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     while np.any(data[max(0, y0 - ws[0]):min(Ny, y0 + ws[0]), xmax]==0) or np.any(np.isnan(data[max(0, y0 - ws[0]):min(Ny, y0 + ws[0]), xmax])):
         image.my_logger.warning(f"Last data column is invalid (full of nan or zeros). Subtract 1 to {xmax=}->{xmax-1}")
         xmax -= 1
+
+    # xmax < xmin happens when the spectrum is out of the detector (we decrease xmax until we sees signal)
+    if xmax <= xmin:
+        raise ValueError(f"No spectrum has been detected. The spectrum may be out of the detector ?")
 
     # Create spectrogram
     data = data[ymin:ymax, xmin:xmax]
