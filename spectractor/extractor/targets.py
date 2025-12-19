@@ -17,7 +17,7 @@ import shutil
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
+from spectractor.extractor.spectroscopy import (Lines, Line, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
                                                 ISM_LINES, STELLAR_LINES)
 from getCalspec import getCalspec
 
@@ -32,7 +32,6 @@ try:
     from gaiaspec import getGaia
 except ModuleNotFoundError:
     getGaia = None
-
 
 def _get_cache_dir():
     cache = os.path.join(astropy.config.get_cache_dir(), "astroquery", "Simbad")
@@ -80,6 +79,9 @@ def load_target(label, verbose=False):
     >>> print([line.wavelength for line in t.lines.lines][:5])
     [253.652, 296.728, 302.15, 313.155, 334.148]
     """
+    if label=="WHITELAMP":
+        parameters.OBS_OBJECT_TYPE = "WHITELAMP"
+
     if parameters.OBS_OBJECT_TYPE == 'STAR':
         return Star(label, verbose)
     elif parameters.OBS_OBJECT_TYPE == 'HG-AR':
@@ -88,6 +90,8 @@ def load_target(label, verbose=False):
         return Monochromator(label, verbose)
     elif parameters.OBS_OBJECT_TYPE == "LED":
         return Led(label, verbose)
+    elif parameters.OBS_OBJECT_TYPE == 'WHITELAMP':
+        return WhiteLamp(label, verbose)
     else:
         raise ValueError(f'Unknown parameters.OBS_OBJECT_TYPE: {parameters.OBS_OBJECT_TYPE}')
 
@@ -185,6 +189,38 @@ class Monochromator(Target):
         self.my_logger = set_logger(self.__class__.__name__)
         self.emission_spectrum = True
         self.lines = Lines([], emission_spectrum=True, orders=[1, 2])
+
+    def load(self):  # pragma: no cover
+        pass
+
+class WhiteLamp(Target):
+
+    def __init__(self, label, verbose=False):
+        """Initialize Monochromator class.
+
+        Parameters
+        ----------
+        label: str
+            String label to name the monochromator.
+        verbose: bool, optional
+            Set True to increase verbosity (default: False)
+
+        Examples
+        --------
+
+        >>> t = Monochromator("XX", verbose=False)
+        >>> print(t.label)
+        XX
+        >>> print(t.emission_spectrum)
+        True
+
+        """
+        Target.__init__(self, label, verbose=verbose)
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.emission_spectrum = True
+
+        white_lamp_lines = [Line(l, atmospheric=False, label=r'$l1$', label_pos=[0.007, 0.02], use_for_calibration=True) for l in [824, 829, 835, 842, 883, 896, 906, 916, 981, 993]]
+        self.lines = Lines(white_lamp_lines, emission_spectrum=True, orders=[1, 2])
 
     def load(self):  # pragma: no cover
         pass

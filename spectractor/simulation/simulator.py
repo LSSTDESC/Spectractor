@@ -485,11 +485,12 @@ class SpectrogramModel(Spectrum):
             if self.profile_params[order] is None or not self.fix_psf_cube:
                 if k==0:
                     self.profile_params[order] = self.chromatic_psf.update(poly_params[k], x0=self.r0.real + shift_x,
-                                                                           y0=self.r0.imag + shift_y, angle=angle, plot=False, apply_bounds=True)
+                                                                           y0=self.r0.imag + shift_y, angle=angle,
+                                                                           plot=False, apply_bounds=True)
                 else:
                     self.profile_params[order] = self.chromatic_psf.from_poly_params_to_profile_params(poly_params[k], apply_bounds=True)
                 self.profile_params[order][:, 0] = 1
-                self.profile_params[order][:, 1] = dispersion_law.real + self.r0.real
+                self.profile_params[order][:, 1] = dispersion_law.real + self.r0.real + shift_x
                 self.profile_params[order][:, 2] += dispersion_law.imag
             if k == 0:
                 self.chromatic_psf.table["Dx"] = self.profile_params[order][:, 1] - self.r0.real

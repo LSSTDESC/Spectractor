@@ -1853,10 +1853,10 @@ class RegFitWorkspace(FitWorkspace):
         if Ndof is not None:
             r_Ndof = self.set_regularisation_with_Ndof(Ndof)
             if self.opt_reg < 1e-3 * r_Ndof or self.opt_reg > 1e3 * r_Ndof:
-                self.my_logger.warning(f"\n\tRegularisation parameter r minimizing G(r) is 3 orders of magnitude away "
-                                       f"from optimal regularisation parameter {r_Ndof} using {Ndof=}. "
+                self.my_logger.warning(f"\n\tFound regularisation parameter r minimizing G(r) is 3 orders of magnitude away "
+                                       f"from optimal regularisation parameter {r_Ndof:.3g} given by {Ndof=:.1f}. "
                                        f"Probably that the model does not fit well data at this stage. "
-                                       f"Switch to optimal parameter.")
+                                       f"Switch to optimal parameter {r_Ndof:.3g}.")
                 self.opt_reg = r_Ndof
                 self.simulate(np.log10(self.opt_reg))
                 self.print_regularisation_summary()

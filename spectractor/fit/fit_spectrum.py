@@ -256,9 +256,21 @@ class SpectrumFitWorkspace(FitWorkspace):
         lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x)
         if B != 0:
             model += B / (lambdas * np.gradient(lambdas))
+
+        if lambdas.shape != self.lambdas.shape or not np.allclose(lambdas, self.lambdas):
+            sim_conv = interp1d(lambdas, model * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
+            err_conv = interp1d(lambdas, model_err * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
+            lambdas_binwidths = np.gradient(self.lambdas)
+            lambdas_binwidths_sim = np.gradient(lambdas)
+            # Interpolate bin widths from simulation grid to observation grid
+            binwidth_conv = interp1d(lambdas, lambdas_binwidths_sim, kind="linear", bounds_error=False, fill_value=(lambdas_binwidths_sim[0], lambdas_binwidths_sim[-1]))
+            lambdas_binwidths_sim_interp = binwidth_conv(self.lambdas)
+            model = sim_conv(self.lambdas) * lambdas_binwidths / lambdas_binwidths_sim_interp / self.lambdas
+            model_err = err_conv(self.lambdas) * lambdas_binwidths / lambdas_binwidths_sim_interp / self.lambdas
+
         self.model = model
         self.model_err = model_err
-        return lambdas, model, model_err
+        return self.lambdas, model, model_err
 
     def plot_fit(self):
         """Plot the fit result.
@@ -402,9 +414,10 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
         fit_workspace.params.fixed = fixed
         run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
                                         ftol=1 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False)
-
-        fit_workspace.params.plot_correlation_matrix()
-        fit_workspace.plot_fit()
+       
+        if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
+            fit_workspace.params.plot_correlation_matrix()
+            fit_workspace.plot_fit()
         if fit_workspace.filename != "":
             write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params,
                                     extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,

@@ -323,7 +323,7 @@ class Astrometry():  # pragma: no cover
         self.gaia_radec_positions_after_pm = None
         if os.path.isfile(self.gaia_file_name):
             self.my_logger.info(f"\n\tLoad Gaia catalog from {self.gaia_file_name}.")
-            self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
+            self.gaia_catalog = Table(ascii.read(self.gaia_file_name, format="ecsv"), masked=True)
             self.gaia_radec_positions_after_pm = get_gaia_coords_after_proper_motion(self.gaia_catalog, self.image.date_obs)
         self.sources = None
         self.sources_radec_positions = None
@@ -1095,9 +1095,16 @@ class Astrometry():  # pragma: no cover
                 self.write_sources()
                 solve_field_input = self.sources_file_name
             elif self.source_extractor == "astrometrynet":
+                # use data without spectrums if it exists
+                if "data_wo_spectrums" in self.image.__dict__.keys():
+                    if getattr(self.image, "data_wo_spectrums") is not None:
+                        data = getattr(self.image, "data_wo_spectrums").copy()
+                    else:
+                        data = self.image.data
+
                 self.my_logger.info(f"\n\tSource extraction directly with solve-field.")
                 # must write a temporary image file with Spectractor flips and rotations
-                fits.writeto(tmp_image_file_name, self.image.data, header=self.image.header, overwrite=True)
+                fits.writeto(tmp_image_file_name, data, header=self.image.header, overwrite=True)
                 solve_field_input = tmp_image_file_name
             else:
                 raise ValueError(f"Got {self.source_extractor=}. Must be either 'iraf' or 'astrometrynet' "
@@ -1121,7 +1128,7 @@ class Astrometry():  # pragma: no cover
         try:
             subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='ascii')
         except subprocess.CalledProcessError as e:  # pragma: nocover
-            self.my_logger.warning(f"\n\tAstrometry command:\n{command}")
+            self.my_logger.info(f"\n\tAstrometry command:\n{command}")
             self.my_logger.error(f"\n\t{e.stderr}")
             sys.exit()
         if os.path.isfile(tmp_image_file_name):
@@ -1218,7 +1225,7 @@ class Astrometry():  # pragma: no cover
 
         # update coordinates with proper motion data
         self.my_logger.info(f"\n\tUpdate object coordinates with proper motion at time={self.image.date_obs}.")
-        self.image.target_radec_position_after_pm = self.image.target.get_radec_position_after_pm(self.image.date_obs)
+        self.image.target_radec_position_after_pm = self.image.target.get_radec_position_after_pm(self.image.target.simbad_table, date_obs=self.image.date_obs)
         self.gaia_radec_positions_after_pm = get_gaia_coords_after_proper_motion(self.gaia_catalog, self.image.date_obs)
         if parameters.DEBUG:
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_radec_positions_after_pm,
@@ -1407,8 +1414,8 @@ class Astrometry():  # pragma: no cover
                 gaia_residuals_quad_sum = np.sum(np.sqrt(np.sum(gaia_residuals ** 2, axis=1)))
                 if parameters.DEBUG:
                     self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_matches, margin=20,
-                                                       quad=self.quad_stars_pixel_positions,
-                                                       label=self.image.target.label)
+                                                        quad=self.quad_stars_pixel_positions,
+                                                        label=self.image.target.label)
                     self.plot_astrometry_shifts(vmax=3)
                     self.plot_quad_stars()
                 target_x, target_y = self.get_target_pixel_position()
@@ -1419,7 +1426,7 @@ class Astrometry():  # pragma: no cover
                                        f"Stop the loop here and look for best solution.")
                 k -= 1
                 break
-        t.pprint_all()
+        #t.pprint_all()
         if len(t) == 0:
             raise IndexError(f"Astrometry has failed at every iteration, empty table {t=}.")
         best_iter = int(np.argmin(t["gaia_residuals_quad_sum"]))

@@ -79,7 +79,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
             raise ValueError(f"At least one diffraction order must be given for spectrogram simulation.")
         length = len(self.spectrum.chromatic_psf.table)
         self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()[length:]
-        self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         self.saturation = self.spectrum.spectrogram_saturation
         D2CCD = np.copy(spectrum.header['D2CCD'])
         p = np.array([1, 1, 0, 0.05, 1.2, 400, 5, 1, 1, D2CCD, self.spectrum.header['PIXSHIFT'],
@@ -421,6 +420,23 @@ class SpectrogramFitWorkspace(FitWorkspace):
         if self.flat is not None:
             # TODO: if flat array is a cube flat, needs to multiply directly in build_psf_cube
             self.model *= self.flat
+
+        from scipy.interpolate import interp1d
+
+        if lambdas.shape != self.lambdas.shape or not np.allclose(lambdas, self.lambdas):
+            sim_conv = interp1d(lambdas, model * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
+            err_conv = interp1d(lambdas, model_err * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
+            lambdas_binwidths = np.gradient(self.lambdas)
+            lambdas_binwidths_sim = np.gradient(lambdas)
+            # Interpolate bin widths from simulation grid to observation grid
+            binwidth_conv = interp1d(lambdas, lambdas_binwidths_sim, kind="linear", bounds_error=False, fill_value=(lambdas_binwidths_sim[0], lambdas_binwidths_sim[-1]))
+            lambdas_binwidths_sim_interp = binwidth_conv(self.lambdas)
+            model = sim_conv(self.lambdas) * lambdas_binwidths / lambdas_binwidths_sim_interp / self.lambdas
+            model_err = err_conv(self.lambdas) * lambdas_binwidths / lambdas_binwidths_sim_interp / self.lambdas
+
+        self.model = model
+        self.model_err = model_err
+
         return self.lambdas, self.model, self.model_err
 
     def jacobian(self, params, model_input=None):
