@@ -45,7 +45,7 @@ packages = [
     "spectractor.fit",
     "spectractor.simulation",
 ]
-
+include-package-data = true
 
 [tool.setuptools.dynamic]
 version = {attr = "spectractor._version.__version__"}
