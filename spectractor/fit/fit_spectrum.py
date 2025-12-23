@@ -79,7 +79,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         fixed[1] = False #"A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
         fixed[5] = False
         # fixed[6:8] = [True, True]
-        fixed[8] = True
+        fixed[8] = False  # alpha_pix
         fixed[9] = True
         # fixed[-1] = True
         if not fit_angstrom_exponent:
@@ -408,8 +408,9 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
         for i in range(3):
             fixed = copy.copy(fit_workspace.params.fixed)
             fit_workspace.params.fixed = [True] * len(fit_workspace.params)
+            fit_workspace.params.fixed[6] = False  # reso
             fit_workspace.params.fixed[7] = False  # dccd
-            fit_workspace.params.fixed[8] = True  # pixshift
+            fit_workspace.params.fixed[8] = False  # pixshift
             run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
                                         ftol=1e-3 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False, with_line_search=True)
             fit_workspace.params.fixed = fixed
