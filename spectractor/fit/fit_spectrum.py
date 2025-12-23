@@ -85,8 +85,8 @@ class SpectrumFitWorkspace(FitWorkspace):
         if not fit_angstrom_exponent:
             fixed[3] = True  # angstrom_exponent
         bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 10), (0, 4), (100, 700), (0, 20),
-                       (0.5, 20),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
-                  (-2, 2), (-np.inf, np.inf)]
+                  (0.5, 20),(p[7] - 20 * parameters.DISTANCE2CCD_ERR, p[7] + 20 * parameters.DISTANCE2CCD_ERR),
+                  (-10, 10), (-np.inf, np.inf)]
         params = FitParameters(p, labels=["A1", "A2", "VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]",
                                           "reso [nm]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],
                                axis_names=["$A_1$", "$A_2$", "VAOD", r'$\"a$', "ozone [db]", "PWV [mm]",
@@ -402,7 +402,21 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
                          verbose=False)
         fit_workspace.params.fixed = fixed
         run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
-                                        ftol=1 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False)
+                                        ftol=1e-3 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False)
+
+        # alternate fixing dccd and pixshift with fitting all parameters
+        for i in range(3):
+            fixed = copy.copy(fit_workspace.params.fixed)
+            fit_workspace.params.fixed = [True] * len(fit_workspace.params)
+            fit_workspace.params.fixed[7] = False  # dccd
+            fit_workspace.params.fixed[8] = True  # pixshift
+            run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
+                                        ftol=1e-3 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False, with_line_search=True)
+            fit_workspace.params.fixed = fixed
+            run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
+                                        ftol=1e-3 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False, with_line_search=True)
+            
+         
 
         fit_workspace.params.plot_correlation_matrix()
         fit_workspace.plot_fit()

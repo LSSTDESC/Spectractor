@@ -104,7 +104,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         for order in self.diffraction_orders:
             axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
         bounds = [[0, 2], [0, 2], [0, 2], [0, 10], [0, 4], [100, 700], [0, 20], [0.8, 1.2], [0, np.inf],
-                  [D2CCD - 5 * parameters.DISTANCE2CCD_ERR, D2CCD + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
+                  [D2CCD - 20 * parameters.DISTANCE2CCD_ERR, D2CCD + 20 * parameters.DISTANCE2CCD_ERR], [-10, 10],
                   [-10, 10], [-90, 90], [0, np.inf]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
         fixed = [False] * p.size
@@ -577,7 +577,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
     my_logger = set_logger(__name__)
     guess = np.asarray(fit_workspace.params.values)
     fit_workspace.simulate(*guess)
-    fit_workspace.plot_fit()
+    # fit_workspace.plot_fit()
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
@@ -624,8 +624,8 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
         #                                            fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
         #                                            niter=40)
-        run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
-                                        ftol=1 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=verbose,
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-10,
+                                        ftol=1e-3 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=verbose,
                                         with_line_search=True)
         extra = {"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
                  "date-obs": fit_workspace.spectrum.date_obs,
