@@ -132,7 +132,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         params.fixed[params.get_index(f"A{self.diffraction_orders[0]}")] = False  # A1
         self.atm_params_indices = np.array([params.get_index(label) for label in ["VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]"]])
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
-        params.fixed[params.get_index(f"A{self.diffraction_orders[0]}")] = False  # A1
+        params.fixed[params.get_index(f"A{self.diffraction_orders[0]}")] = True  # A1
         if "A2" in params.labels:
             params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = False  #not getCalspec.is_calspec(spectrum.target.label) #"A2_T" not in self.spectrum.header
         if "A3" in params.labels:
