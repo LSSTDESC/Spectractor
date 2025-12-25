@@ -134,7 +134,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
         params.fixed[params.get_index(f"A{self.diffraction_orders[0]}")] = True  # A1
         if "A2" in params.labels:
-            params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = False  #not getCalspec.is_calspec(spectrum.target.label) #"A2_T" not in self.spectrum.header
+            params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = True  #not getCalspec.is_calspec(spectrum.target.label) #"A2_T" not in self.spectrum.header
         if "A3" in params.labels:
             params.fixed[params.get_index(f"A{self.diffraction_orders[2]}")] = "A3_T" not in self.spectrum.header
         params.fixed[params.get_index(r"shift_x [pix]")] = False  # Delta x
@@ -610,7 +610,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         fit_workspace.spectrogram_simulation.fast_sim = False
         fit_workspace.spectrogram_simulation.fix_psf_cube = False
         fit_workspace.params.fixed = [True] * len(fit_workspace.params.values)
-        fit_workspace.params.fixed[fit_workspace.params.get_index(r"A1")] = False  # A1
+        fit_workspace.params.fixed[fit_workspace.params.get_index(r"VAOD")] = False  # VAOD
         fit_workspace.params.fixed[fit_workspace.params.get_index(r"shift_y [pix]")] = False  # shift y
         fit_workspace.params.fixed[fit_workspace.params.get_index(r"angle [deg]")] = False  # angle
         run_minimisation(fit_workspace, "newton", xtol=1e-2, ftol=0.01, with_line_search=False)
