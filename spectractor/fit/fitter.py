@@ -1277,6 +1277,91 @@ class FitWorkspace:
         np.savetxt(output_filename, t.T, header=h, delimiter=",")
         self.my_logger.info(f"\n\tSave gradient descent log {output_filename}.")
 
+    def plot_triangle_fisher(self, nsamples=10000, max_params=8):
+        """Plot a triangle (corner) plot of probability contours and distributions using Fisher matrix method.
+        
+        This method generates samples from a multivariate normal distribution based on the parameter 
+        covariance matrix and creates a corner plot showing 1D and 2D marginal distributions.
+        
+        Parameters
+        ----------
+        nsamples: int, optional
+            Number of samples to generate from the multivariate normal distribution (default: 10000).
+        max_params: int, optional
+            Maximum number of parameters to display. Only the first max_params free parameters 
+            will be shown (default: 8).
+            
+        Examples
+        --------
+        >>> from spectractor.fit.fitter import FitParameters, FitWorkspace
+        >>> params = FitParameters(values=[1, 2, 3], axis_names=["x", "y", "z"])
+        >>> params.cov = np.array([[1, -0.5, 0], [-0.5, 1, -1], [0, -1, 1]])
+        >>> w = FitWorkspace(params=params, filename="test.fits")
+        >>> w.plot_triangle_fisher(nsamples=1000, max_params=3)
+        
+        Notes
+        -----
+        This method requires the `corner` package to be installed.
+        The plot is saved if parameters.SAVE is True with suffix '_triangle.pdf'.
+        """
+        try:
+            import corner
+        except ImportError:
+            self.my_logger.warning("Package 'corner' not installed. Cannot create triangle plot. "
+                                   "Install it with: pip install corner")
+            return
+        
+        # Get free parameters indices
+        ipar = self.params.get_free_parameters()
+        
+        # Limit to max_params parameters
+        n_params = min(len(ipar), max_params)
+        ipar = ipar[:n_params]
+        
+        if len(ipar) == 0:
+            self.my_logger.warning("No free parameters to plot.")
+            return
+            
+        # Check that covariance matrix is available
+        if self.params.cov.size == 0:
+            self.my_logger.warning("Covariance matrix not available. Run fit first.")
+            return
+        
+        # Extract mean values and covariance matrix for free parameters
+        mean_values = self.params.values[ipar]
+        cov_matrix = self.params.cov[:n_params, :n_params]
+        
+        # Check if covariance matrix is positive definite
+        eigenvalues = np.linalg.eigvals(cov_matrix)
+        if np.any(eigenvalues <= 0):
+            self.my_logger.warning("Covariance matrix is not positive definite. "
+                                   "Cannot generate samples.")
+            return
+        
+        # Generate samples from multivariate normal distribution
+        samples = np.random.multivariate_normal(mean_values, cov_matrix, size=nsamples)
+        
+        # Get axis names for the selected parameters
+        axis_names = [self.params.axis_names[i] for i in ipar]
+        
+        # Create corner plot
+        fig = corner.corner(samples, labels=axis_names, 
+                           quantiles=[0.16, 0.5, 0.84],
+                           show_titles=True,
+                           title_kwargs={"fontsize": 12},
+                           truths=mean_values)
+        
+        # Save figure if requested
+        if (parameters.SAVE or parameters.LSST_SAVEFIGPATH) and self.filename != "":  # pragma: no cover
+            figname = os.path.splitext(self.filename)[0] + "_triangle.pdf"
+            self.my_logger.info(f"\n\tSave triangle plot {figname}.")
+            fig.savefig(figname, dpi=100, bbox_inches='tight')
+        
+        if parameters.DISPLAY:  # pragma: no cover
+            plt.show()
+        
+        return fig
+
 
 def gradient_descent(fit_workspace, niter=10, xtol=1e-3, ftol=1e-3, with_line_search=True):
     """
