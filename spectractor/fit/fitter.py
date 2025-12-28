@@ -1418,7 +1418,7 @@ def gradient_descent(fit_workspace, niter=10, xtol=1e-3, ftol=1e-3, with_line_se
                 fit_workspace.params.fixed[ip] = True
                 my_logger.warning(
                     f"\n\tStep {i}: {fit_workspace.params.labels[ip]} has a null Jacobian; parameter is fixed "
-                    f"at its last known current value ({tmp_params[ip]}) because |J[par]|={J_norms[ip]:.3e}<{np.sqrt(J.shape[1])*np.finfo(np.float64).eps} with more than half values being zeros.")
+                    f"at its last known current value ({tmp_params[ip]}) because |J[par]|={J_norms[ip]:.3e}<{np.sqrt(len(J_vectors[ip]))*np.finfo(np.float64).eps} with more than half values being zeros.")
                 continue
             # check for degeneracies using Cauchy-Schwartz inequality; fix the second parameter
             for jp in range(ip, J.shape[0]):
