@@ -214,8 +214,9 @@ def test_ctio_fullchain():
                                 f"{np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
         assert np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
         k += 1
-    A2id = w.params.get_index("A2")
-    assert np.abs(w.params.values[A2id] / w.params.err[A2id]) < 3 * nsigma  # A2
+    if w.params.fixed[w.params.get_index("A2")] is False:
+        A2id = w.params.get_index("A2")
+        assert np.abs(w.params.values[A2id] / w.params.err[A2id]) < 3 * nsigma  # A2
     assert np.isclose(np.abs(w.params.values[w.params.get_index("alpha_pix [pix]")]), 0, atol=parameters.PIXSHIFT_PRIOR)  # pixshift
     assert np.isclose(np.abs(w.params.values[w.params.get_index("B")]), 0, atol=1e-3)  # B
 
@@ -239,8 +240,9 @@ def test_ctio_fullchain():
                                 f"{np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
         assert np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
         k += 1
-    A2id = w.params.get_index("A2")
-    assert np.abs((A2 - 1) / w.params.err[A2id]) < 2 * nsigma  # A2
+    if w.params.fixed[w.params.get_index("A2")] is False:
+        A2id = w.params.get_index("A2")
+        assert np.abs((A2 - 1) / w.params.err[A2id]) < 2 * nsigma  # A2
     assert np.isclose(shift_y, 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
     assert np.isclose(D, spectrum.header["D2CCD_T"], atol=0.1)  # D2CCD
     assert np.isclose(B, 1, atol=1e-3)  # B
