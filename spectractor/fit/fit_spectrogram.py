@@ -181,6 +181,11 @@ class SpectrogramFitWorkspace(FitWorkspace):
         if not fit_angstrom_exponent:
             self.params.fixed[self.params.get_index("angstrom_exp")] = True  # angstrom exponent
         self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
+        if np.min(self.spectrum.lambdas) > 500:
+            self.fit_angstrom_exponent = False
+            self.params.fixed[self.params.get_index("angstrom_exp")] = True
+            self.params.values[self.params.get_index("angstrom_exp")] = 0
+            self.my_logger.warning("\n\tWavelengths below 500nm detected: angstrom exponent fitting disabled and fixed to 0.")
         self.spectrogram_simulation = SpectrogramModel(self.spectrum, atmosphere=self.atmosphere,
                                            diffraction_orders=self.diffraction_orders,
                                            fast_sim=False, with_adr=True)

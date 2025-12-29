@@ -112,10 +112,15 @@ class SpectrumFitWorkspace(FitWorkspace):
             self.params.fixed[self.params.get_index("angstrom_exp")] = True  # angstrom exponent
             if parameters.VERBOSE:
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
-        self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
+
         self.lambdas = self.spectrum.lambdas
         self.fit_angstrom_exponent = fit_angstrom_exponent
         self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
+        if np.min(self.spectrum.lambdas) > 500:
+            self.fit_angstrom_exponent = False
+            self.params.fixed[self.params.get_index("angstrom_exp")] = True
+            self.params.values[self.params.get_index("angstrom_exp")] = 0
+            self.my_logger.warning("\n\tWavelengths below 500nm detected: angstrom exponent fitting disabled and fixed to 0.")
         self.simulation = SpectrumSimulation(self.spectrum, atmosphere=self.atmosphere, fast_sim=True, with_adr=True)
         self.amplitude_truth = None
         self.lambdas_truth = None
@@ -399,7 +404,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
         fit_workspace.params.fixed = [True] * len(fit_workspace.params)
         fit_workspace.params.fixed[fit_workspace.params.get_index(r"VAOD")] = False
         run_minimisation(fit_workspace, method="newton", xtol=1e-3, ftol=100 / fit_workspace.data.size,
-                         verbose=False)
+                         verbose=False, with_line_search=False)
         fit_workspace.params.fixed = fixed
         run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
                                         ftol=1e-3 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False)
