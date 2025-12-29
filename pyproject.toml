@@ -49,12 +49,15 @@ include = ["spectractor*"]
 version = {attr = "spectractor._version.__version__"}
 
 [tool.setuptools.package-data]
+"*" = ["*.ini", "*.txt"]
 spectractor = [
     "config/*.ini",
-    "extractor/dispersers/**/*",
-    "simulation/CTIOThroughput/*.txt",
-    "simulation/AuxTelThroughput/*.txt", 
-    "simulation/StarDiceThroughput/*.txt"
+    "extractor/dispersers/**/*"
+]
+"spectractor.simulation" = [
+    "CTIOThroughput/*.txt",
+    "AuxTelThroughput/*.txt",
+    "StarDiceThroughput/*.txt"
 ]
 
 [project.optional-dependencies]
