@@ -46,7 +46,7 @@ SPECTRACTOR_FIT_TIMEOUT = 3600  # maximum time per gradient descent before Timeo
 SPECTRACTOR_ATMOSPHERE_SIM = "none"  # library to compute atmospheric transmission: none, libradtran, getobsatmo
 SPECTRACTOR_SIMULATE_STARFIELD = False  # simulate star field with Gaia catalog: False, True
 
-# Paths
+# Paths (relative paths will be converted to absolute in update_derived_parameters())
 DISPERSER_DIR = "./extractor/dispersers/"
 CONFIG_DIR = "./config/"
 THROUGHPUT_DIR = "./simulation/CTIOThroughput/"
