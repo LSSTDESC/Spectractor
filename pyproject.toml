@@ -39,13 +39,11 @@ Homepage = "https://github.com/LSSTDESC/Spectractor"
 Repository = "https://github.com/LSSTDESC/Spectractor"
 
 [tool.setuptools]
-packages = [
-    "spectractor",
-    "spectractor.extractor",
-    "spectractor.fit",
-    "spectractor.simulation",
-]
 include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["spectractor*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "spectractor._version.__version__"}
