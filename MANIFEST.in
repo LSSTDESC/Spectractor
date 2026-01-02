@@ -1,8 +1,0 @@
-include README.md
-include LICENSE
-include pyproject.toml
-recursive-include spectractor/config *.ini
-recursive-include spectractor/extractor/dispersers *
-recursive-include spectractor/simulation/CTIOThroughput *.txt
-recursive-include spectractor/simulation/AuxTelThroughput *.txt
-recursive-include spectractor/simulation/StarDiceThroughput *.txt
