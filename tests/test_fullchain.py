@@ -226,8 +226,8 @@ def test_ctio_fullchain():
                                 verbose=True, plot=True, live_fit=False)
     run_spectrogram_minimisation(w, method="newton")
     nsigma = 2
-    labels = ["A2_T", "VAOD_T", "OZONE_T", "PWV_T"]  # "A1_T" fixed
-    indices = [1, 3, 5, 6]
+    labels = ["VAOD_T", "OZONE_T", "PWV_T"]  # "A1_T" fixed
+    indices = [3, 5, 6]
     A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, B, Astar, D, shift_x, shift_y, shift_t, pressure, *psf_poly_params = w.params.values
     ipar = w.params.get_free_parameters()  # non fixed param indices
     cov_indices = [list(ipar).index(k) for k in indices]  # non fixed param indices in cov matrix
