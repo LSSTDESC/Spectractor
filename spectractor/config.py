@@ -170,22 +170,6 @@ def load_config(config_filename, rebin=True):
         my_logger.info(f"Loaded {config_filename} with\n{txt}")
 
 def update_derived_parameters():
-    # Convert relative paths to absolute paths based on module location
-    _module_dir = os.path.dirname(os.path.abspath(parameters.__file__))
-    
-    # List of path parameters to convert
-    path_params = ['DISPERSER_DIR', 'CONFIG_DIR', 'THROUGHPUT_DIR']
-    
-    for param_name in path_params:
-        param_value = getattr(parameters, param_name, None)
-        if param_value and isinstance(param_value, str):
-            # Check if it's a relative path (starts with ./ or doesn't start with /)
-            if param_value.startswith('./') or not os.path.isabs(param_value):
-                # Convert to absolute path relative to the module directory
-                abs_path = os.path.join(_module_dir, param_value.lstrip('./'))
-                abs_path = os.path.normpath(abs_path)
-                setattr(parameters, param_name, abs_path)
-    
     # Derive other parameters
     parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
     parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, parameters.LAMBDA_STEP)
