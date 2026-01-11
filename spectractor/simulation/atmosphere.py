@@ -186,9 +186,6 @@ class Atmosphere:
         self.set_label()
         self.my_logger.debug(f'\n\t{self.title}\n\t\t{self.label}')
 
-        if angstrom_exponent is not None and angstrom_exponent < 0:
-            raise ValueError(f"If not None, angstrom_exponnent must be positive. Got {angstrom_exponent=}.")
-
         if parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "getobsatmo":
             if angstrom_exponent is None:
                 angstrom_exponent = 1.2  # value that makes getObsAtmo and Libradtran class close
@@ -196,6 +193,9 @@ class Atmosphere:
             atm = self.emulator.GetAllTransparencies(wl, am=self.airmass, pwv=pwv, oz=ozone,
                                                      tau=aerosols, beta=angstrom_exponent, flagAerosols=True)
         elif parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "libradtran":
+            if angstrom_exponent is not None and angstrom_exponent < 0:
+                raise ValueError(f"If not None, angstrom_exponnent must be positive. Got {angstrom_exponent=}.")
+
             lib = libradtran.Libradtran()
             wl, atm = lib.simulate(self.airmass, aerosols, ozone, pwv, self.pressure, angstrom_exponent=angstrom_exponent,
                                    lambda_min=self.lambda_min, lambda_max=self.lambda_max, altitude=self.altitude)

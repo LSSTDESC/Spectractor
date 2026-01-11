@@ -39,24 +39,25 @@ Homepage = "https://github.com/LSSTDESC/Spectractor"
 Repository = "https://github.com/LSSTDESC/Spectractor"
 
 [tool.setuptools]
-packages = [
-    "spectractor",
-    "spectractor.extractor",
-    "spectractor.fit",
-    "spectractor.simulation",
-]
 include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["spectractor*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "spectractor._version.__version__"}
 
 [tool.setuptools.package-data]
+"*" = ["*.ini", "*.txt"]
 spectractor = [
     "config/*.ini",
-    "extractor/dispersers/**/*",
-    "simulation/CTIOThroughput/*.txt",
-    "simulation/AuxTelThroughput/*.txt", 
-    "simulation/StarDiceThroughput/*.txt"
+    "extractor/dispersers/**/*"
+]
+"spectractor.simulation" = [
+    "CTIOThroughput/*.txt",
+    "AuxTelThroughput/*.txt",
+    "StarDiceThroughput/*.txt"
 ]
 
 [project.optional-dependencies]

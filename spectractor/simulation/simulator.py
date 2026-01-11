@@ -97,7 +97,7 @@ class SpectrumSimulation(Spectrum):
         self.err[idx] = np.sqrt((self.throughput.transmission_err(lambdas[idx]) / self.throughput.transmission(lambdas[idx]))**2 + (self.target.sed_err(lambdas[idx])/self.target.sed(lambdas[idx]))**2)
         self.err[idx] *= np.abs(self.data[idx])
         idx = (self.throughput.transmission(lambdas) <= 0) | (self.target.sed(lambdas) <= 0)
-        self.err[idx] = 10 * np.max(self.err)
+        self.err[idx] = 10 * np.max(self.err)       
         return self.data, self.err
 
     def simulate(self, A1=1.0, A2=0., aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, reso=0.,
@@ -187,10 +187,10 @@ class SpectrumSimulation(Spectrum):
             self.data[-1] = self.data[-2]
             # self.data /= np.gradient(lambdas)
             telescope_transmission = self.throughput.transmission(lambdas)
-            idx = telescope_transmission > 0
+            idx = self.data > 0
             self.err[idx] = self.data[idx] * self.throughput.transmission_err(lambdas)[idx] / telescope_transmission[idx]
-            idx = telescope_transmission <= 0
-            self.err[idx] = 1e6 * np.max(self.err)
+            idx = self.data <= 0
+            self.err[idx] = 10 * np.max(self.err)
         # Now add the systematics
         if reso > 0.1:
             self.data = fftconvolve_gaussian(self.data, reso)
@@ -389,10 +389,8 @@ class SpectrogramModel(Spectrum):
         idx = (telescope_transmission > 0) & (self.target.sed(lambdas) > 0)
         spectrum_err[idx] = np.sqrt((self.throughput.transmission_err(lambdas[idx]) / telescope_transmission[idx])**2 + (self.target.sed_err(lambdas[idx])/self.target.sed(lambdas[idx]))**2)
         spectrum_err[idx] *= np.abs(spectrum[idx])
-        idx = (telescope_transmission <= 0) | (self.target.sed(lambdas) <= 0)
+        idx = (telescope_transmission <= 0) | (self.target.sed(lambdas) <= 0) | (spectrum_err <= 0)
         spectrum_err[idx] = 10 * np.max(spectrum_err)
-        ####TOCHECK idx = telescope_transmission <= 0: not ready yet to be implemented
-        # spectrum_err[idx] = 1e6 * np.max(spectrum_err)
         return spectrum, spectrum_err
 
     

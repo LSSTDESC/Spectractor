@@ -3,3 +3,14 @@ BG40 is from vendor
 BG40_65mm_1 and OG550_65mm_1 are copied from BG40.txt
 
 - multispectra_holo4_003_HD142331_20230802_348-594_HD146233_AuxTel_v3.1.0_doSensorFlat_FreePressure_BG40ReScaled1.09_throughput.txt was created using v3.1.0 1a65d73cddf078472e7df082552cb75b6f39a9a4 commit, with 20230802 HD142331 data extracted with ratio 2/1 where BG40 data were rescaled by a factor 1.09, fixed A1s, binning=1, free angstrom exponent, free ozone, masking of curve edges and absorption lines
+- multispectra_holo4_003_HD200654_20250921_AuxTel_v3.2.1_doSensorFlat_FreePressure_throughput.txt was created using v3.2.1 c5cecc19375c083ada48a2b7ed04d76d2eec8b65 commit, with 20250921 HD200654 data extracted with ratio 2/1, fixed A1s and A2s, binning=1, free angstrom exponent, free ozone, masking of curve edges and absorption lines; atmospheric parameters converged to 
+VAOD: 0.037 +0.002 -0.002 bounds=(0, 1)
+angstrom_exp: 1.8 +0.2 -0.2 bounds=(0, 3)
+ozone [db]: 348 +28 -28 bounds=(np.float64(0.0), np.float64(625.0))
+PWV [mm]: 1.0 +0.1 -0.1 bounds=(np.float64(0.0), np.float64(20.25))
+The night was chosen having CHI2_FIT < 2 and low PWV ~ 1mm.
+multispectra_holo4_003_HD200654_20250921_OG550_65mm_1_AuxTel_v3.2.1_doSensorFlat_FreePressure_throughput.txt and multispectra_holo4_003_multi_20251214_BG40_65mm_1_AuxTel_v3.2.1_doSensorFlat_FreePressure_throughput.txt were created similarly using data taken on 20251214 with HD200654 and multispectra respectively, using the above empty transmission file. 
+BG40_65mm_1 and OG550_65mm_1 are copies of these two files.
+Inpuy collection with v3.2.1 was u/jneveu/test_auxtel_atmosphere_202501_v3.2.0_fixA2fixA1_OG550UnweightedEdge_testRobustFit/20251225T223715Z
+
+

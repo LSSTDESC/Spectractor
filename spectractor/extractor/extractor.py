@@ -495,7 +495,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         if self.flat is not None:
             # multiply each M matrix columns by the flat array (see the docstring)
             # TODO: if flat array is a cube flat, needs to multiply directly in build_sparse_M
-            dia = sparse.dia_matrix(([self.flat], [0]), shape=(self.flat.size, self.flat.size))
+            dia = sparse.dia_matrix(([self.flat.astype("float32")], [0]), shape=(self.flat.size, self.flat.size))
             M = (dia @ M).tocsc()
 
 

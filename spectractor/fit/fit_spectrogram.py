@@ -104,7 +104,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         for order in self.diffraction_orders:
             axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
         bounds = [[0, 2], [0, 2], [0, 2], [0, 10], [0, 4], [100, 700], [0, 20], [0.8, 1.2], [0, np.inf],
-                  [D2CCD - 5 * parameters.DISTANCE2CCD_ERR, D2CCD + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
+                  [D2CCD - 20 * parameters.DISTANCE2CCD_ERR, D2CCD + 20 * parameters.DISTANCE2CCD_ERR], [-10, 10],
                   [-10, 10], [-90, 90], [0, np.inf]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
         fixed = [False] * p.size
@@ -132,9 +132,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         params.fixed[params.get_index(f"A{self.diffraction_orders[0]}")] = False  # A1
         self.atm_params_indices = np.array([params.get_index(label) for label in ["VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]"]])
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
-        params.fixed[params.get_index(f"A{self.diffraction_orders[0]}")] = False  # A1
+        params.fixed[params.get_index(f"A{self.diffraction_orders[0]}")] = True  # A1
         if "A2" in params.labels:
-            params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = False  #not getCalspec.is_calspec(spectrum.target.label) #"A2_T" not in self.spectrum.header
+            params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = True  #not getCalspec.is_calspec(spectrum.target.label) #"A2_T" not in self.spectrum.header
         if "A3" in params.labels:
             params.fixed[params.get_index(f"A{self.diffraction_orders[2]}")] = "A3_T" not in self.spectrum.header
         params.fixed[params.get_index(r"shift_x [pix]")] = False  # Delta x
@@ -181,6 +181,11 @@ class SpectrogramFitWorkspace(FitWorkspace):
         if not fit_angstrom_exponent:
             self.params.fixed[self.params.get_index("angstrom_exp")] = True  # angstrom exponent
         self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
+        if np.min(self.spectrum.lambdas) > 500:
+            self.fit_angstrom_exponent = False
+            self.params.fixed[self.params.get_index("angstrom_exp")] = True
+            self.params.values[self.params.get_index("angstrom_exp")] = 0
+            self.my_logger.warning("\n\tWavelengths below 500nm detected: angstrom exponent fitting disabled and fixed to 0.")
         self.spectrogram_simulation = SpectrogramModel(self.spectrum, atmosphere=self.atmosphere,
                                            diffraction_orders=self.diffraction_orders,
                                            fast_sim=False, with_adr=True)
@@ -577,7 +582,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
     my_logger = set_logger(__name__)
     guess = np.asarray(fit_workspace.params.values)
     fit_workspace.simulate(*guess)
-    fit_workspace.plot_fit()
+    # fit_workspace.plot_fit()
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
@@ -610,7 +615,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         fit_workspace.spectrogram_simulation.fast_sim = False
         fit_workspace.spectrogram_simulation.fix_psf_cube = False
         fit_workspace.params.fixed = [True] * len(fit_workspace.params.values)
-        fit_workspace.params.fixed[fit_workspace.params.get_index(r"A1")] = False  # A1
+        fit_workspace.params.fixed[fit_workspace.params.get_index(r"VAOD")] = False  # VAOD
         fit_workspace.params.fixed[fit_workspace.params.get_index(r"shift_y [pix]")] = False  # shift y
         fit_workspace.params.fixed[fit_workspace.params.get_index(r"angle [deg]")] = False  # angle
         run_minimisation(fit_workspace, "newton", xtol=1e-2, ftol=0.01, with_line_search=False)
@@ -624,8 +629,8 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
         #                                            fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
         #                                            niter=40)
-        run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
-                                        ftol=1 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=verbose,
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-10,
+                                        ftol=1e-3 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=verbose,
                                         with_line_search=True)
         extra = {"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
                  "date-obs": fit_workspace.spectrum.date_obs,
