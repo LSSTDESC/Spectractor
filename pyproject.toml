@@ -38,11 +38,17 @@ dependencies = [
 Homepage = "https://github.com/LSSTDESC/Spectractor"
 Repository = "https://github.com/LSSTDESC/Spectractor"
 
+[tool.setuptools]
+packages = [
+    "spectractor",
+    "spectractor.extractor",
+    "spectractor.fit",
+    "spectractor.simulation",
+]
+include-package-data = true
+
 [tool.setuptools.dynamic]
 version = {attr = "spectractor._version.__version__"}
-
-[tool.setuptools.packages.find]
-include = ["spectractor*"]
 
 [tool.setuptools.package-data]
 spectractor = [
@@ -71,17 +77,12 @@ docs = [
     "sphinxcontrib-apidoc"
 ]
 
-[tool.setuptools.exclude-package-data]
-"*" = ["tests/*"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-# Exclure parameters.py et mcmc.py de la collecte de tests
-addopts = "--ignore=spectractor/parameters.py --ignore=spectractor/fit/mcmc.py --ignore=spectractor/fit/astrometry.py"
-norecursedirs = ["spectractor/fit"]
+addopts = "--ignore=spectractor/parameters.py --ignore=spectractor/fit/mcmc.py"
 
 [tool.coverage.run]
 omit = [
@@ -103,3 +104,4 @@ exclude_lines = [
     "if False:",
     "if TYPE_CHECKING:",
 ]
+show_missing = true

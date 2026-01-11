@@ -75,8 +75,8 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.spectrum = spectrum
         p = np.array([1, 0, 0.05, 1.2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size
-        fixed[0] = True
-        fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
+        fixed[0] = False
+        fixed[1] = False #"A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
         fixed[5] = False
         # fixed[6:8] = [True, True]
         fixed[8] = True
@@ -84,7 +84,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         # fixed[-1] = True
         if not fit_angstrom_exponent:
             fixed[3] = True  # angstrom_exponent
-        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 10), (0, 3), (100, 700), (0, 20),
+        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 10), (0, 4), (100, 700), (0, 20),
                        (0.5, 20),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
                   (-2, 2), (-np.inf, np.inf)]
         params = FitParameters(p, labels=["A1", "A2", "VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]",
@@ -396,7 +396,8 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
 
         fit_workspace.simulation.fast_sim = False
         fixed = copy.copy(fit_workspace.params.fixed)
-        fit_workspace.params.fixed[6] = True
+        fit_workspace.params.fixed = [True] * len(fit_workspace.params)
+        fit_workspace.params.fixed[0] = False
         run_minimisation(fit_workspace, method="newton", xtol=1e-3, ftol=100 / fit_workspace.data.size,
                          verbose=False)
         fit_workspace.params.fixed = fixed
@@ -405,10 +406,12 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
 
         fit_workspace.params.plot_correlation_matrix()
         fit_workspace.plot_fit()
+        extra = {"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
+                 "date-obs": fit_workspace.spectrum.date_obs,
+                 "outliers": len(fit_workspace.outliers)}
+        fit_workspace.params.extra = extra
         if fit_workspace.filename != "":
-            write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params,
-                                    extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
-                                           "date-obs": fit_workspace.spectrum.date_obs})
+            write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params, extra=extra)
             # save_gradient_descent(fit_workspace, costs, params_table)
 
 

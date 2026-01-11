@@ -303,7 +303,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                 data = []
                 for i in range(1, lambdas_bin_edges.size):
                     lbdas = np.arange(self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i] + 1, 1)
-                    data.append(np.trapz(data_func(lbdas), x=lbdas) / self.bin_widths)
+                    data.append(np.trapezoid(data_func(lbdas), x=lbdas) / self.bin_widths)
                 self.data[k] = np.copy(data)
         else:
             for k in range(self.nspectra):
@@ -317,7 +317,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                 data = []
                 for i in range(1, lambdas_bin_edges.size):
                     lbdas = np.arange(self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i] + 1, 1)
-                    data.append(np.trapz(data_func(lbdas), x=lbdas) / self.bin_widths)
+                    data.append(np.trapezoid(data_func(lbdas), x=lbdas) / self.bin_widths)
                 self.ref_spectrum_cube.append(np.copy(data))
         else:
             for k in range(self.nspectra):
@@ -337,7 +337,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                         err.append(np.nan)
                     else:
                         lbdas = np.arange(self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i] + 1, 1)
-                        err.append(np.sqrt(np.abs(np.trapz(err_func(lbdas), x=lbdas) / self.bin_widths)))
+                        err.append(np.sqrt(np.abs(np.trapezoid(err_func(lbdas), x=lbdas) / self.bin_widths)))
                 self.err[k] = np.copy(err)
         else:
             for k in range(self.nspectra):
@@ -445,7 +445,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             if self.bin_widths > 0:
                 for i in range(1, self.lambdas_bin_edges.size):
                     lbdas = np.arange(self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i] + 1, 1)
-                    self.true_atmospheric_transmission.append(np.trapz(tatm(lbdas), x=lbdas) / self.bin_widths)
+                    self.true_atmospheric_transmission.append(np.trapezoid(tatm(lbdas), x=lbdas) / self.bin_widths)
                     # self.true_atmospheric_transmission.append(quad(tatm, self.lambdas_bin_edges[i - 1],
                     #                                                self.lambdas_bin_edges[i])[0] / self.bin_widths)
             else:
@@ -459,7 +459,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         if self.bin_widths > 0:
             for i in range(1, self.lambdas_bin_edges.size):
                 lbdas = np.arange(self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i] + 1, 1)
-                self.true_instrumental_transmission.append(np.trapz(tinst(lbdas), x=lbdas) / self.bin_widths)
+                self.true_instrumental_transmission.append(np.trapezoid(tinst(lbdas), x=lbdas) / self.bin_widths)
                 # self.true_instrumental_transmission.append(quad(tinst, self.lambdas_bin_edges[i - 1],
                 #                                                 self.lambdas_bin_edges[i])[0] / self.bin_widths)
         else:
@@ -537,7 +537,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                         delta = self.lambdas_bin_edges[i] - self.lambdas_bin_edges[i-1]
                         if delta > 0:
                             lbdas = np.arange(self.lambdas_bin_edges[i-1] + deltas[k], self.lambdas_bin_edges[i] + deltas[k] + 1, 1)
-                            atm.append(np.trapz(a(lbdas), x=lbdas)/delta)
+                            atm.append(np.trapezoid(a(lbdas), x=lbdas)/delta)
                         else:
                             atm.append(1)
                 else:
@@ -717,7 +717,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         tatm_binned = []
         for i in range(1, self.lambdas_bin_edges.size):
             lbdas = np.arange(self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i] + 1, 1)
-            tatm_binned.append(np.trapz(tatm(lbdas), x=lbdas) / (self.lambdas_bin_edges[i] - self.lambdas_bin_edges[i - 1]))
+            tatm_binned.append(np.trapezoid(tatm(lbdas), x=lbdas) / (self.lambdas_bin_edges[i] - self.lambdas_bin_edges[i - 1]))
 
         ax[0, 1].errorbar(self.lambdas[0], tatm_binned,
                           label=r'$T_{\mathrm{atm}}$', fmt='k.')  # , markersize=0.1)
@@ -798,7 +798,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         tatm_binned = []
         for i in range(1, self.lambdas_bin_edges.size):
             lbdas = np.arange(self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i] + 1, 1)
-            tatm_binned.append(np.trapz(tatm(lbdas), x=lbdas) / (self.lambdas_bin_edges[i] - self.lambdas_bin_edges[i - 1]))
+            tatm_binned.append(np.trapezoid(tatm(lbdas), x=lbdas) / (self.lambdas_bin_edges[i] - self.lambdas_bin_edges[i - 1]))
         throughput = self.amplitude_params / self.spectra[0].disperser.transmission(self.lambdas[0])
         throughput_err = self.amplitude_params_err / self.spectra[0].disperser.transmission(self.lambdas[0])
         file_name = self.output_file_name + f"_transmissions.txt"

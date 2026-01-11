@@ -48,7 +48,7 @@ SPECTRACTOR_SIMULATE_STARFIELD = False  # simulate star field with Gaia catalog:
 
 # Paths
 DISPERSER_DIR = "./extractor/dispersers/"
-CONFIG_DIR = "../config/"
+CONFIG_DIR = "./config/"
 THROUGHPUT_DIR = "./simulation/CTIOThroughput/"
 if 'ASTROMETRYNET_DIR' in os.environ:
     ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
