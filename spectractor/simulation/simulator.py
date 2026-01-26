@@ -187,10 +187,10 @@ class SpectrumSimulation(Spectrum):
             self.data[-1] = self.data[-2]
             # self.data /= np.gradient(lambdas)
             telescope_transmission = self.throughput.transmission(lambdas)
-            idx = telescope_transmission > 0
+            idx = self.data > 0
             self.err[idx] = self.data[idx] * self.throughput.transmission_err(lambdas)[idx] / telescope_transmission[idx]
-            idx = telescope_transmission <= 0
-            self.err[idx] = 1e6 * np.max(self.err)
+            idx = self.data <= 0
+            self.err[idx] = 10 * np.max(self.err)
         # Now add the systematics
         if reso > 0.1:
             self.data = fftconvolve_gaussian(self.data, reso)
@@ -389,10 +389,8 @@ class SpectrogramModel(Spectrum):
         idx = (telescope_transmission > 0) & (self.target.sed(lambdas) > 0)
         spectrum_err[idx] = np.sqrt((self.throughput.transmission_err(lambdas[idx]) / telescope_transmission[idx])**2 + (self.target.sed_err(lambdas[idx])/self.target.sed(lambdas[idx]))**2)
         spectrum_err[idx] *= np.abs(spectrum[idx])
-        idx = (telescope_transmission <= 0) | (self.target.sed(lambdas) <= 0)
+        idx = (telescope_transmission <= 0) | (self.target.sed(lambdas) <= 0) | (spectrum_err <= 0)
         spectrum_err[idx] = 10 * np.max(spectrum_err)
-        ####TOCHECK idx = telescope_transmission <= 0: not ready yet to be implemented
-        # spectrum_err[idx] = 1e6 * np.max(spectrum_err)
         return spectrum, spectrum_err
 
     
@@ -485,12 +483,11 @@ class SpectrogramModel(Spectrum):
             if self.profile_params[order] is None or not self.fix_psf_cube:
                 if k==0:
                     self.profile_params[order] = self.chromatic_psf.update(poly_params[k], x0=self.r0.real + shift_x,
-                                                                           y0=self.r0.imag + shift_y, angle=angle,
-                                                                           plot=False, apply_bounds=True)
+                                                                           y0=self.r0.imag + shift_y, angle=angle, plot=False, apply_bounds=True)
                 else:
                     self.profile_params[order] = self.chromatic_psf.from_poly_params_to_profile_params(poly_params[k], apply_bounds=True)
                 self.profile_params[order][:, 0] = 1
-                self.profile_params[order][:, 1] = dispersion_law.real + self.r0.real + shift_x
+                self.profile_params[order][:, 1] = dispersion_law.real + self.r0.real
                 self.profile_params[order][:, 2] += dispersion_law.imag
             if k == 0:
                 self.chromatic_psf.table["Dx"] = self.profile_params[order][:, 1] - self.r0.real

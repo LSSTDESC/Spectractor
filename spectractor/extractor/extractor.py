@@ -494,7 +494,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         if self.flat is not None:
             # multiply each M matrix columns by the flat array (see the docstring)
             # TODO: if flat array is a cube flat, needs to multiply directly in build_sparse_M
-            dia = sparse.dia_matrix(([self.flat], [0]), shape=(self.flat.size, self.flat.size))
+            dia = sparse.dia_matrix(([self.flat.astype("float32")], [0]), shape=(self.flat.size, self.flat.size))
             M = (dia @ M).tocsc()
 
 
@@ -1361,7 +1361,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
         xmax = min(right_edge, int(distance[lambda_max_index]) + 1)  # +1 to  include edges
     else:
         lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
-                                                          x0=image.target_pixcoords,    
+                                                          x0=image.target_pixcoords,
                                                           D=parameters.DISTANCE2CCD, order=spectrum.order)
         xmin = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MIN)))
         xmax = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MAX)))

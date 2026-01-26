@@ -1414,8 +1414,8 @@ class Astrometry():  # pragma: no cover
                 gaia_residuals_quad_sum = np.sum(np.sqrt(np.sum(gaia_residuals ** 2, axis=1)))
                 if parameters.DEBUG:
                     self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_matches, margin=20,
-                                                        quad=self.quad_stars_pixel_positions,
-                                                        label=self.image.target.label)
+                                                       quad=self.quad_stars_pixel_positions,
+                                                       label=self.image.target.label)
                     self.plot_astrometry_shifts(vmax=3)
                     self.plot_quad_stars()
                 target_x, target_y = self.get_target_pixel_position()
