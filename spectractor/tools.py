@@ -34,6 +34,25 @@ from numba import njit
 _SCIKIT_IMAGE_NEW_HESSIAN = None
 
 
+# Monkey-patch matplotlib tight_layout to handle LaTeX parsing errors
+# This is needed for matplotlib versions in LSST environment that don't fully support LaTeX
+_original_tight_layout = plt.Figure.tight_layout
+
+
+def _safe_tight_layout(self, *args, **kwargs):
+    """Wrapper for Figure.tight_layout that catches ValueError from LaTeX parsing errors."""
+    try:
+        return _original_tight_layout(self, *args, **kwargs)
+    except ValueError:
+        # Silently ignore LaTeX parsing errors in tight_layout
+        # This typically happens with Greek letters and complex math expressions
+        # in axis labels or titles when matplotlib's mathtext parser has issues
+        pass
+
+
+plt.Figure.tight_layout = _safe_tight_layout
+
+
 # do not increase speed:
 # @njit(fastmath=True, cache=True)
 def gauss(x, A, x0, sigma):
