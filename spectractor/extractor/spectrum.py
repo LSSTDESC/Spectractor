@@ -633,7 +633,7 @@ class Spectrum:
             Path of the output fits file.
         overwrite: bool
             If True overwrite the output file if needed (default: False).
-
+            
         Examples
         --------
         >>> import os
@@ -677,7 +677,8 @@ class Spectrum:
             hdu1.header[header_key] = value
             # print(f"Set header key {header_key} to {value} from attr {attribute}")
 
-        extnames = ["SPECTRUM", "SPEC_COV", "ORDER2", "ORDER0"]  # spectrum data
+        extnames = ["SPECTRUM", "SPEC_COV", "ORDER2"]  # spectrum data
+        extnames += ["ORDER0"]  # spectrum order0 timestamps
         extnames += ["S_DATA", "S_ERR", "S_BGD", "S_BGD_ER", "S_FIT", "S_RES", "S_FLAT", "S_STAR", "S_MASK"]
         extnames += ["PSF_TAB"]  # PSF parameter table
         extnames += ["LINES"]  # spectroscopic line table
@@ -1095,9 +1096,9 @@ class Spectrum:
 
         if not self.fast_load:
             with (fits.open(input_file_name) as hdu_list):
-                # load other spectrum info
                 self.cov_matrix = hdu_list["SPEC_COV"].data
                 _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
+                # load other spectrum info
                 self.target.image = hdu_list["ORDER0"].data
                 self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
                 self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
@@ -1117,7 +1118,7 @@ class Spectrum:
                     if self.spectrogram_mask is not None:
                         self.spectrogram_mask = self.spectrogram_mask.astype(bool)
                 self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
-                                                   saturation=self.spectrogram_saturation)
+                                                saturation=self.spectrogram_saturation)
                 self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
 
     def load_spectrogram(self, input_file_name):  # pragma: no cover
