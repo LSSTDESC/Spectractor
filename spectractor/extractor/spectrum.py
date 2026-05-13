@@ -173,7 +173,7 @@ class Spectrum:
         Size of the spectrogram along the y axis.
     """
 
-    def __init__(self, file_name="", image=None, order=1, target=None, config="", fast_load=True,
+    def __init__(self, file_name="", image=None, order=1, target=None, config="", fast_load=False,
                  spectrogram_file_name_override=None,
                  psf_file_name_override=None,):
         """ Class used to store information and methods relative to spectra and their extraction.
@@ -634,13 +634,6 @@ class Spectrum:
         overwrite: bool
             If True overwrite the output file if needed (default: False).
             
-        NOTES
-        -----
-        - The spectrum is saved in the first extension of the fits file, with the wavelength array in the first column, the spectrum in the second column and the error in the third column.
-        - The header of the first extension contains the relevant parameters of the spectrum and its extraction.
-        - The config parameters are saved in the CONFIG extension of the fits file, and the lines table is saved in the LINES extension of the fits file.
-        - Only in DEBUG mode, the spectrogram data and the PSF table are saved in the fits file in the S_DATA and PSF_TAB extensions respectively.
-
         Examples
         --------
         >>> import os
@@ -685,11 +678,10 @@ class Spectrum:
             # print(f"Set header key {header_key} to {value} from attr {attribute}")
 
         extnames = ["SPECTRUM", "SPEC_COV", "ORDER2"]  # spectrum data
-        if parameters.DEBUG:
-            extnames += ["ORDER0"]  # spectrum order0 timestamps
-            extnames += ["S_DATA", "S_ERR", "S_BGD", "S_BGD_ER", "S_FIT", "S_RES", "S_FLAT", "S_STAR", "S_MASK"]
-            extnames += ["PSF_TAB"]  # PSF parameter table
-            extnames += ["LINES"]  # spectroscopic line table
+        extnames += ["ORDER0"]  # spectrum order0 timestamps
+        extnames += ["S_DATA", "S_ERR", "S_BGD", "S_BGD_ER", "S_FIT", "S_RES", "S_FLAT", "S_STAR", "S_MASK"]
+        extnames += ["PSF_TAB"]  # PSF parameter table
+        extnames += ["LINES"]  # spectroscopic line table
         extnames += ["CONFIG"]  # config parameters
         hdus = {"SPECTRUM": hdu1}
         for k, extname in enumerate(extnames):
@@ -830,7 +822,7 @@ class Spectrum:
         self.my_logger.info('\n\tSpectrogram saved in %s' % output_file_name)
 
     def load_spectrum(self, input_file_name, spectrogram_file_name_override=None,
-                      psf_file_name_override=None, fast_load=True):
+                      psf_file_name_override=None, fast_load=False):
         """Load the spectrum from a fits file (data, error and wavelengths).
 
         Parameters
@@ -842,8 +834,7 @@ class Spectrum:
         psf_file_name_override : str
             Manually specify a path to the psf file.
         fast_load: bool, optional
-            If True, only the spectrum is loaded (not the PSF nor the spectrogram data) (default: True).
-            If False, load other hdus only in DEBUG mode.
+            If True, only the spectrum is loaded (not the PSF nor the spectrogram data) (default: False).
 
         Examples
         --------
@@ -1103,10 +1094,10 @@ class Spectrum:
         if 'PSF_REG' in self.header and float(self.header["PSF_REG"]) > 0:
             self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
 
-        self.cov_matrix = hdu_list["SPEC_COV"].data
-        _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
-        if not self.fast_load and parameters.DEBUG:
+        if not self.fast_load:
             with (fits.open(input_file_name) as hdu_list):
+                self.cov_matrix = hdu_list["SPEC_COV"].data
+                _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
                 # load other spectrum info
                 self.target.image = hdu_list["ORDER0"].data
                 self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
@@ -1127,7 +1118,7 @@ class Spectrum:
                     if self.spectrogram_mask is not None:
                         self.spectrogram_mask = self.spectrogram_mask.astype(bool)
                 self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
-                                                   saturation=self.spectrogram_saturation)
+                                                saturation=self.spectrogram_saturation)
                 self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
 
     def load_spectrogram(self, input_file_name):  # pragma: no cover
