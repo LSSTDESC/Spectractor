@@ -1,5 +1,4 @@
 import os
-import matplotlib as mpl
 import numpy as np
 
 # These parameters are the default values adapted to CTIO
