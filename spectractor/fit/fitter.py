@@ -1680,7 +1680,7 @@ def run_simple_newton_minimisation(fit_workspace, xtol=1e-8, ftol=1e-8, niter=50
     return params_table, funcs
 
 
-def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter=50,
+def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter=100,
                      verbose=False, with_line_search=True, minimizer_method="L-BFGS-B"):
     my_logger = set_logger(__name__)
 
@@ -1770,7 +1770,7 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
 
 
 def run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4,
-                                    niter=50, sigma_clip=5.0, niter_clip=3, verbose=False, with_line_search=True):
+                                    niter=100, sigma_clip=5.0, niter_clip=3, verbose=False, with_line_search=True):
     my_logger = set_logger(__name__)
     for step in range(niter_clip):
         if verbose:
@@ -1898,18 +1898,18 @@ class RegFitWorkspace(FitWorkspace):
         ax[1].axvline(opt_reg, color="k")
         ax[2].axvline(opt_reg, color="k")
         ax[0].set_ylabel(r"$G(r)$")
-        ax[0].set_xlabel("Regularisation hyper-parameter $r$")
+        ax[0].set_xlabel(r"Regularisation hyper-parameter $r$")
         ax[0].grid()
         ax[0].set_title(f"Optimal regularisation parameter: {opt_reg:.3g}")
         ax[1].plot(regs, chisqs)
         ax[1].set_ylabel(r"$\chi^2(\mathbf{A}(r) \vert \mathbf{\theta})$")
-        ax[1].set_xlabel("Regularisation hyper-parameter $r$")
+        ax[1].set_xlabel(r"Regularisation hyper-parameter $r$")
         ax[1].grid()
         ax[1].set_xscale("log")
         ax[2].set_xscale("log")
         ax[2].plot(regs, resolutions)
         ax[2].set_ylabel(r"$\mathrm{Tr}\,\mathbf{R}$")
-        ax[2].set_xlabel("Regularisation hyper-parameter $r$")
+        ax[2].set_xlabel(r"Regularisation hyper-parameter $r$")
         ax[2].grid()
         # fig.tight_layout()
         plt.subplots_adjust(hspace=0)
@@ -1920,7 +1920,7 @@ class RegFitWorkspace(FitWorkspace):
 
         fig = plt.figure(figsize=(7, 5))
         rho = compute_correlation_matrix(self.w.amplitude_cov_matrix)
-        plot_correlation_matrix_simple(plt.gca(), rho, axis_names=[''] * len(self.w.amplitude_params))
+        plot_correlation_matrix_simple(plt.gca(), rho, axis_names=[r'a'] * len(self.w.amplitude_params))
         # ipar=np.arange(10, 20))
         plt.gca().set_title(r"Correlation matrix $\mathbf{\rho}$")
         fig.tight_layout()

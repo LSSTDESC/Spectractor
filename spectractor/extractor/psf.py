@@ -1457,7 +1457,7 @@ class PSF:
         self.my_logger = set_logger(self.__class__.__name__)
         self.values_default = np.array([1, 0, 0, 1])
         self.params = FitParameters(values=self.values_default, labels=["amplitude", "x_c", "y_c", "saturation"],
-                                    axis_names=["$A$", r"$x_c$", r"$y_c$", "saturation"])
+                                    axis_names=[r"$A$", r"$x_c$", r"$y_c$", "saturation"])
         self.max_half_width = np.inf
         self.clip = clip
 
@@ -1586,7 +1586,7 @@ class Moffat(PSF):
         if values is None:
             values = np.copy(self.values_default)
         labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "saturation"]
-        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", "saturation"]
+        axis_names = [r"$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf),
                                 (1.1, 10), (0, np.inf)]
         self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
@@ -1783,7 +1783,7 @@ class Gauss(PSF):
         if values is None:
             values = np.copy(self.values_default)
         labels = ["amplitude", "x_c", "y_c", "sigma", "saturation"]
-        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\sigma$", "saturation"]
+        axis_names = [r"$A$", r"$x_c$", r"$y_c$", r"$\sigma$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (0, np.inf)]
         self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
@@ -1955,7 +1955,7 @@ class MoffatGauss(PSF):
         if values is None:
             values = np.copy(self.values_default)
         labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
-        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
+        axis_names = [r"$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (1.1, 10),
                   (-1, np.inf), (1, np.inf), (0, np.inf)]
         self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
@@ -2137,7 +2137,7 @@ class DoubleMoffat(PSF):
         if values is None:
             values = np.copy(self.values_default)
         labels = ["amplitude", "x_c", "y_c", "gamma1", "alpha1", "eta", "gamma2", "alpha2", "saturation"]
-        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma_1$", r"$\alpha_1$", r"$\eta$", r"$\gamma_2$", r"$\alpha_2$", "saturation"]
+        axis_names = [r"$A$", r"$x_c$", r"$y_c$", r"$\gamma_1$", r"$\alpha_1$", r"$\eta$", r"$\gamma_2$", r"$\alpha_2$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (1.1, 10),
                   (0, 1), (1, np.inf), (1.1, 10), (0, np.inf)]
         self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
@@ -2322,7 +2322,7 @@ class Order0(PSF):
         if values is None:
             values = np.copy(self.values_default)
         labels = ["amplitude", "x_c", "y_c", "gamma", "saturation"]
-        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", "saturation"]
+        axis_names = [r"$A$", r"$x_c$", r"$y_c$", r"$\gamma$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.5, 5), (0, np.inf)]
         self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
         self.psf_func = self.build_interpolated_functions(target=target)

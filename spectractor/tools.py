@@ -33,6 +33,24 @@ from numba import njit
 
 _SCIKIT_IMAGE_NEW_HESSIAN = None
 
+# Monkey-patch matplotlib tight_layout to handle LaTeX parsing errors
+# This is needed for matplotlib versions in LSST environment that don't fully support LaTeX
+_original_tight_layout = plt.Figure.tight_layout
+
+
+def _safe_tight_layout(self, *args, **kwargs):
+    """Wrapper for Figure.tight_layout that catches ValueError from LaTeX parsing errors."""
+    try:
+        return _original_tight_layout(self, *args, **kwargs)
+    except ValueError:
+        # Silently ignore LaTeX parsing errors in tight_layout
+        # This typically happens with Greek letters and complex math expressions
+        # in axis labels or titles when matplotlib's mathtext parser has issues
+        pass
+
+
+plt.Figure.tight_layout = _safe_tight_layout
+
 
 # do not increase speed:
 # @njit(fastmath=True, cache=True)
@@ -2587,13 +2605,71 @@ def compute_correlation_matrix(cov):
     return rho
 
 
+
+
+def _convert_latex_to_plain_text(text):
+    """Convert LaTeX math symbols to plain text for matplotlib compatibility.
+    
+    Remove math mode delimiters ($) and replace LaTeX Greek letters with their plain text names
+    to avoid mathtext parsing errors in matplotlib versions with limited LaTeX support.
+    
+    Parameters
+    ----------
+    text : str
+        Text potentially containing LaTeX math symbols (e.g., r"$\gamma$", "$y_c^{(0)}$").
+        
+    Returns
+    -------
+    str
+        Plain text representation (e.g., "gamma", "y_c^(0)").
+    """
+    # Dictionary mapping LaTeX Greek letters to plain text names
+    latex_to_plain = {
+        r'\alpha': 'alpha',
+        r'\beta': 'beta',
+        r'\gamma': 'gamma',
+        r'\delta': 'delta',
+        r'\epsilon': 'epsilon',
+        r'\zeta': 'zeta',
+        r'\eta': 'eta',
+        r'\theta': 'theta',
+        r'\iota': 'iota',
+        r'\kappa': 'kappa',
+        r'\lambda': 'lambda',
+        r'\mu': 'mu',
+        r'\nu': 'nu',
+        r'\xi': 'xi',
+        r'\pi': 'pi',
+        r'\rho': 'rho',
+        r'\sigma': 'sigma',
+        r'\tau': 'tau',
+        r'\upsilon': 'upsilon',
+        r'\phi': 'phi',
+        r'\chi': 'chi',
+        r'\psi': 'psi',
+        r'\omega': 'omega',
+    }
+    
+    # Remove $ delimiters
+    plain_text = text.replace('$', '')
+    
+    # Replace LaTeX commands with plain text
+    for latex, plain in latex_to_plain.items():
+        plain_text = plain_text.replace(latex, plain)
+    
+    # Replace remaining LaTeX syntax for readability
+    plain_text = plain_text.replace('{', '').replace('}', '')
+    
+    return plain_text
+
+
 def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None, vmin=-1, vmax=1):  # pragma: no cover
     if ipar is None:
         ipar = np.arange(rho.shape[0]).astype(int)
     im = plt.imshow(rho[ipar[:, None], ipar], interpolation="nearest", cmap='bwr', vmin=vmin, vmax=vmax)
     ax.set_title("Correlation matrix")
     if axis_names is not None:
-        names = [axis_names[ip] for ip in ipar]
+        names = [_convert_latex_to_plain_text(axis_names[ip]) for ip in ipar]
         plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=15)
         plt.yticks(np.arange(ipar.size), names, fontsize=15)
     cbar = plt.colorbar(im)

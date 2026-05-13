@@ -120,15 +120,15 @@ class ChromaticPSF:
                 continue
             self.n_poly_params += self.degrees[name] + 1
         labels = []  # [f"a{k}" for k in range(self.poly_params.size)]
-        axis_names = []  # "$a_{" + str(k) + "}$" for k in range(self.poly_params.size)]
+        axis_names = []  # r"$a_{" + str(k) + "}$" for k in range(self.poly_params.size)]
         for ip, p in enumerate(self.psf.params.labels):
             if ip == 0:
                 labels += [f"{p}_{k}" for k in range(len(self.table))]
-                axis_names += ["$" + self.psf.params.axis_names[ip].replace("$", "") + "_{" + str(k) + "}$" for k in range(len(self.table))]
+                axis_names += [r"$" + self.psf.params.axis_names[ip].replace("$", "") + "_{" + str(k) + "}$" for k in range(len(self.table))]
             else:
                 for k in range(self.degrees[p] + 1):
                     labels.append(f"{p}_{k}")
-                    axis_names.append("$" + self.psf.params.axis_names[ip].replace("$", "") + "^{(" + str(k) + ")}$")
+                    axis_names.append(r"$" + self.psf.params.axis_names[ip].replace("$", "") + "^{(" + str(k) + ")}$")
         self.params = FitParameters(values=np.zeros(self.n_poly_params), labels=labels, axis_names=axis_names)
 
     def resize_table(self, new_Nx):
@@ -1471,7 +1471,7 @@ class ChromaticPSF:
         ax.grid()
         ax.set_yscale('symlog', linthresh=10)
         ax.legend()
-        fig.tight_layout()
+        #fig.tight_layout()
         # fig.subplots_adjust(hspace=0)
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
@@ -2072,7 +2072,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         ax[3, 0].legend(fontsize=7)
         ax[3, 0].set_xlim((0, data.shape[1]))
         ax[3, 0].grid(True)
-        fig.tight_layout()
+        #fig.tight_layout()
         if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)
