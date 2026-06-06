@@ -1215,13 +1215,13 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False, epsilon=1e-3):
     Parameters
     ----------
     x: array_like
-        The abscisse array.
+        The abscissa array.
     y: array_like
         The function array.
     minimum: float, optional
-        The minimum reference from which to compyte half the height (default: 0).
+        The minimum reference from which to compute half the height (default: 0).
     center: float, optional
-        The center of the curve. If None, the weighted averageof the y(x) distribution is computed (default: None).
+        The center of the curve. If None, the weighted average of the y(x) distribution is computed (default: None).
     full_output: bool, optional
         If True, half maximum, the edges of the curve and the curve center are given in output (default: False).
     epsilon: float, optional
