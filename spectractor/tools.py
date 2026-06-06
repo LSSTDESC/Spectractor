@@ -2608,7 +2608,7 @@ def compute_correlation_matrix(cov):
 
 
 def _convert_latex_to_plain_text(text):
-    """Convert LaTeX math symbols to plain text for matplotlib compatibility.
+    r"""Convert LaTeX math symbols to plain text for matplotlib compatibility.
     
     Remove math mode delimiters ($) and replace LaTeX Greek letters with their plain text names
     to avoid mathtext parsing errors in matplotlib versions with limited LaTeX support.
