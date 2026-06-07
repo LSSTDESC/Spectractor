@@ -583,7 +583,7 @@ def write_fitparameter_json(json_filename, params, extra=None):
     Returns
     -------
     jsontxt: str
-        The JSON dictionnary as string.
+        The JSON dictionary as a string.
 
     Examples
     --------
@@ -600,7 +600,7 @@ def write_fitparameter_json(json_filename, params, extra=None):
         >>> os.remove(params.json_filename)
     """
     if json_filename == "":
-        raise ValueError("Must provide attribute a JSON filename.")
+        raise ValueError("Must provide a JSON filename.")
     if extra:
         params.extra = extra
     jsontxt = json.dumps(params.__dict__, cls=NumpyArrayEncoder)
@@ -770,7 +770,7 @@ class FitWorkspace:
         Returns
         -------
         x: array_like
-            The abscisse of the model prediction.
+            The abscissa of the model prediction.
         model: array_like
             The model prediction.
         model_err: array_like
@@ -1279,18 +1279,18 @@ class FitWorkspace:
 
     def plot_triangle_fisher(self, nsamples=10000, max_params=8):
         """Plot a triangle (corner) plot of probability contours and distributions using Fisher matrix method.
-        
-        This method generates samples from a multivariate normal distribution based on the parameter 
+
+        This method generates samples from a multivariate normal distribution based on the parameter
         covariance matrix and creates a corner plot showing 1D and 2D marginal distributions.
-        
+
         Parameters
         ----------
         nsamples: int, optional
             Number of samples to generate from the multivariate normal distribution (default: 10000).
         max_params: int, optional
-            Maximum number of parameters to display. Only the first max_params free parameters 
+            Maximum number of parameters to display. Only the first max_params free parameters
             will be shown (default: 8).
-            
+
         Examples
         --------
         >>> from spectractor.fit.fitter import FitParameters, FitWorkspace
@@ -1298,7 +1298,7 @@ class FitWorkspace:
         >>> params.cov = np.array([[1, -0.5, 0], [-0.5, 1, -1], [0, -1, 1]])
         >>> w = FitWorkspace(params=params, filename="test.fits")
         >>> w.plot_triangle_fisher(nsamples=1000, max_params=3)
-        
+
         Notes
         -----
         This method requires the `corner` package to be installed.
@@ -1310,56 +1310,56 @@ class FitWorkspace:
             self.my_logger.warning("Package 'corner' not installed. Cannot create triangle plot. "
                                    "Install it with: pip install corner")
             return
-        
+
         # Get free parameters indices
         ipar = self.params.get_free_parameters()
-        
+
         # Limit to max_params parameters
         n_params = min(len(ipar), max_params)
         ipar = ipar[:n_params]
-        
+
         if len(ipar) == 0:
             self.my_logger.warning("No free parameters to plot.")
             return
-            
+
         # Check that covariance matrix is available
         if self.params.cov.size == 0:
             self.my_logger.warning("Covariance matrix not available. Run fit first.")
             return
-        
+
         # Extract mean values and covariance matrix for free parameters
         mean_values = self.params.values[ipar]
         cov_matrix = self.params.cov[:n_params, :n_params]
-        
+
         # Check if covariance matrix is positive definite
         eigenvalues = np.linalg.eigvals(cov_matrix)
         if np.any(eigenvalues <= 0):
             self.my_logger.warning("Covariance matrix is not positive definite. "
                                    "Cannot generate samples.")
             return
-        
+
         # Generate samples from multivariate normal distribution
         samples = np.random.multivariate_normal(mean_values, cov_matrix, size=nsamples)
-        
+
         # Get axis names for the selected parameters
         axis_names = [self.params.axis_names[i] for i in ipar]
-        
+
         # Create corner plot
-        fig = corner.corner(samples, labels=axis_names, 
+        fig = corner.corner(samples, labels=axis_names,
                            quantiles=[0.16, 0.5, 0.84],
                            show_titles=True,
                            title_kwargs={"fontsize": 12},
                            truths=mean_values)
-        
+
         # Save figure if requested
         if (parameters.SAVE or parameters.LSST_SAVEFIGPATH) and self.filename != "":  # pragma: no cover
             figname = os.path.splitext(self.filename)[0] + "_triangle.pdf"
             self.my_logger.info(f"\n\tSave triangle plot {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
-        
+
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-        
+
         return fig
 
 
@@ -1865,7 +1865,7 @@ class RegFitWorkspace(FitWorkspace):
                 A = cov @ (self.w.M.T @ (self.w.W * self.w.data) + reg * self.w.Q_dot_A0)
             else:
                 A = cov @ (self.w.M.T @ (self.w.W @ self.w.data) + reg * self.w.Q_dot_A0)
-         
+
             if A.ndim == 2:  # ndim == 2 when A comes from a sparse matrix computation
                 A = np.asarray(A).reshape(-1)
             diff = self.w.data - self.w.M @ A

@@ -217,17 +217,17 @@ class Image(object):
             QN3_2 = Line(539, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 3rd band right edge
             QN3_3 = Line(531, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[1, 50], use_for_calibration=False) # QN 3rd band center
             QN4_1 = Line(620, atmospheric=True, label=r'$QN4$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 4th band left edge
-            QN = [QN1_1, QN1_2, QN2_1, QN2_2, QN3_1, QN3_2, QN4_1, QN1_3, QN2_3, QN3_3] 
+            QN = [QN1_1, QN1_2, QN2_1, QN2_2, QN3_1, QN3_2, QN4_1, QN1_3, QN2_3, QN3_3]
             for line in self.target.lines.lines:
                 # TODO: make this an attribute of the disperser or filter
                 if 410 < line.wavelength < 415 or 475 < line.wavelength < 500 or 520 < line.wavelength < 545 or 610 < line.wavelength:
                     line.use_for_calibration = False
-            
+
             for l in QN:
                 self.target.lines.lines.append(l)
             _ = self.target.lines.sort_lines()
             self.target.lines.sort_lines()
-            
+
 
     def rebin(self):
         """Rebin the image and reset some related parameters.
@@ -840,7 +840,7 @@ def load_STARDICE_image(image):  # pragma: no cover
     # with spectrogram nearly horizontal and on the right of central star
     image.data = image.data[::-1, ::-1]
     image.airmass = 1/np.cos(np.radians(90-image.header['MOUNTALT']))
-       
+
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
@@ -863,7 +863,7 @@ def load_STARDICE_image(image):  # pragma: no cover
         if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=atol):
             image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degrees while "
                                     f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degrees. "
-                                    f"\nBoth differs by more than {atol} degrees... bug ?")
+                                    f"\nDifference is more than {atol} degrees... bug ?")
 
     image.read_out_noise = 8.5 * np.ones_like(image.data)
     image.compute_parallactic_angle()
@@ -1051,7 +1051,7 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     x0 = int(guess[0])
     y0 = int(guess[1])
     Dx, Dy = widths
-    
+
     # crop parameters
     subYmin, subYmax = y0 - Dy, y0 + Dy
     subXmin, subXmax = x0 - Dx, x0 + Dx
@@ -1060,7 +1060,7 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
 
     # verify if the sub image is out of bounds
     if subYmin < 0 or subXmin < 0 or subYmax >= sizeY or subXmax >= sizeX:
-        
+
         old_subYmin, old_subYmax, old_subXmin, old_subXmax = subYmin, subYmax, subXmin, subXmax
 
         subYmin, subXmin = max(0,       subYmin), max(0,       subXmin)

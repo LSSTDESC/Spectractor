@@ -130,7 +130,7 @@ def line(x, a, b):
 # noinspection PyTypeChecker
 def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf), sigma=None):
     """Fit a Gaussian profile to data, using curve_fit. The mean guess value of the Gaussian
-    must not be far from the truth values. Boundaries helps a lot also.
+    must not be far from the truth values. Boundaries help a lot also.
 
     Parameters
     ----------
@@ -213,7 +213,7 @@ def multigauss_and_line(x, *params):
 def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf)):
     """Fit a multiple Gaussian profile plus a straight line to data, using curve_fit.
     The mean guess value of the Gaussian must not be far from the truth values.
-    Boundaries helps a lot also. The order of the parameters is line slope, line intercept,
+    Boundaries help a lot also. The order of the parameters is line slope, line intercept,
     and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
     deviation.
 
@@ -322,7 +322,7 @@ def multigauss_and_bgd(x, *params):
     """Multiple Gaussian profile plus a polynomial background to data.
     Polynomial function is based on the orthogonal Legendre polynomial basis.
     The degree of the polynomial background is fixed by parameters.CALIB_BGD_NPARAMS.
-    The order of the parameters is a first block CALIB_BGD_NPARAMS parameters (from low to high Legendre polynome degree,
+    The order of the parameters is a first block CALIB_BGD_NPARAMS parameters (from low to high Legendre polynomial degree,
     contrary to np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
     deviation.
 
@@ -379,7 +379,7 @@ def multigauss_and_bgd(x, *params):
 def multigauss_and_bgd_jacobian(x, *params):
     """Jacobien of the multiple Gaussian profile plus a polynomial background to data.
     The degree of the polynomial background is fixed by parameters.CALIB_BGD_NPARAMS.
-    The order of the parameters is a first block CALIB_BGD_NPARAMS parameters (from low to high Legendre polynome degree,
+    The order of the parameters is a first block CALIB_BGD_NPARAMS parameters (from low to high Legendre polynomial degree,
     contrary to np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
     deviation. x values are renormalised on the [-1, 1] interval for the background.
 
@@ -425,7 +425,7 @@ def multigauss_and_bgd_jacobian(x, *params):
 def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None):
     """Fit a multiple Gaussian profile plus a polynomial background to data, using iminuit.
     The mean guess value of the Gaussian must not be far from the truth values.
-    Boundaries helps a lot also. The degree of the polynomial background is fixed by parameters.CALIB_BGD_NPARAMS.
+    Boundaries help a lot also. The degree of the polynomial background is fixed by parameters.CALIB_BGD_NPARAMS.
     The order of the parameters is a first block CALIB_BGD_NPARAMS parameters (from high to low monomial terms,
     same as np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
     deviation. x values are renormalised on the [-1, 1] interval for the background.
@@ -1340,17 +1340,17 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False, epsilon=1e-3):
 
 def compute_integral(x, y, bounds=None):
     """
-    Compute the integral of an y(x) curve. The curve is interpolated and extrapolated with cubic splines.
+    Compute the integral of a y(x) curve. The curve is interpolated and extrapolated with cubic splines.
     If not provided, bounds are set to the x array edges.
 
     Parameters
     ----------
     x: array_like
-        The abscisse array.
+        The abscissa array.
     y: array_like
         The function array.
     bounds: array_like, optional
-        The bounds of the integral. If None, the edges of thex array are taken (default bounds=None).
+        The bounds of the integral. If None, the edges of the x array are taken (default bounds=None).
 
     Returns
     -------
@@ -1795,7 +1795,7 @@ def detect_peaks(image):
     background = (image == 0)
 
     # a little technicality: we must erode the background in order to
-    # successfully subtract it form local_max, otherwise a line will
+    # successfully subtract it from local_max, otherwise a line will
     # appear along the background border (artifact of the local maximum filter)
     eroded_background = binary_erosion(background, structure=neighborhood, border_value=50)
 
@@ -1936,7 +1936,7 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
     data_err: array, optional
         The spectrum uncertainty array (default: None).
     xlim: list, optional
-        List of minimum and maximum abscisses (default: None).
+        List containing a minimum and a maximum x value (default: None).
     color: str, optional
         String for the color of the spectrum (default: 'r').
     linestyle: str, optional
@@ -2609,15 +2609,15 @@ def compute_correlation_matrix(cov):
 
 def _convert_latex_to_plain_text(text):
     r"""Convert LaTeX math symbols to plain text for matplotlib compatibility.
-    
+
     Remove math mode delimiters ($) and replace LaTeX Greek letters with their plain text names
     to avoid mathtext parsing errors in matplotlib versions with limited LaTeX support.
-    
+
     Parameters
     ----------
     text : str
         Text potentially containing LaTeX math symbols (e.g., r"$\gamma$", "$y_c^{(0)}$").
-        
+
     Returns
     -------
     str
@@ -2649,17 +2649,17 @@ def _convert_latex_to_plain_text(text):
         r'\psi': 'psi',
         r'\omega': 'omega',
     }
-    
+
     # Remove $ delimiters
     plain_text = text.replace('$', '')
-    
+
     # Replace LaTeX commands with plain text
     for latex, plain in latex_to_plain.items():
         plain_text = plain_text.replace(latex, plain)
-    
+
     # Replace remaining LaTeX syntax for readability
     plain_text = plain_text.replace('{', '').replace('}', '')
-    
+
     return plain_text
 
 
@@ -2703,7 +2703,7 @@ def flip_and_rotate_radec_vector_to_xy_vector(ra, dec, camera_angle=0, flip_ra_s
         Vector coordinates along DEC direction.
     camera_angle: float
         Angle of the camera between y axis and the North Celestial Pole counterclockwise, or equivalently between
-        the x axis and the West direction counterclokwise. Units are degrees. (default: 0).
+        the x axis and the West direction counterclockwise. Units are degrees. (default: 0).
     flip_ra_sign: -1, 1, optional
         Flip RA axis is value is -1 (default: 1).
     flip_dec_sign: -1, 1, optional

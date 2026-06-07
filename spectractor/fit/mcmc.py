@@ -99,7 +99,7 @@ class Grid:
     def normalize(self):
         self.total = self.getTotal()
         if self.total == 0:
-            sys.exit('Warning! Sum of likelihood is zero: can not normalize grid {}.'.format(self.axis_names))
+            sys.exit('Warning! Sum of likelihood is zero: cannot normalize grid {}.'.format(self.axis_names))
         else:
             self.grid = self.grid / self.total
         return self.total

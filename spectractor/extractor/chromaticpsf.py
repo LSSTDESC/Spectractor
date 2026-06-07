@@ -113,7 +113,7 @@ class ChromaticPSF:
         self.saturation = saturation
         if saturation is None:
             self.saturation = 1e20
-            self.my_logger.warning(f"\n\tSaturation level should be given to instanciate the ChromaticPSF "
+            self.my_logger.warning(f"\n\tSaturation level should be given to instantiate the ChromaticPSF "
                                    f"object. self.saturation is set arbitrarily to 1e20. Good luck.")
         for name in self.psf.params.labels:
             if "amplitude" in name:
@@ -619,8 +619,8 @@ class ChromaticPSF:
 
     @staticmethod
     def set_rectangular_boundaries(psf_cube_masked):
-        """Compute the ChromaticPSF computation boundaries, as a dictionnary of integers giving
-        the `"xmin"`, `"xmax"`, `"ymin"` and `"ymax"` edges where to compute the PSF for each wavelength.
+        """Compute the ChromaticPSF computation boundaries, as a dictionary of integers giving
+        the `"xmin"`, `"xmax"`, `"ymin"` and `"ymax"` edges where the PSF is computed for each wavelength.
         True regions are rectangular after this operation. The `psf_cube_masked` cube is updated accordingly and returned.
 
         Parameters
@@ -631,7 +631,7 @@ class ChromaticPSF:
         Returns
         -------
         boundaries: dict
-            The dictionnary of PSF edges per wavelength.
+            The dictionary of PSF edges per wavelength.
         psf_cube_masked: np.ndarray
             Updated cube of boolean values where `psf_cube` cube is positive, eventually convolved.
 
@@ -684,12 +684,12 @@ class ChromaticPSF:
         return boundaries, psf_cube_masked
 
     def get_sparse_indices(self, boundaries):
-        """Methods that returns the indices to build sparse matrices from rectangular `boundaries`.
+        """Method that returns the indices to build sparse matrices from rectangular `boundaries`.
 
         Parameters
         ----------
         boundaries: dict
-            The dictionnary of PSF edges per wavelength.
+            The dictionary of PSF edges per wavelength.
 
         Returns
         -------
@@ -1813,7 +1813,7 @@ class ChromaticPSF:
             # first fit order 0 terms
             w.my_logger.info("\n\tFit order 0 parameters...")
             fixed_default = np.copy(w.params.fixed)
-            # fix higher order coefficients of polynomes
+            # fix higher-order coefficients of polynomials
             for k in range(w.params.ndim):
                 if "_0" not in w.params.labels[k] and not w.params.fixed[k]:
                     w.params.fixed[k] = True  # _k parameters that are yet fixed
