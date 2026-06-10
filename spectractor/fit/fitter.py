@@ -1406,7 +1406,7 @@ def gradient_descent(fit_workspace, niter=10, xtol=1e-3, ftol=1e-3, with_line_se
             raise TypeError(f"Type of fit_workspace.W is {type(W)}. It must be a np.ndarray.")
         # Jacobian
         J = fit_workspace.jacobian(tmp_params, model_input=[tmp_lambdas, tmp_model, tmp_model_err])
-        # remove parameters with unexpected null Jacobian vectors or that are degenerated
+        # remove parameters with unexpected null Jacobian vectors or that are degenerate
         J_vectors = [np.array(J[ip]).ravel() for ip in range(J.shape[0])]
         J_norms = [np.linalg.norm(J_vectors[ip]) for ip in range(J.shape[0])]
         for ip in range(J.shape[0]):
@@ -1429,10 +1429,10 @@ def gradient_descent(fit_workspace, niter=10, xtol=1e-3, ftol=1e-3, with_line_se
                     ipar = np.delete(ipar, list(ipar).index(jp))
                     fit_workspace.params.fixed[jp] = True
                     my_logger.warning(
-                        f"\n\tStep {i}: {fit_workspace.params.labels[jp]} is degenerated with {fit_workspace.params.labels[ip]}; "
+                        f"\n\tStep {i}: {fit_workspace.params.labels[jp]} is degenerate with {fit_workspace.params.labels[ip]}; "
                         f"parameter {fit_workspace.params.labels[jp]} is fixed at its last known current value ({tmp_params[jp]}).")
                     continue
-        # remove fixed and degenerated parameters; then transpose
+        # remove fixed and degenerate parameters; then transpose
         J = J[ipar].T
 
         # compute J.T @ W @ J matrix and invert it
