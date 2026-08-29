@@ -74,20 +74,20 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # for order in self.diffraction_orders:
         #     p = np.concatenate([p] + [self.psf_poly_params * order])
         input_labels = [f"A{order}" for order in self.diffraction_orders]
-        input_labels += [r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B", "A_star", "R", "P [hPa]", "T [Celsius]", "z"]
+        input_labels += [r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B", "A_star", "R", "ADR", "T [Celsius]", "z"]
         for order in self.diffraction_orders:
             input_labels += [label+f"_{order}" for label in psf_poly_params_labels]
-        axis_names = [f"$A_{order}$" for order in self.diffraction_orders]
+        axis_names = [rf"$A_{order}$" for order in self.diffraction_orders]
         axis_names += [r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^{(\mathrm{fit})}$ [pix]",
                        r"$\delta_{\mathrm{y}}^{(\mathrm{fit})}$ [pix]", r"$\alpha$ [deg]", "$B$", r"$A_{star}$", "R",
-                       r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]", "$z$"]
+                       r"$A_{ADR}$", r"$T_{\mathrm{atm}}$ [Celcius]", r"$z$"]
         for order in self.diffraction_orders:
-            axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
+            axis_names += [label+r"$\!_$" + str(order) + "$" for label in psf_poly_params_names]
         bounds = [[0, 2], [0, 2], [0, 2],
                   [D2CCD - 3 * parameters.DISTANCE2CCD_ERR, D2CCD + 3 * parameters.DISTANCE2CCD_ERR],
                   [-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR],
                   [-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR],
-                  [-90, 90], [0.2, 5], [0.5, 2], [-360, 360], [0, np.inf], [-100, 100], [1.001, 3]]
+                  [-90, 90], [0.2, 5], [0.5, 2], [-360, 360], [-np.inf, np.inf], [-100, 100], [1.001, 3]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
         fixed = [False] * p.size
         for k, par in enumerate(input_labels):
@@ -128,7 +128,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         params.fixed[params.get_index("angle [deg]")] = False  # angle
         params.fixed[params.get_index("B")] = True  # B: not needed in simulations, to check with data
         params.fixed[params.get_index("R")] = True  # camera rot
-        params.fixed[params.get_index("P [hPa]")] = False  # pressure
+        params.fixed[params.get_index("ADR")] = False  # pressure
         params.fixed[params.get_index("T [Celsius]")] = True  # temperature
         params.fixed[params.get_index("z")] = True  # airmass
 
@@ -876,6 +876,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.params.fixed[self.params.get_index(f"A{self.diffraction_orders[0]}")] = True  # A1
         self.params.fixed[self.params.get_index(r"shift_y [pix]")] = False  # shift y
         self.params.fixed[self.params.get_index(r"angle [deg]")] = False  # angle
+        self.params.fixed[self.params.get_index(r"ADR")] = False  # ADR
         run_minimisation(self, "newton", xtol=1e-2, ftol=0.01, with_line_search=False)  # 1000 / self.data.size)
         self.params.fixed = fixed_default
         self.set_mask(params=self.params.values, fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)

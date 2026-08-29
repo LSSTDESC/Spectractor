@@ -94,18 +94,18 @@ class SpectrogramFitWorkspace(FitWorkspace):
         p = np.concatenate([p] + [self.psf_poly_params] * len(self.diffraction_orders))
         input_labels = [f"A{order}" for order in self.diffraction_orders]
         input_labels += ["VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]", "B", "A_star",
-                         r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "P [hPa]"]
+                         r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "ADR"]
         for order in self.diffraction_orders:
             input_labels += [label + f"_{order}" for label in psf_poly_params_labels]
         axis_names = [f"$A_{order}$" for order in self.diffraction_orders]
         axis_names += ["VAOD", r'$\"a$', "ozone [db]", "PWV [mm]", "$B$", r"$A_{star}$", r"$D_{CCD}$ [mm]",
                        r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"$\theta$ [deg]",
-                       r"$P_{\mathrm{atm}}$ [hPa]"]
+                       r"$A_{\mathrm{ADR}}$"]
         for order in self.diffraction_orders:
             axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
         bounds = [[0, 2], [0, 2], [0, 2], [0, 10], [0, 4], [100, 700], [0, 20], [0.8, 1.2], [0, np.inf],
                   [D2CCD - 20 * parameters.DISTANCE2CCD_ERR, D2CCD + 20 * parameters.DISTANCE2CCD_ERR], [-10, 10],
-                  [-10, 10], [-90, 90], [0, np.inf]]
+                  [-10, 10], [-90, 90], [-np.inf, np.inf]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
         fixed = [False] * p.size
         for k, par in enumerate(input_labels):
@@ -141,7 +141,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         params.fixed[params.get_index(r"shift_y [pix]")] = False  # Delta y
         params.fixed[params.get_index(r"angle [deg]")] = False  # angle
         params.fixed[params.get_index("B")] = True  # B
-        params.fixed[params.get_index("P [hPa]")] = False  # pressure for ADR
+        params.fixed[params.get_index("ADR")] = False  # pressure for ADR
 
         if self.spectrum.spectrogram_Ny > 2 * parameters.PIXDIST_BACKGROUND:
             self.crop_spectrogram()
