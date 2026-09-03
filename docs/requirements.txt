@@ -5,7 +5,7 @@ pandas
 astropy>3.1
 coloredlogs
 recommonmark
-mistune==3.3.0
+mistune==3.3.3
 docutils<1.0,>=0.16
 sphinx-mdinclude
 sphinx-rtd-theme
