@@ -5,18 +5,18 @@
 
 # Spectractor
 
-The goal of Spectractor is to measure the atmospheric transmission and intempt extracting spectra from slitless spectrophotometric images. It has been optimized on CTIO images but can be configured to analyse any kind of slitless data that contains the order 0 and the order 1 of a spectrum. In particular it can  be used to estimate the atmospheric transmission of the LSST site using the dedicated  Auxiliary Telescope. 
+The goal of Spectractor is to measure the atmospheric transmission and attempt to extract spectra from slitless spectrophotometric images. It has been optimized on CTIO images but can be configured to analyse any kind of slitless data that contains the order 0 and the order 1 of a spectrum. In particular it can be used to estimate the atmospheric transmission of the LSST site using the dedicated Auxiliary Telescope.
 
-Spectractor is structured in three subpackages: 
-- `spectractor.extractor`: extracts as most information as possible from a slitless data  image, as the amplitude of the spectrum, the PSF evolution with the wavelength, the pixel to wavelength calibration, an estimate of the background under the spectrum, the position of the order 0;
-- `spectractor.simulation`: contains all the tools to simulate a spectrogram, as the atmospheric transmission simulation, the inclusion of instrumental throughput, the simulation of mock  slitless  data images;
+Spectractor is structured in three subpackages:
+- `spectractor.extractor`: extracts as much information as possible from a slitless data  image, such as the amplitude of the spectrum, the PSF evolution with the wavelength, the pixel to wavelength calibration, an estimate of the background under the spectrum, and the position of the order 0;
+- `spectractor.simulation`: contains all the tools to simulate a spectrogram, such as atmospheric transmission simulation, the inclusion of instrumental throughput, the simulation of mock slitless data images;
 - `spectractor.fit`: compares the extracted data with simulations to estimate the atmospheric transmission and refine the spectral extraction.
 
-Some submodules complete the structures with generic functions:
-- `spectractor.parameters`: contains all the global parameters of Spectractor to set its general behaviour, the instrumental characteritics, etc;
+Some submodules complete the structure with generic functions:
+- `spectractor.parameters`: contains all the global parameters of Spectractor to set its general behaviour, the instrumental characteristics, etc;
 - `spectractor.config`: tools to read config `.ini` text files and set the global parameters;
 - `spectractor.logbook`: tools to read logbook `.csv` text files and get some metadata relative to the data images that are not contained in the header;
-- `spectractor.tools`: contains generic functions shared by all  the subpackages (fitting procedures, plotting functions, etc).
+- `spectractor.tools`: contains generic functions shared by all the subpackages (fitting procedures, plotting functions, etc).
 
 ## Installation
 
@@ -50,9 +50,9 @@ Spectractor is able to perform parameter fits using the MCMC library [emcee](htt
 ## Basic extraction
 
 The main file is `spectractor/extractor/extractor.py` with the function `Spectractor`. It extracts the spectrum from a science data image (deflatted, debiased), given:
-- the path to the FITS image from which to extract the image, 
+- the path to the FITS image from which to extract the image,
 - the path of the output directory to save the extracted spectrum (created automatically if it does not exist yet),
-- the rough pr exact position of the object in the image (in pixels),
+- the rough or exact position of the object in the image (in pixels),
 - the name of the disperser (as it is named in the `spectractor/extractor/dispersers/` folder),
 - the name of the config .ini file,
 - optionally the name of the target (to search for the extra-atmospheric spectrum if available).
@@ -66,7 +66,7 @@ config = "./config/ctio.ini"
 target = "HD111980"
 ```
 
-Then the spectrum is simply extracted from the image and saved in a new fits file using the `Spectractor` function:
+Then the spectrum is simply extracted from the image and saved in a new FITS file using the `Spectractor` function:
 ```
 spectrum = Spectractor(filename, output_directory, guess=guess, target_label=target, disperser_label=disperser_label, config=config)
 ```

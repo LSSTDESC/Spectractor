@@ -405,7 +405,7 @@ class Spectrum:
         label: str
             Label for the legend (default: '').
         xlim: list, optional
-            List of minimum and maximum abscisses (default: None)
+            List containing a minimum and a maximum x value (default: None)
         live_fit: bool, optional
             If True the spectrum is plotted in live during the fitting procedures
             (default: False).
@@ -529,7 +529,7 @@ class Spectrum:
         Parameters
         ----------
         xlim: list, optional
-            List of minimum and maximum abscisses (default: None).
+            List containing a minimum and a maximum x value (default: None).
         figsize: tuple
             Figure size (default: (12, 12)).
         save_as : str, optional

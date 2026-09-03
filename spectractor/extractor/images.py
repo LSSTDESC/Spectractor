@@ -217,17 +217,17 @@ class Image(object):
             QN3_2 = Line(539, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 3rd band right edge
             QN3_3 = Line(531, atmospheric=True, label=r'$QN3$', label_pos=[0.007, 0.02], width_bounds=[1, 50], use_for_calibration=False) # QN 3rd band center
             QN4_1 = Line(620, atmospheric=True, label=r'$QN4$', label_pos=[0.007, 0.02], width_bounds=[0.1, 3], use_for_calibration=True) # QN 4th band left edge
-            QN = [QN1_1, QN1_2, QN2_1, QN2_2, QN3_1, QN3_2, QN4_1, QN1_3, QN2_3, QN3_3] 
+            QN = [QN1_1, QN1_2, QN2_1, QN2_2, QN3_1, QN3_2, QN4_1, QN1_3, QN2_3, QN3_3]
             for line in self.target.lines.lines:
-                # TODO: put this has an attribute of the disperser of filter
+                # TODO: make this an attribute of the disperser or filter
                 if 410 < line.wavelength < 415 or 475 < line.wavelength < 500 or 520 < line.wavelength < 545 or 610 < line.wavelength:
                     line.use_for_calibration = False
-            
+
             for l in QN:
                 self.target.lines.lines.append(l)
             _ = self.target.lines.sort_lines()
             self.target.lines.sort_lines()
-            
+
 
     def rebin(self):
         """Rebin the image and reset some related parameters.
@@ -409,7 +409,7 @@ class Image(object):
         in terms of gain and read-out noise.
 
         A linear model is fitted to the squared pixel uncertainty values with respect to the pixel data values.
-        The slop gives the gain value and the intercept gives the read-out noise value.
+        The slope gives the gain value and the intercept gives the read-out noise value.
 
         Returns
         -------
@@ -794,7 +794,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
         if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=2):
             image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degree while "
                                     f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degree. "
-                                    f"\nBoth differs by more than 2 degree... bug ?")
+                                    f"\nDifference is more than 2 degrees... bug ?")
     parameters.OBS_ALTITUDE = float(image.header['OBS-ELEV']) / 1000
     parameters.OBS_LATITUDE = image.header['OBS-LAT']
     image.read_out_noise = 8.5 * np.ones_like(image.data)
@@ -840,7 +840,7 @@ def load_STARDICE_image(image):  # pragma: no cover
     # with spectrogram nearly horizontal and on the right of central star
     image.data = image.data[::-1, ::-1]
     image.airmass = 1/np.cos(np.radians(90-image.header['MOUNTALT']))
-       
+
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
@@ -859,11 +859,11 @@ def load_STARDICE_image(image):  # pragma: no cover
     if "PC2_1" in image.header:
         rotation_wcs = 180 / np.pi * np.arctan2(-hdu_list[0].header["PC2_1"]/hdu_list[0].header["CDELT2"], hdu_list[0].header["PC1_1"]/hdu_list[0].header["CDELT1"])
         atol = 0.02
-        print("RORATION WCS :", rotation_wcs)
+        print("ROTATION WCS :", rotation_wcs)
         if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=atol):
             image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degrees while "
                                     f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degrees. "
-                                    f"\nBoth differs by more than {atol} degrees... bug ?")
+                                    f"\nDifference is more than {atol} degrees... bug ?")
 
     image.read_out_noise = 8.5 * np.ones_like(image.data)
     image.compute_parallactic_angle()
@@ -872,7 +872,7 @@ def load_STARDICE_image(image):  # pragma: no cover
 def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
     """Find the target in the Image instance.
 
-    The object is search in a windows of size defined by the XWINDOW and YWINDOW parameters,
+    The object is searched in a window of size defined by the XWINDOW and YWINDOW parameters,
     using two iterative fits of a PSF model.
     User must give a guess array in the raw image.
 
@@ -991,7 +991,7 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     elif parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
         pass
     else:
-        raise ValueError(f"For unrotated images, parameters.SPECTRACTOR_FIT_TARGET_CENTROID muste be either: "
+        raise ValueError(f"For unrotated images, parameters.SPECTRACTOR_FIT_TARGET_CENTROID must be either: "
                          f"guess, fit or WCS. Got {parameters.SPECTRACTOR_FIT_TARGET_CENTROID}.")
     image.my_logger.info(f'\n\tX,Y target position in pixels: {theX:.3f},{theY:.3f}')
     if rotated:
@@ -1051,7 +1051,7 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     x0 = int(guess[0])
     y0 = int(guess[1])
     Dx, Dy = widths
-    
+
     # crop parameters
     subYmin, subYmax = y0 - Dy, y0 + Dy
     subXmin, subXmax = x0 - Dx, x0 + Dx
@@ -1060,7 +1060,7 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
 
     # verify if the sub image is out of bounds
     if subYmin < 0 or subXmin < 0 or subYmax >= sizeY or subXmax >= sizeX:
-        
+
         old_subYmin, old_subYmax, old_subXmin, old_subXmax = subYmin, subYmax, subXmin, subXmax
 
         subYmin, subXmin = max(0,       subYmin), max(0,       subXmin)
@@ -1293,7 +1293,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
     angle_range: (float, float)
         Don't consider pixel with Hessian angle outside this range (default: (-10,10)).
     width_cut: int
-        Half with of the image to consider in height (default: parameters.YWINDOW).
+        Half width of the image to consider in height (default: parameters.YWINDOW).
     edges: (int, int)
         Minimum and maximum pixel on the right edge (default: (0, parameters.CCD_IMSIZE)).
     margin_cut: int
@@ -1305,7 +1305,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
     Returns
     -------
     theta: float
-        The median value of the histogram of angles deduced with the Hessian of the pixels (in degree).
+        The median value of the histogram of angles deduced with the Hessian of the pixels (in degrees).
 
     Examples
     --------
@@ -1403,7 +1403,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
 def turn_image(image):
     """Compute the rotation angle using the Hessian algorithm and turn the image.
 
-    The results are stored in Image.data_rotated and Image.stat_errors_rotated.
+    The results are stored in Image.data_rotated and Image.err_rotated.
 
     Parameters
     ----------

@@ -407,8 +407,8 @@ def rec2pol(x, y, deg=False):
 Functions to:
   - get adr object from fits file
   - get list of shift due to adr corresponding to a list of lambdas
-  - get maximum shift due to adr between (in th range of lambdas given)
-  - plot the adr along both axis and the biggest one against the wavelength
+  - get maximum shift due to adr in the given wavelength range
+  - plot the adr along both axes and the largest one against wavelength
 Example to get shift in pixels:
   instanciation_adr(fitsfile, latitude, lbda_ref)
   xs, ys = get_adr_shift_for_lbdas(adr_object, lbdas)
@@ -427,7 +427,7 @@ def adr_calib(lambdas, params, lat, lambda_ref=550):
     elif isinstance(lat, AC.Latitude):
         lat = lat
     else:
-        raise TypeError('Latitude type is neither a str, float nor an astropy.coordinates')
+        raise TypeError('Latitude type is neither a str, float, nor an astropy.coordinates.Latitude')
 
     meadr = instanciation_adr(params, lat, lambda_ref * 10)
 
@@ -450,7 +450,7 @@ def instanciation_adr(params, latitude, lbda_ref):
         dec = dec
         hour_angle = hour_angle
     else:
-        raise TypeError('dec/hour_angle type is neither a str nor an astropy.coordinates')
+        raise TypeError('dec/hour_angle type is neither a str nor an astropy.coordinates.Angle')
 
     temperature, pressure, humidity, airmass = params[2:]
 

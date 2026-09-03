@@ -371,7 +371,7 @@ class Astrometry():  # pragma: no cover
     def load_sources_from_file(self):
         """Load the sources from the class associated self.sources_file_name file.
 
-        By default, the creation of an Astrometry class instance try to load the default
+        By default, the creation of an Astrometry class instance tries to load the default
         source file if it exists.
 
         Returns
@@ -397,7 +397,7 @@ class Astrometry():  # pragma: no cover
         return sources
 
     def get_target_pixel_position(self):
-        """Gives the principal targetted object position in pixels in the image given the WCS.
+        """Gives the principal targeted object position in pixels in the image given the WCS.
         The object proper motion is taken into account.
 
         Returns
@@ -495,7 +495,7 @@ class Astrometry():  # pragma: no cover
             if np.sum(coord) > 0:
                 coords.append(coord)
         if len(coords) < 4:
-            self.my_logger.warning(f"\n\tOnly {len(coords)} calibration stars has been extracted from "
+            self.my_logger.warning(f"\n\tOnly {len(coords)} calibration stars have been extracted from "
                                    f"{self.match_file_name}, with positions {coords}. "
                                    f"A quad of at least 4 stars is expected. "
                                    f"Please check {self.match_file_name}.")
@@ -754,7 +754,7 @@ class Astrometry():  # pragma: no cover
 
     def set_constraints(self, min_stars=100, flux_log10_threshold=0.1, min_range=3 * u.arcsec, max_range=5 * u.arcmin,
                         max_sep=1 * u.arcsec):
-        """Gives a boolean array for sources that respect certain criterai (see below).
+        """Gives a boolean array for sources that respect certain criteria (see below).
 
         Parameters
         ----------

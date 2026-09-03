@@ -27,7 +27,7 @@ def __getattr__(name):
     # Exclude pytest_plugins to avoid pytest trying to load this module as a plugin
     if name == 'pytest_plugins':
         raise AttributeError(f"module 'parameters' has no attribute '{name}'")
-    
+
     if name in locals():
         return locals()[name]
     else:
@@ -40,7 +40,7 @@ SPECTRACTOR_COMPUTE_ROTATION_ANGLE = "hessian"  # method to get image rotation a
 SPECTRACTOR_DECONVOLUTION_PSF2D = True  # deconvolve spectrogram with simple 2D PSF analysis: False, True
 SPECTRACTOR_DECONVOLUTION_FFM = True  # deconvolve spectrogram with full forward model: False, True
 SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP = 20  # value of sigma clip parameter for the spectractor deconvolution process PSF2D and FFM
-SPECTRACTOR_BACKGROUND_SUBTRACTION = True #if True the background is estimated and subtracted 
+SPECTRACTOR_BACKGROUND_SUBTRACTION = True # if True, the background is estimated and subtracted
 SPECTRACTOR_FIT_TIMEOUT_PER_ITER = 600  # maximum time per gradient descent iteration before TimeoutError in seconds
 SPECTRACTOR_FIT_TIMEOUT = 3600  # maximum time per gradient descent before TimeoutError in seconds
 SPECTRACTOR_ATMOSPHERE_SIM = "none"  # library to compute atmospheric transmission: none, libradtran, getobsatmo
@@ -74,7 +74,7 @@ OBS_LATITUDE = '-30 10 07.90'  # CTIO latitude
 OBS_SURFACE = 6361  # Effective surface of the telescope in cm**2 accounting for obscuration
 OBS_EPOCH = "J2000.0"
 OBS_OBJECT_TYPE = 'STAR'  # To choose between STAR, HG-AR, MONOCHROMATOR
-OBS_FULL_INSTRUMENT_TRANSMISSON = 'ctio_throughput_300517_v1.txt'  # Full instrument transmission file
+OBS_FULL_INSTRUMENT_TRANSMISSION = 'ctio_throughput_300517_v1.txt'  # Full instrument transmission file
 OBS_TRANSMISSION_SYSTEMATICS = 0.005
 OBS_CAMERA_ROTATION = 0  # Camera (x,y) rotation angle with respect to (north-up, east-left) system in degrees
 OBS_CAMERA_DEC_FLIP_SIGN = 1  # Camera (x,y) flip signs with respect to (north-up, east-left) system
@@ -121,7 +121,7 @@ PSF_FWHM_CLIP = 2  # PSF is not evaluated outside a region larger than max(PIXWI
 PSF_POLY_TYPE = "polynomial"  # polynomial type: must be polynomial or legendre
 
 # Detection line algorithm
-CALIB_BGD_ORDER = 3  # order of the background polynome to fit
+CALIB_BGD_ORDER = 3  # order of the background polynomial to fit
 CALIB_PEAK_WIDTH = 7  # half range to look for local extrema in pixels around tabulated line values
 CALIB_BGD_WIDTH = 10  # size of the peak sides to use to fit spectrum base line
 CALIB_SAVGOL_WINDOW = 5  # window size for the savgol filter in pixels
