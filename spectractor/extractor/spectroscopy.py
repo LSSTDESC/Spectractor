@@ -485,7 +485,7 @@ class Lines:
             t = Table(rows=rows, names=(
                 'Line', 'Tabulated', 'Detected', 'Shift', 'Err', 'FWHM', 'Amplitude', 'SNR', 'Chisq', 'Eqwidth_mod',
                 'Eqwidth_data'),
-                      dtype=('a12', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
+                      dtype=('S12', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
             for col in t.colnames[1:6]:
                 t[col].unit = 'nm'
             t[t.colnames[5]].unit = amplitude_units

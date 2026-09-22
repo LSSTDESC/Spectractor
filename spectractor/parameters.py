@@ -140,8 +140,8 @@ DEBUG_LOGGING = False
 
 # Plots
 DISPLAY = True
-if os.environ.get('DISPLAY', '') == '':
-    mpl.use('agg')
+backend = mpl.get_backend()
+if os.environ.get('DISPLAY', '') == '' or backend.lower() in ["agg", "pdf", "ps", "svg", "pgf", "cairo"]:
     DISPLAY = False
 PLOT_XLABEL = r"$x$ [pixels]"
 PLOT_YLABEL = r"$y$ [pixels]"
