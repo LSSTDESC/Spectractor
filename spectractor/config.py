@@ -20,7 +20,7 @@ logging.getLogger("h5py").setLevel(logging.ERROR)
 
 
 def from_config_to_dict(path):
-    """Convert config file keywords into dictionnary.
+    """Convert config file keywords into dictionary.
 
     Parameters
     ----------
@@ -243,7 +243,6 @@ def set_logger(logger):
     >>> parameters.DEBUG = True
     >>> test = Test()
     >>> test.log()
-    
     """
     my_logger = logging.getLogger(logger)
     my_format = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"

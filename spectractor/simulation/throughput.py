@@ -94,7 +94,7 @@ def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, la
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="FGB37")
         >>> lambdas, transmissions, errors = load_transmission_file(os.path.join(parameters.THROUGHPUT_DIR, "RG715.txt"))
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="RG715")
-        >>> lambdas, transmissions, errors = load_transmission_file(os.path.join(parameters.THROUGHPUT_DIR, parameters.OBS_FULL_INSTRUMENT_TRANSMISSON))
+        >>> lambdas, transmissions, errors = load_transmission_file(os.path.join(parameters.THROUGHPUT_DIR, parameters.OBS_FULL_INSTRUMENT_TRANSMISSION))
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Full instrument")
         >>> if parameters.DISPLAY: plt.show()
 
@@ -167,7 +167,7 @@ class TelescopeTransmission:
 
         """
         wl, trm, err = load_transmission_file(os.path.join(parameters.THROUGHPUT_DIR,
-                                                      parameters.OBS_FULL_INSTRUMENT_TRANSMISSON))
+                                                      parameters.OBS_FULL_INSTRUMENT_TRANSMISSION))
         to = interp1d(wl, trm, kind='linear', bounds_error=False, fill_value=0.)
         err = np.sqrt(err ** 2 + parameters.OBS_TRANSMISSION_SYSTEMATICS ** 2)
         to_err = interp1d(wl, err, kind='linear', bounds_error=False, fill_value=0.)

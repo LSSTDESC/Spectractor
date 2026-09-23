@@ -379,4 +379,5 @@ def auxtel_fullchain():
                              rtol=0.01, atol=0.01))
 
 
-test_ctio_fullchain()
+if __name__ == "__main__":
+    test_ctio_fullchain()

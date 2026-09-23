@@ -31,7 +31,7 @@ if _astroquery_version < packaging.version.parse("0.4.8"):
 else:
     _USE_NEW_SIMBAD = True
     _SIMBAD_VOTABLE_FIELDS = ('U', 'B', 'V', 'R', 'I', 'J', 'sp_type',
-                              'parallax', 'propermotions', 'rvz_redshift', "IDS", "ids")                
+                              'parallax', 'propermotions', 'rvz_redshift', "IDS", "ids")
 
 try:
     from gaiaspec import getGaia
@@ -59,7 +59,7 @@ def load_target(label, verbose=False):
     """Load the target properties according to the type set by parameters.OBS_OBJECT_TYPE.
 
     Currently, the type can be either "STAR", "HG-AR" or "MONOCHROMATOR". The label parameter gives the
-    name of the source and allows to load its specific properties.
+    name of the source and allows loading its specific properties.
 
     Parameters
     ----------
@@ -343,8 +343,8 @@ class Star(Target):
             self.redshift = float(self.simbad_table[redshift_key][0])
         else:
             self.redshift = 0
-        self.get_radec_position_after_pm(self.simbad_table, 
-                                         date_obs="J2000", 
+        self.get_radec_position_after_pm(self.simbad_table,
+                                         date_obs="J2000",
                                          date_reference = date_reference)
         self.load_spectra()
 
@@ -420,7 +420,7 @@ class Star(Target):
     def load_gaia(self):
         """
         Load the spectrum from the Gaia database.
-        
+
         Examples
         --------
         >>> s = Star('HD111980')
@@ -470,7 +470,7 @@ class Star(Target):
     def load_ned(self):
         """
         Load the spectrum from NED database.
-        
+
         Examples
         --------
         >>> s = Star('3C273')
@@ -583,8 +583,8 @@ class Star(Target):
                                         fill_value=0.)
             else:
                 self.sed_err = interp1d(self.wavelengths[index], self.spectra_err[index], kind='linear', bounds_error=False,
-                                fill_value=10*np.max(self.spectra_err[index]))      
-            
+                                fill_value=10*np.max(self.spectra_err[index]))
+
     def plot_spectra(self):
         """ Plot the spectra stored in the self.spectra list.
 

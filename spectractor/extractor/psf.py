@@ -1440,7 +1440,7 @@ class PSF:
     (in this order) and "saturation" parameter as the last parameter. "amplitude", "x_c" and "y_c"
     stands respectively for the general amplitude of the model, the position along the dispersion axis and the
     transverse position with respect to the dispersion axis (assumed to be the X axis).
-    Last "saturation" parameter must be express in the same units as the signal to model and as the "amplitude"
+    Last "saturation" parameter must be expressed in the same units as the signal to model and as the "amplitude"
     parameter. The PSF models must be normalized to one in total flux divided by the first parameter (amplitude).
     Then the PSF model integral is equal to the "amplitude" parameter.
 
@@ -1610,9 +1610,9 @@ class Moffat(PSF):
         Parameters
         ----------
         pixels: list
-            List containing the X abscisse 2D array and the Y abscisse 2D array.
+            List containing the X abscissa 2D array and the Y abscissa 2D array.
         values: array_like
-            The parameter array. If None, the array used to instanciate the class is taken.
+            The parameter array. If None, the array used to instantiate the class is taken.
             If given, the class instance parameter array is updated.
 
         Returns
@@ -1688,16 +1688,16 @@ class Moffat(PSF):
         Parameters
         ----------
         pixels: array_like
-            List containing the X abscisse 2D array and the Y abscisse 2D array.
+            List containing the X abscissa 2D array and the Y abscissa 2D array.
         params: array_like
-            The parameter array. If None, the array used to instanciate the class is taken.
+            The parameter array. If None, the array used to instantiate the class is taken.
             If given, the class instance parameter array is updated.
         epsilon: array_like, optional
             The array of small steps to compute the partial derivatives of the model if analytical=False (default: None).
         model_input: array_like, optional
             A model input as a list with (x, model, model_err) to avoid an additional call to simulate() if analytical=False (default: None).
         analytical: bool, optional
-            If True, use analytical derivatives to compute Jacobian operator. Otherwise use numerical differenciations
+            If True, use analytical derivatives to compute Jacobian operator. Otherwise use numerical differentiations
             with steps given by epsilon argument (default: True).
 
         Returns
@@ -1801,9 +1801,9 @@ class Gauss(PSF):
         Parameters
         ----------
         pixels: list
-            List containing the X abscisse 2D array and the Y abscisse 2D array.
+            List containing the X abscissa 2D array and the Y abscissa 2D array.
         values: array_like
-            The parameter array. If None, the array used to instanciate the class is taken.
+            The parameter array. If None, the array used to instantiate the class is taken.
             If given, the class instance parameter array is updated.
 
         Returns
@@ -1863,16 +1863,16 @@ class Gauss(PSF):
         Parameters
         ----------
         pixels: array_like
-            List containing the X abscisse 2D array and the Y abscisse 2D array.
+            List containing the X abscissa 2D array and the Y abscissa 2D array.
         params: array_like
-            The parameter array. If None, the array used to instanciate the class is taken.
+            The parameter array. If None, the array used to instantiate the class is taken.
             If given, the class instance parameter array is updated.
         epsilon: array_like, optional
             The array of small steps to compute the partial derivatives of the model if analytical=False (default: None).
         model_input: array_like, optional
             A model input as a list with (x, model, model_err) to avoid an additional call to simulate() if analytical=False (default: None).
         analytical: bool, optional
-            If True, use analytical derivatives to compute Jacobian operator. Otherwise use numerical differenciations
+            If True, use analytical derivatives to compute Jacobian operator. Otherwise use numerical differentiations
             with steps given by epsilon argument (default: True).
 
         Returns
@@ -1980,9 +1980,9 @@ class MoffatGauss(PSF):
         Parameters
         ----------
         pixels: list
-            List containing the X abscisse 2D array and the Y abscisse 2D array.
+            List containing the X abscissa 2D array and the Y abscissa 2D array.
         values: array_like
-            The parameter array. If None, the array used to instanciate the class is taken.
+            The parameter array. If None, the array used to instantiate the class is taken.
             If given, the class instance parameter array is updated.
 
         Returns
@@ -2043,16 +2043,16 @@ class MoffatGauss(PSF):
         Parameters
         ----------
         pixels: array_like
-            List containing the X abscisse 2D array and the Y abscisse 2D array.
+            List containing the X abscissa 2D array and the Y abscissa 2D array.
         params: array_like
-            The parameter array. If None, the array used to instanciate the class is taken.
+            The parameter array. If None, the array used to instantiate the class is taken.
             If given, the class instance parameter array is updated.
         epsilon: array_like, optional
             The array of small steps to compute the partial derivatives of the model if analytical=False (default: None).
         model_input: array_like, optional
             A model input as a list with (x, model, model_err) to avoid an additional call to simulate() if analytical=False (default: None).
         analytical: bool, optional
-            If True, use analytical derivatives to compute Jacobian operator. Otherwise use numerical differenciations
+            If True, use analytical derivatives to compute Jacobian operator. Otherwise use numerical differentiations
             with steps given by epsilon argument (default: True).
 
         Returns
@@ -2162,9 +2162,9 @@ class DoubleMoffat(PSF):
         Parameters
         ----------
         pixels: list
-            List containing the X abscisse 2D array and the Y abscisse 2D array.
+            List containing the X abscissa 2D array and the Y abscissa 2D array.
         values: array_like
-            The parameter array. If None, the array used to instanciate the class is taken.
+            The parameter array. If None, the array used to instantiate the class is taken.
             If given, the class instance parameter array is updated.
 
         Returns
@@ -2226,16 +2226,16 @@ class DoubleMoffat(PSF):
         Parameters
         ----------
         pixels: array_like
-            List containing the X abscisse 2D array and the Y abscisse 2D array.
+            List containing the X abscissa 2D array and the Y abscissa 2D array.
         params: array_like
-            The parameter array. If None, the array used to instanciate the class is taken.
+            The parameter array. If None, the array used to instantiate the class is taken.
             If given, the class instance parameter array is updated.
         epsilon: array_like, optional
             The array of small steps to compute the partial derivatives of the model if analytical=False (default: None).
         model_input: array_like, optional
             A model input as a list with (x, model, model_err) to avoid an additional call to simulate() if analytical=False (default: None).
         analytical: bool, optional
-            If True, use analytical derivatives to compute Jacobian operator. Otherwise use numerical differenciations
+            If True, use analytical derivatives to compute Jacobian operator. Otherwise use numerical differentiations
             with steps given by epsilon argument (default: True).
 
         Returns
@@ -2364,9 +2364,9 @@ class Order0(PSF):
         Parameters
         ----------
         pixels: list
-            List containing the X abscisse 2D array and the Y abscisse 2D array.
+            List containing the X abscissa 2D array and the Y abscissa 2D array.
         values: array_like
-            The parameter array. If None, the array used to instanciate the class is taken.
+            The parameter array. If None, the array used to instantiate the class is taken.
             If given, the class instance parameter array is updated.
 
         Returns
@@ -2448,16 +2448,16 @@ class Order0(PSF):
         Parameters
         ----------
         pixels: array_like
-            List containing the X abscisse 2D array and the Y abscisse 2D array.
+            List containing the X abscissa 2D array and the Y abscissa 2D array.
         params: array_like
-            The parameter array. If None, the array used to instanciate the class is taken.
+            The parameter array. If None, the array used to instantiate the class is taken.
             If given, the class instance parameter array is updated.
         epsilon: array_like, optional
             The array of small steps to compute the partial derivatives of the model if analytical=False (default: None).
         model_input: array_like, optional
             A model input as a list with (x, model, model_err) to avoid an additional call to simulate() if analytical=False (default: None).
         analytical: bool, optional
-            If True, use analytical derivatives to compute Jacobian operator. Otherwise use numerical differenciations
+            If True, use analytical derivatives to compute Jacobian operator. Otherwise use numerical differentiations
             with steps given by epsilon argument (default: True).
 
         Returns

@@ -70,7 +70,7 @@ class Atmosphere:
             self.lambda_min = self.emulator.WLMIN
             self.lambda_max = self.emulator.WLMAX
         elif parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "none":
-            raise ValueError(f"Can not compute atmospheric transmission with {parameters.SPECTRACTOR_ATMOSPHERE_SIM=}. "
+            raise ValueError(f"Cannot compute atmospheric transmission with {parameters.SPECTRACTOR_ATMOSPHERE_SIM=}. "
                              f"Check your configuration.")
         elif parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "libradtran":
             self.emulator = None
@@ -239,9 +239,9 @@ class AtmosphereGrid(Atmosphere):
         Parameters
         ----------
         image_filename: str, optional
-            The original image fits file name from which the grid was computed or has to be computed (default: "").
+            The original image FITS file name from which the grid was computed or has to be computed (default: "").
         spectrum_filename: str, optional
-            The file name of the spectrum fits file name from which the grid was computed or has to be computed (default: "").
+            The file name of the spectrum FITS file name from which the grid was computed or has to be computed (default: "").
         atmgrid_filename: str, optional
             The file name of the atmospheric grid if it exists (default: "").
         airmass: float, optional
@@ -307,7 +307,7 @@ class AtmosphereGrid(Atmosphere):
 
     def set_grid(self, pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10],
                  lambdas=parameters.LAMBDAS):
-        """Set the size of the simulation grid self.atmgrid before compute it.
+        """Set the size of the simulation grid self.atmgrid before computing it.
 
         The first column of self.atmgrid will contain the wavelengths set by lambdas argument,
         the other columns the future simulations.
