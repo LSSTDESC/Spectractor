@@ -7,7 +7,7 @@ from spectractor.fit.fit_multispectra import run_multispectra_minimisation, Mult
 
 
 def filter_data(file_names):  # pragma: no cover
-    from scipy.stats import median_absolute_deviation
+    from scipy.stats import median_abs_deviation
     D = []
     chi2 = []
     dx = []
@@ -34,20 +34,20 @@ def filter_data(file_names):  # pragma: no cover
     plt.plot(k, D)
     # plt.plot(k, np.polyval(np.polyfit(k, reg, deg=1), k))
     plt.axhline(np.median(D))
-    plt.axhline(np.median(D) + 3 * median_absolute_deviation(D))
-    plt.axhline(np.median(D) - 3 * median_absolute_deviation(D))
+    plt.axhline(np.median(D) + 3 * median_abs_deviation(D, scale='normal'))
+    plt.axhline(np.median(D) - 3 * median_abs_deviation(D, scale='normal'))
     plt.grid()
     plt.title("D2CCD")
     plt.show()
-    filter_indices = np.logical_and(D > np.median(D) - 3 * median_absolute_deviation(D),
-                                    D < np.median(D) + 3 * median_absolute_deviation(D))
+    filter_indices = np.logical_and(D > np.median(D) - 3 * median_abs_deviation(D, scale='normal'),
+                                    D < np.median(D) + 3 * median_abs_deviation(D, scale='normal'))
     if len(chi2) > 0:
-        filter_indices *= np.logical_and(chi2 > np.median(chi2) - 3 * median_absolute_deviation(chi2),
-                                         chi2 < np.median(chi2) + 3 * median_absolute_deviation(chi2))
-    filter_indices *= np.logical_and(dx > np.median(dx) - 3 * median_absolute_deviation(dx),
-                                     dx < np.median(dx) + 3 * median_absolute_deviation(dx))
-    filter_indices *= np.logical_and(regs > np.median(regs) - 3 * median_absolute_deviation(regs),
-                                     regs < np.median(regs) + 3 * median_absolute_deviation(regs))
+        filter_indices *= np.logical_and(chi2 > np.median(chi2) - 3 * median_abs_deviation(chi2, scale='normal'),
+                                         chi2 < np.median(chi2) + 3 * median_abs_deviation(chi2, scale='normal'))
+    filter_indices *= np.logical_and(dx > np.median(dx) - 3 * median_abs_deviation(dx, scale='normal'),
+                                     dx < np.median(dx) + 3 * median_abs_deviation(dx, scale='normal'))
+    filter_indices *= np.logical_and(regs > np.median(regs) - 3 * median_abs_deviation(regs, scale='normal'),
+                                     regs < np.median(regs) + 3 * median_abs_deviation(regs, scale='normal'))
     plt.plot(k, D)
     plt.title("D2CCD")
     plt.plot(k[filter_indices], D[filter_indices], "ko")
