@@ -1,5 +1,6 @@
 import os
 import sys
+import warnings
 from copy import deepcopy
 import subprocess
 import shutil
@@ -153,7 +154,9 @@ def get_gaia_coords_after_proper_motion(gaia_catalog, date_obs):
                               np.array(gaia_catalog['dec']) * np.pi / 180),
                           pm_dec=gaia_catalog['pmdec'].filled(0),
                           distance=Distance(parallax=parallax * u.mas, allow_negative=True))
-    gaia_coords_after_proper_motion = gaia_stars.apply_space_motion(new_obstime=Time(date_obs))
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*distance overridden.*", category=Warning)
+        gaia_coords_after_proper_motion = gaia_stars.apply_space_motion(new_obstime=Time(date_obs))
     return gaia_coords_after_proper_motion
 
 

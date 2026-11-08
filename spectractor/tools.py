@@ -31,16 +31,12 @@ from math import floor
 from numba import njit
 
 
+
 _SCIKIT_IMAGE_NEW_HESSIAN = None
 
 # Monkey-patch matplotlib tight_layout to handle LaTeX parsing errors
 # This is needed for matplotlib versions in LSST environment that don't fully support LaTeX
-# Guard against double-patching (e.g. when tools.py is imported from two different paths),
-# which would cause infinite recursion.
-if not hasattr(plt.Figure, '_spectractor_original_tight_layout'):
-    plt.Figure._spectractor_original_tight_layout = plt.Figure.tight_layout
-
-_original_tight_layout = plt.Figure._spectractor_original_tight_layout
+_original_tight_layout = plt.Figure.tight_layout
 
 
 def _safe_tight_layout(self, *args, **kwargs):
@@ -1882,11 +1878,11 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         >>> if parameters.DISPLAY: plt.show()
     """
     if cmap is not None and isinstance(cmap, str):
-        colormap = copy.copy(cm.get_cmap(cmap))
+        colormap = copy.copy(matplotlib.colormaps[cmap])
     elif isinstance(cmap, matplotlib.colors.Colormap):
         colormap = cmap
     else:
-        colormap = copy.copy(cm.get_cmap('viridis'))
+        colormap = copy.copy(matplotlib.colormaps['viridis'])
     cmap_nan = copy.copy(colormap)
     cmap_nan.set_bad(color='lightgrey')
 

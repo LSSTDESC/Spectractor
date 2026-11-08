@@ -110,16 +110,19 @@ def load_config(config_filename, rebin=True):
     """
     my_logger = set_logger(__name__)
     mypath = os.path.dirname(__file__)
-    if not os.path.isfile(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini")):
+    # Use the bundled config/ directory relative to this file, not parameters.CONFIG_DIR
+    # (parameters.CONFIG_DIR can be overwritten at runtime, e.g. by loading a spectrum FITS file)
+    config_dir = os.path.join(mypath, "config")
+    if not os.path.isfile(os.path.join(config_dir, "default.ini")):
         raise FileNotFoundError('Config file default.ini does not exist.')
     # Load the configuration file
-    from_config_to_parameters(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini"))
+    from_config_to_parameters(os.path.join(config_dir, "default.ini"))
 
     if not os.path.isfile(config_filename):
-        if not os.path.isfile(os.path.join(mypath, parameters.CONFIG_DIR, config_filename)):
+        if not os.path.isfile(os.path.join(config_dir, config_filename)):
             raise FileNotFoundError(f'Config file {config_filename} does not exist.')
         else:
-            config_filename = os.path.join(mypath, parameters.CONFIG_DIR, config_filename)
+            config_filename = os.path.join(config_dir, config_filename)
     # Load the configuration file
     my_logger.info(f"\n\tLoading {config_filename} with {parameters.VERBOSE=}...")
     from_config_to_parameters(config_filename)
@@ -160,7 +163,7 @@ def load_config(config_filename, rebin=True):
         txt = ""
         # default.ini should be the config file with the most parameters
         config = configparser.ConfigParser()
-        config.read(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini"))
+        config.read(os.path.join(config_dir, "default.ini"))
         for section in config.sections():
             txt += f"Section: {section}\n"
             for options in config.options(section):

@@ -1781,4 +1781,4 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
         plt.show()
     if parameters.LSST_SAVEFIGPATH:
         fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'deconvolution_truth.pdf'), transparent=True)
-    plt.show()
+

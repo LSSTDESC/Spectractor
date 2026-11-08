@@ -929,7 +929,8 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
             plt.figure(figsize=(5, 5))
             plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
                                 target_pixcoords=[theX - x0 + Dx, theX - x0 + Dx])
-            plt.show()
+            if parameters.DISPLAY:
+                plt.show()
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
 
@@ -1071,7 +1072,7 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
 
     if rotated:
         sub_image = np.copy(image.data_rotated[subYmin:subYmax, subXmin:subXmax])
-        sub_errors = np.copy(image.err[subYmin:subYmax, subXmin:subXmax])
+        sub_errors = np.copy(image.err_rotated[subYmin:subYmax, subXmin:subXmax])
     else:
         sub_image = np.copy(image.data[subYmin:subYmax, subXmin:subXmax])
         sub_errors = np.copy(image.err[subYmin:subYmax, subXmin:subXmax])
