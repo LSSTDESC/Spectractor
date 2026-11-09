@@ -1685,11 +1685,17 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
                      verbose=False, with_line_search=True, minimizer_method="L-BFGS-B"):
     my_logger = set_logger(__name__)
 
+    guess = fit_workspace.params.values.astype('float64')
     bounds = fit_workspace.params.bounds
+    ipar = fit_workspace.params.get_free_parameters()
+
+    def weighted_residuals_free(free_params):
+        params = np.copy(fit_workspace.params.values)
+        params[ipar] = free_params
+        return fit_workspace.weighted_residuals(params)
 
     nll = lambda params: -fit_workspace.lnlike(params)
 
-    guess = fit_workspace.params.values.astype('float64')
     if verbose:
         my_logger.debug(f"\n\tStart guess: {guess}")
 
@@ -1712,33 +1718,39 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
             my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
 
     elif method == "least_squares":  # pragma: no cover
-        fit_workspace.my_logger.warning("least_squares might not work, use with caution... "
-                                        "or repair carefully the function weighted_residuals()")
         start = time.time()
         x_scale = np.abs(guess)
         x_scale[x_scale == 0] = 0.1
-        p = optimize.least_squares(fit_workspace.weighted_residuals, guess, verbose=2, ftol=1e-6, #x_scale=x_scale,
-                                   diff_step=fit_workspace.epsilon, bounds=list(np.array(bounds).T))
-        fit_workspace.params.values = p.x
+        
+        res = optimize.least_squares(weighted_residuals_free, guess[ipar], verbose=2, ftol=1e-8, #x_scale=x_scale,
+                                     diff_step=fit_workspace.epsilon[ipar] / x_scale[ipar], bounds=list(np.array(bounds)[ipar].T))
+        fit_workspace.params.values[ipar] = res.x
+        Jfree = res.jac
+        fit_workspace.params.cov = np.linalg.inv(Jfree.T @ Jfree)
         if verbose:
             my_logger.debug(f"\n\t{p}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
 
     elif method == 'curve_fit':
 
-        def model(x, *params):
+        def model(x, *free_params):
+            params = np.copy(fit_workspace.params.values)
+            params[ipar] = free_params
             x, mod, mod_err = fit_workspace.simulate(*params)
             return mod
 
-        def Dfun(x, *params):
-            return fit_workspace.jacobian(params, model_input=None).T
+        def Dfun(x, *free_params):
+            params = np.copy(fit_workspace.params.values)
+            params[ipar] = free_params
+            return fit_workspace.jacobian(params, model_input=None)[ipar].T
 
         start = time.time()
-        result = optimize.curve_fit(model, fit_workspace.x, fit_workspace.data, jac=Dfun, x_scale='jac',
-                                    p0=fit_workspace.params.values, sigma=fit_workspace.err,
+        fake_x = 0
+        result = optimize.curve_fit(model, fake_x, fit_workspace.data, jac=Dfun, x_scale='jac',
+                                    p0=fit_workspace.params.values[ipar], sigma=fit_workspace.err,
                                     verbose=0, xtol=xtol, ftol=ftol,
-                                    bounds=list(np.array(bounds).T), absolute_sigma=True)
-        fit_workspace.params.values = result[0]
+                                    bounds=list(np.array(bounds)[ipar].T), absolute_sigma=True)
+        fit_workspace.params.values[ipar] = result[0]
         fit_workspace.params.cov = result[1]
         if verbose:
             my_logger.debug(f"\n\t{result}")
@@ -1748,9 +1760,9 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
 
     elif method == "lm":  # pragma: no cover
         start = time.time()
-        x, cov, infodict, mesg, ier = optimize.leastsq(fit_workspace.weighted_residuals, guess,
+        x, cov, infodict, mesg, ier = optimize.leastsq(weighted_residuals_free, guess[ipar],
                                                        ftol=ftol, xtol=xtol, full_output=True)
-        fit_workspace.params.values = x
+        fit_workspace.params.values[ipar] = x
         fit_workspace.params.cov = cov
         if verbose:
             my_logger.debug(f"\n\t{x}")
