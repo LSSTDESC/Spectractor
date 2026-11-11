@@ -2180,6 +2180,290 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
     return lambdas
 
 
+def _line_detection_gain(lambdas, data, ivar, center, sign, sigmas):
+    r"""Chisq gain of a line of given sign over a local linear baseline, maximised over trial widths.
+
+    With :math:`x_i=\lambda_i-\lambda_k`, the data around the line are compared to two models:
+    :math:`d_i = a + b x_i` (no line) and :math:`d_i = a + b x_i + A g_i` with
+    :math:`g_i=\exp(-x_i^2/2\sigma^2)`, a free amplitude :math:`A` and a fixed position.
+    The baseline :math:`(a, b)` is marginalised analytically: the gaussian is projected on the space spanned
+    by :math:`\{1, x\}` (weighted least squares) and this projection is subtracted,
+
+    .. math::
+        g^\perp = g - \Pi_{\{1,x\}} g, \quad S = \sum_i w_i g^\perp_i d_i, \quad N = \sum_i w_i (g^\perp_i)^2,
+
+    so that :math:`\hat A = S/N`, :math:`\sigma_A = 1/\sqrt{N}` and the chisq gain is
+
+    .. math::
+        G = \Delta\chi^2 = S^2/N = (\hat A/\sigma_A)^2 \text{ if } \mathrm{sign}\times S > 0, \text{ else } 0.
+
+    The weights are :math:`w_i = t_i/\sigma_i^2` with the taper
+    :math:`t_i = [1 - (x_i/6\sigma)^2]_+^2`: the window half-width is :math:`6\sigma` and vanishes smoothly
+    at its edges, so that the gain is continuous in the line position. The returned gain is the maximum of
+    :math:`G` over the trial widths.
+
+    Parameters
+    ----------
+    lambdas, data, ivar: array_like
+        Wavelengths, data and inverse variances of the valid pixels.
+    center: float
+        Tabulated wavelength of the line in nm.
+    sign: int
+        +1 for an emission line, -1 for an absorption line.
+    sigmas: array_like
+        Trial gaussian widths in nm.
+
+    Returns
+    -------
+    gain: float
+        Chisq gain, zero if the amplitude has the wrong sign.
+    """
+    # pixels of the largest trial window, each width then uses its own 6 sigma taper
+    half_window = 6 * np.max(sigmas)
+    sel = np.abs(lambdas - center) < half_window
+    if np.sum(sel) < 8:
+        return 0.
+    x = lambdas[sel] - center
+    d = data[sel]
+    iv = ivar[sel]
+    best = 0.
+    for s in sigmas:
+        taper = np.clip(1 - (x / (6 * s)) ** 2, 0, None) ** 2
+        w = iv * taper
+        # normal equations of the weighted linear baseline fit: [[s0, s1], [s1, s2]] (a, b) = (b0, b1)
+        s0, s1, s2 = np.sum(w), np.sum(w * x), np.sum(w * x * x)
+        det = s0 * s2 - s1 * s1
+        if s0 <= 0 or det <= 1e-12 * s0 * s0 * s * s:
+            continue
+        g = np.exp(-0.5 * (x / s) ** 2)
+        b0, b1 = np.sum(w * g), np.sum(w * g * x)
+        # gaussian minus its best-fit linear baseline: what no baseline can mimic
+        g_perp = g - ((s2 * b0 - s1 * b1) + (s0 * b1 - s1 * b0) * x) / det
+        norm = np.sum(w * g_perp * g_perp)
+        if norm <= 0:
+            continue
+        signal = np.sum(w * g_perp * d)
+        if signal * sign > 0:
+            best = max(best, signal * signal / norm)
+    return best
+
+
+def calibrate_spectrum_v2(spectrum, with_adr=False, niter=5, grid_search=False):
+    r"""Copy of calibrate_spectrum with a cost function based on a matched filter instead of line fits.
+
+    The wavelength of each pixel depends on the two free parameters, the distance to CCD :math:`D` and the
+    order 0 shift :math:`\delta` (in pixels): :math:`\lambda_i(D,\delta)`. For each calibration line :math:`k`,
+    the gain :math:`G_k(D,\delta)` is the chisq gain of a gaussian of fixed position (the tabulated wavelength),
+    free amplitude of the expected sign and trial widths, above a local linear baseline
+    (see :func:`_line_detection_gain`). The cost is
+
+    .. math::
+        C(D,\delta) = -\sum_k \ln(1 + G_k)
+        + \left(\frac{D - D_\mathrm{def}}{\sigma_D}\right)^2
+        + \left(\frac{\delta}{\sigma_\delta}\right)^2
+
+    with :math:`D_\mathrm{def}` = DISTANCE2CCD, :math:`\sigma_D` = DISTANCE2CCD_ERR and :math:`\sigma_\delta`
+    = PIXSHIFT_PRIOR. :math:`\ln(1+G) \simeq G` for weak lines, and grows only logarithmically for strong lines
+    so that a mismatched profile of a band can not dominate. The same pixels and the same lines are used
+    whatever the parameters, so that the cost does not depend on the number of detected lines.
+    The minimum is searched with an optional grid then a Nelder-Mead minimisation.
+    If the total gain :math:`\sum_k G_k` at the minimum is below parameters.CALIB_V2_MIN_DETECTION, the
+    default D and a null shift are kept.
+
+    Note that :math:`D` and :math:`\delta` are nearly degenerate with the lines alone, as
+    :math:`\lambda \propto (u - u_0)/D` gives :math:`\Delta D/\Delta\delta \simeq -D/(u - u_0)`:
+    the shift is then essentially constrained by its prior.
+
+    Parameters
+    ----------
+    spectrum: Spectrum
+        Spectrum object to calibrate
+    with_adr: bool, optional
+        If True, the ADR longitudinal shift is subtracted to distances.
+        Must be False if the spectrum has already been decontaminated from ADR (default: False).
+    niter: int, optional
+        Number of iterations for ADR accurate evaluation (default: 5).
+    grid_search: bool, optional
+        If True, explore a grid of (D, shift) before the local minimisation (default: False).
+
+    Returns
+    -------
+    lambdas: array_like
+        The new wavelength array in nm.
+
+    Examples
+    --------
+    >>> spectrum = Spectrum('tests/data/reduc_20170530_134_spectrum.fits', config="")
+    >>> parameters.LAMBDA_MIN = 350
+    >>> parameters.LAMBDA_MAX = 800
+    >>> parameters.PIXSHIFT_PRIOR = 2
+    >>> parameters.DISTANCE2CCD_ERR = 0.05
+    >>> lambdas = calibrate_spectrum_v2(spectrum, with_adr=True, grid_search=True)
+    """
+    with_adr = int(with_adr)
+    if spectrum.units != "ADU/s":  # go back in ADU/s to remove previous lambda*dlambda normalisation
+        spectrum.convert_from_flam_to_ADUrate()
+    distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis()
+    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0,
+                                                                  D=parameters.DISTANCE2CCD, order=spectrum.order)
+    if with_adr > 0:
+        for k in range(niter):
+            adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
+                                        lambda_ref=spectrum.lambda_ref)
+            adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                                   dispersion_axis_angle=spectrum.rotation_angle)
+            spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - adr_u, spectrum.x0,
+                                                                          D=parameters.DISTANCE2CCD, order=spectrum.order)
+    else:
+        adr_u = np.zeros_like(distance)
+    x0 = spectrum.x0
+    if x0 is None:
+        x0 = spectrum.target_pixcoords
+        spectrum.x0 = x0
+
+    fwhm_func = interp1d(spectrum.chromatic_psf.table['lambdas'],
+                         spectrum.chromatic_psf.table['fwhm'],
+                         fill_value=(parameters.CALIB_PEAK_WIDTH, parameters.CALIB_PEAK_WIDTH), bounds_error=False)
+
+    # the same valid pixels are used for any (D, shift): only their wavelengths change
+    data = np.array(spectrum.data, dtype=float)
+    if spectrum.err is not None:
+        err = np.array(spectrum.err, dtype=float)
+    else:  # noise from the pixel to pixel differences
+        err = np.full_like(data, 1.4826 * np.nanmedian(np.abs(np.diff(data))) / np.sqrt(2))
+    valid = np.isfinite(data) & np.isfinite(err) & (err > 0)
+    data, ivar = data[valid], 1 / err[valid] ** 2
+
+    # calibration lines with their expected sign (absorption for stars and atmospheric lines)
+    calib_lines = []
+    for line in spectrum.lines.lines:
+        if not line.use_for_calibration:
+            continue
+        if line.wavelength < parameters.LAMBDA_MIN or line.wavelength > parameters.LAMBDA_MAX:
+            continue
+        sign = 1 if (spectrum.lines.emission_spectrum and not line.atmospheric) else -1
+        calib_lines.append((line, sign))
+
+    D_default = parameters.DISTANCE2CCD
+    D_err = parameters.DISTANCE2CCD_ERR
+    pixel_shift_prior = parameters.PIXSHIFT_PRIOR
+
+    def compute_lambdas(D, shift):
+        dist = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=shift)
+        return spectrum.disperser.grating_pixel_to_lambda(dist - with_adr * adr_u, x0=[x0[0] + shift, x0[1]],
+                                                          D=D, order=spectrum.order)
+
+    def line_gains(D, shift):
+        lambdas = compute_lambdas(D, shift)
+        dl = np.abs(np.gradient(lambdas))
+        lam_v = lambdas[valid]
+        lam_min, lam_max = np.nanmin(lambdas), np.nanmax(lambdas)
+        gains = []
+        for line, sign in calib_lines:
+            if not (lam_min < line.wavelength < lam_max):
+                gains.append(0.)
+                continue
+            # PSF width converted from pixels to nm with the local dispersion, at least 0.7 pixel to stay sampled
+            dl_line = dl[np.nanargmin(np.abs(lambdas - line.wavelength))]
+            sigma_psf = max(float(fwhm_func(line.wavelength)) / 2.355, 0.7) * dl_line
+            # intrinsic widths from unresolved (0) to the largest width_bounds, added in quadrature to the PSF
+            widths = np.unique([0, line.width_bounds[0], 0.5 * sum(line.width_bounds), line.width_bounds[1]])
+            sigmas = np.sqrt(sigma_psf ** 2 + widths ** 2)
+            gains.append(_line_detection_gain(lam_v, data, ivar, line.wavelength, sign, sigmas))
+        return np.array(gains)
+
+    def cost(params):
+        D, shift = params
+        if np.isnan(D):
+            D = D_default
+        if np.isnan(shift):
+            shift = 0
+        gains = line_gains(D, shift)
+        # chisq for weak lines, logarithmic for strong ones so that a mismatched profile of a band can not dominate
+        compressed = np.log1p(gains)
+        return (-np.sum(compressed) + ((D - D_default) / D_err) ** 2 + (shift / pixel_shift_prior) ** 2)
+
+    D = parameters.DISTANCE2CCD
+    pixel_shift = 0
+    if 'D2CCD' in spectrum.header:
+        D = spectrum.header['D2CCD']
+    if 'PIXSHIFT' in spectrum.header:
+        pixel_shift = spectrum.header['PIXSHIFT']
+    D_start, pixel_shift_start = D, pixel_shift
+    D_step = D_err / 2
+    pixel_shift_step = pixel_shift_prior / 10.
+    best_gain = 0.
+    if len(calib_lines) > 0:
+        if grid_search:
+            Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
+            pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)
+            cost_grid = np.zeros((len(Ds), len(pixel_shifts)))
+            for i, D_i in enumerate(Ds):
+                for j, shift_j in enumerate(pixel_shifts):
+                    cost_grid[i, j] = cost([D_i, shift_j])
+            imin, jmin = np.unravel_index(cost_grid.argmin(), cost_grid.shape)
+            D = Ds[imin]
+            pixel_shift = pixel_shifts[jmin]
+            if imin == 0 or imin == Ds.size - 1 or jmin == 0 or jmin == pixel_shifts.size - 1:
+                spectrum.my_logger.warning('\n\tMinimum cost is on the edge of the exploration grid.')
+            if parameters.DEBUG:
+                fig = plt.figure(figsize=(7, 4))
+                im = plt.imshow(cost_grid, origin='lower', aspect='auto',
+                                extent=(np.min(pixel_shifts) - pixel_shift_step / 2,
+                                        np.max(pixel_shifts) + pixel_shift_step / 2,
+                                        np.min(Ds) - D_step / 2, np.max(Ds) + D_step / 2))
+                plt.gca().scatter(pixel_shift, D, marker='o', s=100, edgecolors='k', facecolors='none',
+                                  label='Minimum', linewidth=2)
+                c = plt.colorbar(im)
+                c.set_label('Cost')
+                plt.xlabel(r'Pixel shift $\delta u_0$ [pix]')
+                plt.ylabel(r'$D_\mathrm{CCD}$ [mm]')
+                plt.legend()
+                fig.tight_layout()
+                if parameters.DISPLAY:  # pragma: no cover
+                    plt.show()
+                if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+                    fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'D2CCD_x0_fit_v2.pdf'))
+
+        # local minimisation in units of the prior widths, so that the simplex is well conditioned
+        center = np.array([D, pixel_shift])
+        scale = np.array([D_err, pixel_shift_prior])
+        simplex = np.array([[0, 0], [0.5, 0], [0, 0.5]])
+        res = optimize.minimize(lambda p: cost(center + scale * p), np.zeros(2), method='Nelder-Mead',
+                                options={'initial_simplex': simplex, 'xatol': 1e-3, 'fatol': 1e-4})
+        D, pixel_shift = center + scale * res.x
+        best_gain = np.sum(line_gains(D, pixel_shift))
+    if best_gain < parameters.CALIB_V2_MIN_DETECTION:
+        spectrum.my_logger.warning(f"\n\tNo significant calibration line detected (total chisq gain {best_gain:.1f} "
+                                   f"< {parameters.CALIB_V2_MIN_DETECTION}): keep default D and pixel shift.")
+        D, pixel_shift = D_start, 0
+    spectrum.my_logger.debug(f"\n\tCalibration v2: total chisq gain {best_gain:.1f} "
+                             f"with {len(calib_lines)} calibration lines")
+
+    x0 = [x0[0] + pixel_shift, x0[1]]
+    spectrum.x0 = x0
+    distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=pixel_shift)
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr * adr_u, x0=x0,
+                                                         D=D, order=spectrum.order)
+    spectrum.lambdas = lambdas
+    spectrum.lambdas_binwidths = np.gradient(lambdas)
+    spectrum.convert_from_ADUrate_to_flam()
+    spectrum.chromatic_psf.table['Dx'] -= pixel_shift
+    spectrum.chromatic_psf.table['Dy_disp_axis'] = distance * np.sin(spectrum.rotation_angle * np.pi / 180)
+    spectrum.pixels = np.copy(spectrum.chromatic_psf.table['Dx'])
+    # line table for quality control, with the original detection algorithm
+    detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
+                 fwhm_func=fwhm_func, ax=None, calibration_lines_only=False)
+    spectrum.my_logger.info(
+        f"\n\tOrder0 total shift: {pixel_shift:.3f}pix"
+        f"\n\tD = {D:.3f} mm (default: DISTANCE2CCD = {parameters.DISTANCE2CCD:.2f} "
+        f"+/- {parameters.DISTANCE2CCD_ERR:.2f} mm, "
+        f"{(D - parameters.DISTANCE2CCD) / parameters.DISTANCE2CCD_ERR:.1f} sigma shift)")
+    spectrum.header['PIXSHIFT'] = pixel_shift
+    spectrum.header['D2CCD'] = D
+    return lambdas
+
+
 if __name__ == "__main__":
     import doctest
 

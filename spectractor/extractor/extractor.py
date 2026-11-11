@@ -12,7 +12,7 @@ import time
 from spectractor import parameters
 from spectractor.config import set_logger, load_config
 from spectractor.extractor.images import Image, find_target, turn_image
-from spectractor.extractor.spectrum import Spectrum, calibrate_spectrum
+from spectractor.extractor.spectrum import Spectrum, calibrate_spectrum, calibrate_spectrum_v2
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
@@ -1013,7 +1013,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
                 w.spectrum.err_next_order = np.abs(w.params.values[w.diffraction_orders[1]] * w.amplitude_params_err * w.tr[1](w.lambdas))
 
             # Calibrate the spectrum
-            calibrate_spectrum(w.spectrum, with_adr=(parameters.OBS_OBJECT_TYPE == "STAR"), grid_search=False)
+            calibrate = calibrate_spectrum_v2 if parameters.CALIB_ALGO == "v2" else calibrate_spectrum
+            calibrate(w.spectrum, with_adr=(parameters.OBS_OBJECT_TYPE == "STAR"), grid_search=False)
             w.params.set(r"D_CCD [mm]", w.spectrum.header['D2CCD'])
             w.params.set(r"shift_x [pix]", w.spectrum.header['PIXSHIFT'])
             w.spectrum.convert_from_flam_to_ADUrate()
@@ -1221,7 +1222,8 @@ def SpectractorRun(image, output_directory, guess=None):
 
     # Calibrate the spectrum
     my_logger.info(f'\n\tCalibrating order {spectrum.order:d} spectrum...')
-    calibrate_spectrum(spectrum, with_adr=(parameters.OBS_OBJECT_TYPE == "STAR"), grid_search=True)
+    calibrate = calibrate_spectrum_v2 if parameters.CALIB_ALGO == "v2" else calibrate_spectrum
+    calibrate(spectrum, with_adr=(parameters.OBS_OBJECT_TYPE == "STAR"), grid_search=True)
     spectrum.data_next_order = np.zeros_like(spectrum.lambdas)
     spectrum.err_next_order = np.zeros_like(spectrum.lambdas)
 

@@ -126,6 +126,8 @@ CALIB_PEAK_WIDTH = 7  # half range to look for local extrema in pixels around ta
 CALIB_BGD_WIDTH = 10  # size of the peak sides to use to fit spectrum base line
 CALIB_SAVGOL_WINDOW = 5  # window size for the savgol filter in pixels
 CALIB_SAVGOL_ORDER = 2  # polynom order for the savgol filter
+CALIB_ALGO = "v2"  # wavelength calibration algorithm: "v1" (line fits) or "v2" (matched filter)
+CALIB_V2_MIN_DETECTION = 25  # min total line detection chisq gain for v2, else keep default D and pixel shift
 
 # Plotting
 PAPER = False
