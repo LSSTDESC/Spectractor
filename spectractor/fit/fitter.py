@@ -1185,6 +1185,11 @@ class FitWorkspace:
                     J[ip].append((tmp_model[k] - model[k]) / self.epsilon[ip])
             else:
                 J[ip] = (tmp_model.flatten() - model) / self.epsilon[ip]
+        if self.W.dtype == object and self.W[0].ndim == 2:
+            # multi-block case: list of Jacobians, J[ip][k] is the derivative vector
+            # of block k with respect to parameter ip (length m_k). The dtype=object
+            # cast is mandatory to keep blocks of unequal lengths as separate arrays.
+            return np.asarray(J, dtype=object)
         return np.asarray(J)
 
     def hessian(self, params):  # pragma: nocover
