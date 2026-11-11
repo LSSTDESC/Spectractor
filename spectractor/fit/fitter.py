@@ -880,6 +880,76 @@ class FitWorkspace:
                 res = L @ (model - self.data)
         return res
 
+
+    def weighted_residuals_jac(self, p):  # pragma: nocover
+        """Compute the Jacobian of the weighted residuals array for a set of model parameters p.
+
+        Parameters
+        ----------
+        p: array_like
+            The array of model parameters.
+
+        Returns
+        -------
+        Jacobian: np.array
+            The Jacobian of the weighted residuals array, with shape
+            (n_params, m_residuals): each row corresponds to the derivatives
+            of the weighted residuals with respect to one model parameter.
+
+        """
+        x, model, model_err = self.simulate(*p)
+        J = self.jacobian(p, model_input=[x, model, model_err])
+        if self.data_cov is None:
+            if len(self.outliers) > 0:
+                model_err = model_err.flatten()
+                err = self.err.flatten()
+                L = 1. / np.sqrt(model_err * model_err + err * err)
+            else:
+                L = 1. / np.sqrt(model_err * model_err + self.err * self.err).flatten()
+            res_jac = L * J
+        else:
+            if self.data_cov.ndim > 2 or (self.data_cov.dtype == object and self.data_cov[0].ndim == 2):
+                K = self.data_cov.shape[0]
+                if np.any([np.any(me > 0) for me in model_err]):
+                    cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
+                    L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
+                else:
+                    L = [np.linalg.cholesky(self.W[k]) for k in range(K)]
+                # J[ip][k] is the derivative vector of block k w.r.t. parameter ip (length m_k).
+                # The weighted residual of block k is L[k] @ (model[k] - data[k]), so its
+                # derivative w.r.t. parameter ip is L[k] @ J[ip][k]. Concatenate the blocks
+                # for each parameter and stack them into an (n_params, total_m) matrix.
+                # Note: like jacobian(), fixed parameters are skipped (they have no entries
+                # in J[ip]) so we leave a zero row for them, keeping the (n_params, total_m)
+                # shape consistent with the diagonal and 2D cases.
+                total_m = sum(d.size for d in self.data)
+                res_jac = np.zeros((p.size, total_m))
+                for ip in range(p.size):
+                    if self.params.fixed[ip]:
+                        continue
+                    res_jac[ip] = np.concatenate([L[k] @ J[ip][k] for k in range(K)])
+            else:
+                if np.any(model_err > 0):
+                    cov = self.data_cov + np.diag(model_err * model_err)
+                    L = np.linalg.inv(np.linalg.cholesky(cov))
+                else:
+                    if not scipy.sparse.issparse(self.W):
+                        if self.W.ndim == 1 and self.W.dtype != object:
+                            L = np.diag(np.sqrt(self.W))
+                        elif self.W.ndim == 2 and self.W.dtype != object:
+                            L = np.linalg.cholesky(self.W)
+                        else:
+                            raise ValueError(f"Case not implemented with self.W.ndim={self.W.ndim} "
+                                             f"and self.W.dtype={self.W.dtype}")
+                    else:
+                        if scipy.sparse.isspmatrix_dia(self.W):
+                            L = self.W.sqrt()
+                        else:
+                            L = np.linalg.cholesky(self.W.toarray())
+                res_jac = J @ L.T
+        return res_jac
+
+
     def prepare_weight_matrices(self):
         r"""Compute weight matrix :math:`\mathbf{W}` `self.W` as the inverse of data covariance matrix `self.data_cov`.
         Cancel weights of data outliers given by `self.outliers`.
