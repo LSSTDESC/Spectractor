@@ -1487,7 +1487,20 @@ def gradient_descent(fit_workspace, niter=10, xtol=1e-3, ftol=1e-3, with_line_se
         # Jacobian
         J = fit_workspace.jacobian(tmp_params, model_input=[tmp_lambdas, tmp_model, tmp_model_err])
         # remove parameters with unexpected null Jacobian vectors or that are degenerated
-        J_vectors = [np.array(J[ip]).ravel() for ip in range(J.shape[0])]
+        # In the multi-block case (W object array), each J[ip] holds one block vector per
+        # data block (possibly of unequal lengths), so we must concatenate the blocks into
+        # a single contiguous 1D vector before measuring norms / dot products.
+        J_vectors = []
+        for ip in range(J.shape[0]):
+            J_part = J[ip]
+            # multi-block: J_part is a list or object-array of per-block vectors (ragged when a
+            # parameter is fixed, since fixed params contribute an empty sub-list, numpy returns
+            # a flat object-array of lists); concatenate the blocks into a contiguous 1D vector.
+            if isinstance(J_part, (list, tuple)) or (isinstance(J_part, np.ndarray) and J_part.dtype == object):
+                blocks = [b for b in J_part if getattr(b, 'size', 1) > 0]
+                J_vectors.append(np.concatenate(blocks).ravel() if blocks else np.array([]))
+            else:
+                J_vectors.append(np.ravel(J_part))
         J_norms = [np.linalg.norm(J_vectors[ip]) for ip in range(J.shape[0])]
         for ip in range(J.shape[0]):
             if ip not in ipar:
