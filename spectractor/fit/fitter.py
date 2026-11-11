@@ -1749,14 +1749,31 @@ def simple_newton_minimisation(fit_workspace, niter=10, xtol=1e-3, ftol=1e-3):  
     return tmp_params, inv_H[:, :, 0], np.array(funcs), np.array(params_table)
 
 
+def _append_params_table(fit_workspace, values):
+    """Append parameter rows to ``fit_workspace.params_table``.
+
+    ``params_table`` is initialised to ``None`` in :meth:`FitWorkspace.__init__` and must
+    remain an (n_rows, n_params) 2D ndarray so that :meth:`FitWorkspace.plot_gradient_descent`
+    (which accesses ``params_table.shape`` and ``params_table[:, ip]``) keeps working whatever
+    the minimisation method (gradient descent, least_squares, lm, ...) that filled it.
+
+    ``values`` may be a single 1D parameter vector ``(n_params,)`` (least_squares / lm) or a
+    full 2D block ``(n_rows, n_params)`` (gradient descent). It is stacked along ``axis=0``.
+    """
+    values = np.atleast_2d(np.asarray(values, dtype=float))
+    if fit_workspace.params_table is None:
+        fit_workspace.params_table = values.copy()
+    else:
+        fit_workspace.params_table = np.append(fit_workspace.params_table, values, axis=0)
+
+
 def run_gradient_descent(fit_workspace, xtol, ftol, niter, verbose=False, with_line_search=True):
     if fit_workspace.costs.size == 0:
         fit_workspace.costs = np.array([fit_workspace.chisq(fit_workspace.params.values)])
-        fit_workspace.params_table = np.array([fit_workspace.params.values])
     p, cov, tmp_costs, tmp_params_table = gradient_descent(fit_workspace, niter=niter, xtol=xtol, ftol=ftol,
                                                            with_line_search=with_line_search)
     fit_workspace.params.values, fit_workspace.params.cov = p, cov
-    fit_workspace.params_table = np.concatenate([fit_workspace.params_table, tmp_params_table])
+    _append_params_table(fit_workspace, tmp_params_table)
     fit_workspace.costs = np.concatenate([fit_workspace.costs, tmp_costs])
     if verbose or fit_workspace.verbose:
         fit_workspace.my_logger.info(f"\n{fit_workspace.params.print_parameters_summary()}")
