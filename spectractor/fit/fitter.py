@@ -1341,10 +1341,10 @@ class FitWorkspace:
             plt.show()
         if parameters.PdfPages:  # args from the above? MFL
             parameters.PdfPages.savefig()
-
-        self.simulate(*self.params.values)
-        self.live_fit = False
-        self.plot_fit()
+        if parameters.DISPLAY:
+            self.simulate(*self.params.values)
+            self.live_fit = False
+            self.plot_fit()
 
     def save_gradient_descent(self):
         iterations = np.arange(self.params_table.shape[0]).astype(int)
