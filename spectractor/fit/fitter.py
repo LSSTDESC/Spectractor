@@ -1526,7 +1526,12 @@ def gradient_descent(fit_workspace, niter=10, xtol=1e-3, ftol=1e-3, with_line_se
                         f"parameter {fit_workspace.params.labels[jp]} is fixed at its last known current value ({tmp_params[jp]}).")
                     continue
         # remove fixed and degenerated parameters; then transpose
-        J = J[ipar].T
+        if W.dtype == object:
+            # multi-block case: J is an object array (n_params, n_blocks) and the branches
+            # below index it as J[param][block], so keep it free-parameter indexed, not transposed.
+            J = J[ipar]
+        else:
+            J = J[ipar].T
 
         # compute J.T @ W @ J matrix and invert it
         if W.ndim == 1 and W.dtype != object:
