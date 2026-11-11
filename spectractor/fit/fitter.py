@@ -1731,33 +1731,6 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
             my_logger.debug(f"\n\t{p}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
 
-    elif method == 'curve_fit':
-
-        def model(x, *free_params):
-            params = np.copy(fit_workspace.params.values)
-            params[ipar] = free_params
-            x, mod, mod_err = fit_workspace.simulate(*params)
-            return mod
-
-        def Dfun(x, *free_params):
-            params = np.copy(fit_workspace.params.values)
-            params[ipar] = free_params
-            return fit_workspace.jacobian(params, model_input=None)[ipar].T
-
-        start = time.time()
-        fake_x = 0
-        result = optimize.curve_fit(model, fake_x, fit_workspace.data, jac=Dfun, x_scale='jac',
-                                    p0=fit_workspace.params.values[ipar], sigma=fit_workspace.err,
-                                    verbose=0, xtol=xtol, ftol=ftol,
-                                    bounds=list(np.array(bounds)[ipar].T), absolute_sigma=True)
-        fit_workspace.params.values[ipar] = result[0]
-        fit_workspace.params.cov = result[1]
-        if verbose:
-            my_logger.debug(f"\n\t{result}")
-            my_logger.debug(f"\n\tCurve_fit: total computation time: {time.time() - start}s")
-            if parameters.DEBUG:
-                fit_workspace.plot_fit()
-
     elif method == "lm":  # pragma: no cover
         start = time.time()
         x, cov, infodict, mesg, ier = optimize.leastsq(weighted_residuals_free, guess[ipar],
