@@ -1770,6 +1770,10 @@ def _append_params_table(fit_workspace, values):
 def run_gradient_descent(fit_workspace, xtol, ftol, niter, verbose=False, with_line_search=True):
     if fit_workspace.costs.size == 0:
         fit_workspace.costs = np.array([fit_workspace.chisq(fit_workspace.params.values)])
+        # keep costs and params_table aligned: the initial cost corresponds to the
+        # initial parameter vector (save_gradient_descent builds one CSV row per
+        # cost / parameter-vector pair, so both must have the same length).
+        _append_params_table(fit_workspace, fit_workspace.params.values)
     p, cov, tmp_costs, tmp_params_table = gradient_descent(fit_workspace, niter=niter, xtol=xtol, ftol=ftol,
                                                            with_line_search=with_line_search)
     fit_workspace.params.values, fit_workspace.params.cov = p, cov
