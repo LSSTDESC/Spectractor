@@ -94,7 +94,7 @@ class SpectrumSimulation(Spectrum):
         self.data *= self.target.sed(lambdas)
         self.err = np.zeros_like(self.data)
         idx = (self.throughput.transmission(lambdas) > 0) & (self.target.sed(lambdas) > 0)
-        self.err[idx] = np.sqrt((self.throughput.transmission_err(lambdas[idx]) / self.throughput.transmission(lambdas[idx]))**2 + (self.target.sed_err(lambdas[idx])/self.target.sed(lambdas[idx]))**2)
+        self.err[idx] = np.sqrt((self.throughput.transmission_err(lambdas[idx]) / self.throughput.transmission(lambdas[idx]))**2 + (self.target.sed_err(lambdas[idx])/self.target.sed(lambdas[idx]))**2 + (self.disperser.transmission_err(lambdas[idx]) / self.disperser.transmission(lambdas[idx]))**2)
         self.err[idx] *= np.abs(self.data[idx])
         idx = (self.throughput.transmission(lambdas) <= 0) | (self.target.sed(lambdas) <= 0)
         self.err[idx] = 10 * np.max(self.err)       
@@ -387,7 +387,7 @@ class SpectrogramModel(Spectrum):
         idx = telescope_transmission > 0
         spectrum_err[idx] = self.throughput.transmission_err(lambdas)[idx] / telescope_transmission[idx] * spectrum[idx]
         idx = (telescope_transmission > 0) & (self.target.sed(lambdas) > 0)
-        spectrum_err[idx] = np.sqrt((self.throughput.transmission_err(lambdas[idx]) / telescope_transmission[idx])**2 + (self.target.sed_err(lambdas[idx])/self.target.sed(lambdas[idx]))**2)
+        spectrum_err[idx] = np.sqrt((self.throughput.transmission_err(lambdas[idx]) / telescope_transmission[idx])**2 + (self.target.sed_err(lambdas[idx])/self.target.sed(lambdas[idx]))**2 + (self.disperser.transmission_err(lambdas[idx]) / self.disperser.transmission(lambdas[idx]))**2)
         spectrum_err[idx] *= np.abs(spectrum[idx])
         idx = (telescope_transmission <= 0) | (self.target.sed(lambdas) <= 0) | (spectrum_err <= 0)
         spectrum_err[idx] = 10 * np.max(spectrum_err)
