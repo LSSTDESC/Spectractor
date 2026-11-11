@@ -1000,7 +1000,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.chromatic_psf.params.values = w.spectrum.chromatic_psf.from_table_to_poly_params()
             w.spectrum.spectrogram_fit = w.model.reshape((w.Ny, w.Nx))
             w.spectrum.spectrogram_residuals = (w.data.reshape((w.Ny, w.Nx)) - w.spectrum.spectrogram_fit) / w.err.reshape((w.Ny, w.Nx))
-            w.spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask))
+            w.spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask) - np.sum(w.params.fixed) - len(w.outliers))
             w.spectrum.header['PIXSHIFT'] = w.params[r"shift_x [pix]"]
             w.spectrum.header['D2CCD'] = w.params[r"D_CCD [mm]"]
             if len(w.diffraction_orders) >= 2:
@@ -1031,7 +1031,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             parameters.SAVE = True
             w.params.plot_correlation_matrix()
             write_fitparameter_json(w.params.json_filename, w.params,
-                                    extra={"chi2": costs[-1] / (w.data.size - len(w.outliers) - len(w.mask)),
+                                    extra={"chi2": costs[-1] / (w.data.size - len(w.outliers) - len(w.mask) - np.sum(w.params.fixed)),
                                            "date-obs": w.spectrum.date_obs})
             w.plot_fit()
             parameters.SAVE = False
@@ -1544,7 +1544,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
                    f'\n\tNew target position in spectrogram frame: {target_pixcoords_spectrogram}')
 
     # Save results
-    spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask))
+    spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask) - np.sum(w.params.fixed) - len(w.outliers))
     spectrum.spectrogram_x0 = target_pixcoords_spectrogram[0]
     spectrum.spectrogram_y0 = target_pixcoords_spectrogram[1]
     spectrum.spectrogram_xmin = xmin

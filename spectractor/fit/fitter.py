@@ -708,6 +708,13 @@ class FitWorkspace:
             self.err = np.sqrt(np.diag(data_cov))
         self.outliers = []
         self.mask = []
+        # Optional boolean mask (or array of indices) selecting, among all the workspace
+        # data points, the ones actually used by the least_squares / lm minimisers
+        # (weighted_residuals / weighted_residuals_jac). When set, those two routines
+        # physically shrink the residual / jacobian arrays to the selected points, which
+        # drastically reduces the memory footprint for large data vectors such as full
+        # spectrogram images. Other methods (newton via chisq / jacobian) are untouched.
+        self.keep = None
         self.W = None
         if self.data_cov is not None or self.err is not None:
             self.prepare_weight_matrices()
@@ -861,8 +868,18 @@ class FitWorkspace:
                 res = np.concatenate(res).ravel()
             else:
                 if np.any(model_err > 0):
-                    cov = self.data_cov + np.diag(model_err * model_err)
-                    L = np.linalg.inv(np.linalg.cholesky(cov))
+                    if self.data_cov.ndim == 1 and self.data_cov.dtype != object:
+                        # Diagonal covariance with model uncertainties: stay vectorised (1D)
+                        # rather than forming a full (N, N) matrix + Cholesky, which would
+                        # both blow up the memory on large datasets (e.g. whole spectrogram
+                        # images) and fail with "matrix is not positive definite".
+                        L = 1. / np.sqrt(self.data_cov + model_err * model_err)
+                    elif self.data_cov.ndim == 2 and self.data_cov.dtype != object:
+                        cov = self.data_cov + np.diag(model_err * model_err)
+                        L = np.linalg.inv(np.linalg.cholesky(cov))
+                    else:
+                        raise ValueError(f"Case not implemented with self.data_cov.ndim={self.data_cov.ndim} "
+                                         f"and self.data_cov.dtype={self.data_cov.dtype}")
                 else:
                     if not scipy.sparse.issparse(self.W):
                         if self.W.ndim == 1 and self.W.dtype != object:
@@ -877,7 +894,16 @@ class FitWorkspace:
                             L = self.W.sqrt()
                         else:
                             L = np.linalg.cholesky(self.W.toarray())
-                res = L @ (model - self.data)
+                if np.ndim(L) == 1:
+                    # 1D (diagonal) weight factor: multiply point-wise (no N x N matrix).
+                    res = L * (model - self.data)
+                else:
+                    res = L @ (model - self.data)
+        if self.keep is not None:
+            # Sparse (subsample) the residuals to the points selected by self.keep so that
+            # least_squares / lm only manipulate a reduced vector (typically the pixels of
+            # signal in a spectrogram instead of the whole image).
+            res = res[self.keep]
         return res
 
 
@@ -930,8 +956,16 @@ class FitWorkspace:
                     res_jac[ip] = np.concatenate([L[k] @ J[ip][k] for k in range(K)])
             else:
                 if np.any(model_err > 0):
-                    cov = self.data_cov + np.diag(model_err * model_err)
-                    L = np.linalg.inv(np.linalg.cholesky(cov))
+                    if self.data_cov.ndim == 1 and self.data_cov.dtype != object:
+                        # Diagonal covariance with model uncertainties: stay vectorised (1D)
+                        # (see weighted_residuals) instead of forming a full (N, N) matrix.
+                        L = 1. / np.sqrt(self.data_cov + model_err * model_err)
+                    elif self.data_cov.ndim == 2 and self.data_cov.dtype != object:
+                        cov = self.data_cov + np.diag(model_err * model_err)
+                        L = np.linalg.inv(np.linalg.cholesky(cov))
+                    else:
+                        raise ValueError(f"Case not implemented with self.data_cov.ndim={self.data_cov.ndim} "
+                                         f"and self.data_cov.dtype={self.data_cov.dtype}")
                 else:
                     if not scipy.sparse.issparse(self.W):
                         if self.W.ndim == 1 and self.W.dtype != object:
@@ -946,7 +980,16 @@ class FitWorkspace:
                             L = self.W.sqrt()
                         else:
                             L = np.linalg.cholesky(self.W.toarray())
-                res_jac = J @ L.T
+                if np.ndim(L) == 1:
+                    # 1D (diagonal) weight factor: multiply each residual-column of J by L.
+                    res_jac = L * J
+                else:
+                    res_jac = J @ L.T
+        if self.keep is not None:
+            # Keep only the columns (residuals) selected by self.keep, so the stored
+            # jacobian stays (n_params, n_selected) in consistency with the reduced
+            # residuals returned by weighted_residuals (memory saving for large data).
+            res_jac = res_jac[:, self.keep]
         return res_jac
 
 
@@ -1828,6 +1871,8 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
         result = optimize.minimize(nll, fit_workspace.params.values, method=minimizer_method,
                                    options={'maxiter': 100000}, bounds=bounds)
         fit_workspace.params.values = result['x']
+        #fit_workspace.params.cov = result['hess_inv'].todense() if hasattr(result['hess_inv'], 'todense') else result['hess_inv']
+        #fit_workspace.costs = np.append(fit_workspace.costs, [fit_workspace.chisq(fit_workspace.params.values)])
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tMinimize: total computation time: {time.time() - start}s")
@@ -1837,6 +1882,8 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
         minimizer_kwargs = dict(method=minimizer_method, bounds=bounds)
         result = optimize.basinhopping(nll, guess, minimizer_kwargs=minimizer_kwargs)
         fit_workspace.params.values = result['x']
+        #fit_workspace.params.cov = result['hess_inv'].todense() if hasattr(result['hess_inv'], 'todense') else result['hess_inv']
+        #fit_workspace.costs = np.append(fit_workspace.costs, [fit_workspace.chisq(fit_workspace.params.values)])
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
@@ -1851,7 +1898,11 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
                                      diff_step=fit_workspace.epsilon[ipar] / x_scale[ipar], bounds=list(np.array(bounds)[ipar].T))
         fit_workspace.params.values[ipar] = res.x
         Jfree = res.jac
-        fit_workspace.params.cov = np.linalg.inv(Jfree.T @ Jfree)
+        # Use the pseudo-inverse: Jfree.T @ Jfree can be singular when some free
+        # parameters are (nearly) degenerate on the fitted pixels (e.g. high-order PSF
+        # shape parameters when the spectrogram is masked down to the signal region).
+        # pinv returns the inverse on the non-singular subspace instead of crashing.
+        fit_workspace.params.cov = np.linalg.pinv(Jfree.T @ Jfree)
         fit_workspace.costs = np.append(fit_workspace.costs, [res.fun @ res.fun])
         _append_params_table(fit_workspace, fit_workspace.params.values)
         if verbose:
