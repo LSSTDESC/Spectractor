@@ -1805,9 +1805,14 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
     ipar = fit_workspace.params.get_free_parameters()
 
     def weighted_residuals_free(free_params):
-        params = np.copy(fit_workspace.params.values)
+        params = np.copy(fit_workspace.params.values).astype(float)
         params[ipar] = free_params
         return fit_workspace.weighted_residuals(params)
+
+    def weighted_residuals_jac_free(free_params):
+        params = np.copy(fit_workspace.params.values).astype(float)
+        params[ipar] = free_params
+        return fit_workspace.weighted_residuals_jac(params)[ipar].T
 
     nll = lambda params: -fit_workspace.lnlike(params)
 
@@ -1837,13 +1842,17 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
         x_scale = np.abs(guess)
         x_scale[x_scale == 0] = 0.1
         
-        res = optimize.least_squares(weighted_residuals_free, guess[ipar], verbose=2, ftol=1e-8, #x_scale=x_scale,
+        res = optimize.least_squares(weighted_residuals_free, guess[ipar], verbose=verbose, ftol=1e-8, #x_scale=x_scale,
+                                     jac=weighted_residuals_jac_free,
                                      diff_step=fit_workspace.epsilon[ipar] / x_scale[ipar], bounds=list(np.array(bounds)[ipar].T))
         fit_workspace.params.values[ipar] = res.x
         Jfree = res.jac
         fit_workspace.params.cov = np.linalg.inv(Jfree.T @ Jfree)
+        fit_workspace.costs = np.append(fit_workspace.costs, [res.fun @ res.fun])
+        _append_params_table(fit_workspace, fit_workspace.params.values)
         if verbose:
-            my_logger.debug(f"\n\t{p}")
+            fit_workspace.plot_fit()
+            my_logger.debug(f"\n\t{res}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
 
     elif method == "lm":  # pragma: no cover
@@ -1852,6 +1861,8 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
                                                        ftol=ftol, xtol=xtol, full_output=True)
         fit_workspace.params.values[ipar] = x
         fit_workspace.params.cov = cov
+        fit_workspace.costs = np.append(fit_workspace.costs, [infodict['fvec'] @ infodict['fvec']])
+        _append_params_table(fit_workspace, fit_workspace.params.values)
         if verbose:
             my_logger.debug(f"\n\t{x}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
