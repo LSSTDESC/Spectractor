@@ -1722,6 +1722,8 @@ def _init_fit_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_f
             x_norm = rescale_x_to_legendre(lambdas[idx])
             guess[bgd_npar + 3 * j] = np.sign(guess[bgd_npar + 3 * j]) * abs(
                 spec_smooth[idx] - np.polynomial.legendre.legval(x_norm, guess[:bgd_npar]))
+            # lines sharing the same peak (e.g. O2 doublet) must share the depth, not each take all of it
+            guess[bgd_npar + 3 * j] /= peak_index.count(idx)
             # guess[bgd_npar + 3 * j] = np.sign(guess[bgd_npar + 3 * j]) * abs(spec_smooth[idx] - np.polyval(guess[:bgd_npar], lambdas[idx]))
             if np.sign(guess[bgd_npar + 3 * j]) < 0:  # absorption
                 bounds[0][bgd_npar + 3 * j] = 5 * guess[bgd_npar + 3 * j]
