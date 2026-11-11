@@ -1268,47 +1268,47 @@ class FitWorkspace:
         return np.asarray(J)
 
     def hessian(self, params):  # pragma: nocover
-        """Experimental function to compute the hessian of a model.
+        """Compute the Hessian of the model residuals by centred finite differences
+        on the numerical Jacobian.
 
-        Parameters
-        ----------
-        params: array_like
-            The array of model parameters.
+        ``H[ip, jp]`` is the derivative of the ``jp``-th row of the Jacobian
+        (i.e. of ``d model / d p_jp``) with respect to the ``ip``-th parameter:
+
+            H[ip, jp, :] ≈ ( J(p + h_ip . e_ip)[jp, :] - J(p - h_ip . e_ip)[jp, :] ) / (2 . h_ip)
+
+        It reuses :meth:`jacobian` so the per-parameter finite-difference step
+        (``self.epsilon``, with the same bound "flip" convention as :meth:`jacobian`)
+        is handled consistently across the 1D / 2D cases. Fixed parameters are left at
+        zero rows/columns (like in :meth:`jacobian`).
+
+        .. note::
+            This is an experimental helper currently only used by
+            :func:`simple_newton_minimisation`, which expects a 3D array of shape
+            ``(n_params, n_params, m_residuals)`` (it accesses ``H[:, :, 0]``).
+            It is coded for the regular (non multi-block) Jacobians; the multi-block
+            object-array case is not supported here.
 
         Returns
         -------
-
+        H: np.array
+            Array of shape (n_params, n_params, m_residuals).
         """
-        x, model, model_err = self.simulate(*params)
-        model = model.flatten()
         J = self.jacobian(params)
-        H = np.zeros((params.size, params.size, model.size))
-        tmp_p = np.copy(params)
-        for ip, p1 in enumerate(params):
-            print(ip, p1, params[ip], tmp_p[ip], self.params.bounds[ip], self.epsilon[ip], tmp_p[ip] + self.epsilon[ip])
-            if self.params.fixed[ip]:
-                continue
-            if tmp_p[ip] + self.epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + self.epsilon[ip] > self.params.bounds[ip][1]:
-                self.epsilon[ip] = - self.epsilon[ip]
-            tmp_p[ip] += self.epsilon[ip]
-            print(tmp_p)
-            # tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            # J[ip] = (tmp_model.flatten() - model) / self.epsilon[ip]
-        tmp_J = self.jacobian(tmp_p)
-        for ip, p1 in enumerate(params):
-            if self.params.fixed[ip]:
-                continue
-            for jp, p2 in enumerate(params):
-                if self.params.fixed[jp]:
-                    continue
-                x, modelplus, model_err = self.simulate(params + self.epsilon)
-                x, modelmoins, model_err = self.simulate(params - self.epsilon)
-                model = model.flatten()
-
-                print("hh", ip, jp, tmp_J[ip], J[jp], tmp_p[ip], params, (tmp_J[ip] - J[jp]) / self.epsilon)
-                print((modelplus + modelmoins - 2 * model) / (np.asarray(self.epsilon) ** 2))
-                H[ip, jp] = (tmp_J[ip] - J[jp]) / self.epsilon
-                H[ip, jp] = (modelplus + modelmoins - 2 * model) / (np.asarray(self.epsilon) ** 2)
+        H = np.zeros((params.size, params.size, J.shape[1]))
+        ipar = self.params.get_free_parameters()
+        for ip in ipar:
+            h = self.epsilon[ip]
+            # mirror the bound "flip" convention used in jacobian()
+            if params[ip] + h < self.params.bounds[ip][0] or params[ip] + h > self.params.bounds[ip][1]:
+                h = -h
+            tmp_p_plus = np.copy(params)
+            tmp_p_minus = np.copy(params)
+            tmp_p_plus[ip] += h
+            tmp_p_minus[ip] -= h
+            J_plus = self.jacobian(tmp_p_plus)
+            J_minus = self.jacobian(tmp_p_minus)
+            # H[ip, jp, :] is the derivative of the jp-th Jacobian row w.r.t. p_ip
+            H[ip, :, :] = (J_plus - J_minus) / (2 * h)
         return H
 
     def __post_fit__(self):
