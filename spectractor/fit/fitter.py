@@ -1041,7 +1041,12 @@ class FitWorkspace:
                [0.  , 0.  , 0.  ]])
 
         """
-        if np.any(model_err > 0):
+        # model_err may be a flat ndarray (1D/2D cases) or an object array of blocks
+        # of unequal lengths (multi-spectra case). Evaluate the "has model errors"
+        # boolean in a way that works for both.
+        has_model_err = (model_err.dtype == object and bool(np.any([np.any(me > 0) for me in model_err]))
+                         or model_err.dtype != object and bool(np.any(model_err > 0)))
+        if has_model_err:
             if not scipy.sparse.issparse(self.W):
                 zeros = self.W == 0
                 if self.W.ndim == 1 and self.W.dtype != object:
