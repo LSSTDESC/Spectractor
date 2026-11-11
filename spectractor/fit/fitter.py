@@ -850,7 +850,7 @@ class FitWorkspace:
             else:
                 res = ((model - self.data) / np.sqrt(model_err * model_err + self.err * self.err)).flatten()
         else:
-            if self.data_cov.ndim > 2:
+            if self.data_cov.ndim > 2 or (self.data_cov.dtype == object and self.data_cov[0].ndim == 2):
                 K = self.data_cov.shape[0]
                 if np.any(model_err > 0):
                     cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
