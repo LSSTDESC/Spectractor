@@ -564,7 +564,7 @@ def lnprob_spectrogram(p):  # pragma: no cover
     return lp + fit_workspace.lnlike_spectrogram(p)
 
 
-def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
+def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False, sigma_clip=20):
     """Interface function to fit spectrogram simulation parameters to data.
 
     Parameters
@@ -589,7 +589,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
     # fit_workspace.plot_fit()
     start = time.time()
     if method != "newton":
-        run_minimisation(fit_workspace, method=method)
+        run_minimisation_sigma_clipping(fit_workspace, method=method, sigma_clip=sigma_clip, niter_clip=3)
     else:
         # costs = np.array([fit_workspace.chisq(guess)])
         # if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):

@@ -383,7 +383,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
     my_logger = set_logger(__name__)
     guess = np.asarray(fit_workspace.params.values)
     if method != "newton":
-        run_minimisation(fit_workspace, method=method)
+        run_minimisation_sigma_clipping(fit_workspace, method=method, sigma_clip=sigma_clip, niter_clip=3)
     else:
         # fit_workspace.simulation.fast_sim = True
         fit_workspace.chisq(guess)
