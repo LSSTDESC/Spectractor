@@ -288,6 +288,11 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.mask = list(set(self.mask))
         self.W = np.copy(self.W_before_mask)
         self.W[self.mask] = 0
+        # Physical (sparse) selection of the pixels actually used by least_squares / lm:
+        # all pixels except the masked ones. This shrinks the residual and jacobian
+        # vectors manipulated by those minimisers, saving memory on large spectrograms.
+        self.keep = np.ones(self.data.size, dtype=bool)
+        self.keep[np.asarray(self.mask, dtype=int)] = False
 
     def get_spectrogram_truth(self):
         """Load the truth parameters (if provided) from the file header.
