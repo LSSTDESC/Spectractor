@@ -31,6 +31,7 @@ from math import floor
 from numba import njit
 
 
+
 _SCIKIT_IMAGE_NEW_HESSIAN = None
 
 # Monkey-patch matplotlib tight_layout to handle LaTeX parsing errors

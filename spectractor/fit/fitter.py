@@ -850,9 +850,9 @@ class FitWorkspace:
             else:
                 res = ((model - self.data) / np.sqrt(model_err * model_err + self.err * self.err)).flatten()
         else:
-            if self.data_cov.ndim > 2:
+            if self.data_cov.ndim > 2 or (self.data_cov.dtype == object and self.data_cov[0].ndim == 2):
                 K = self.data_cov.shape[0]
-                if np.any(model_err > 0):
+                if np.any([np.any(me > 0) for me in model_err]):
                     cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
                     L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
                 else:
@@ -879,6 +879,76 @@ class FitWorkspace:
                             L = np.linalg.cholesky(self.W.toarray())
                 res = L @ (model - self.data)
         return res
+
+
+    def weighted_residuals_jac(self, p):  # pragma: nocover
+        """Compute the Jacobian of the weighted residuals array for a set of model parameters p.
+
+        Parameters
+        ----------
+        p: array_like
+            The array of model parameters.
+
+        Returns
+        -------
+        Jacobian: np.array
+            The Jacobian of the weighted residuals array, with shape
+            (n_params, m_residuals): each row corresponds to the derivatives
+            of the weighted residuals with respect to one model parameter.
+
+        """
+        x, model, model_err = self.simulate(*p)
+        J = self.jacobian(p, model_input=[x, model, model_err])
+        if self.data_cov is None:
+            if len(self.outliers) > 0:
+                model_err = model_err.flatten()
+                err = self.err.flatten()
+                L = 1. / np.sqrt(model_err * model_err + err * err)
+            else:
+                L = 1. / np.sqrt(model_err * model_err + self.err * self.err).flatten()
+            res_jac = L * J
+        else:
+            if self.data_cov.ndim > 2 or (self.data_cov.dtype == object and self.data_cov[0].ndim == 2):
+                K = self.data_cov.shape[0]
+                if np.any([np.any(me > 0) for me in model_err]):
+                    cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
+                    L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
+                else:
+                    L = [np.linalg.cholesky(self.W[k]) for k in range(K)]
+                # J[ip][k] is the derivative vector of block k w.r.t. parameter ip (length m_k).
+                # The weighted residual of block k is L[k] @ (model[k] - data[k]), so its
+                # derivative w.r.t. parameter ip is L[k] @ J[ip][k]. Concatenate the blocks
+                # for each parameter and stack them into an (n_params, total_m) matrix.
+                # Note: like jacobian(), fixed parameters are skipped (they have no entries
+                # in J[ip]) so we leave a zero row for them, keeping the (n_params, total_m)
+                # shape consistent with the diagonal and 2D cases.
+                total_m = sum(d.size for d in self.data)
+                res_jac = np.zeros((p.size, total_m))
+                for ip in range(p.size):
+                    if self.params.fixed[ip]:
+                        continue
+                    res_jac[ip] = np.concatenate([L[k] @ J[ip][k] for k in range(K)])
+            else:
+                if np.any(model_err > 0):
+                    cov = self.data_cov + np.diag(model_err * model_err)
+                    L = np.linalg.inv(np.linalg.cholesky(cov))
+                else:
+                    if not scipy.sparse.issparse(self.W):
+                        if self.W.ndim == 1 and self.W.dtype != object:
+                            L = np.diag(np.sqrt(self.W))
+                        elif self.W.ndim == 2 and self.W.dtype != object:
+                            L = np.linalg.cholesky(self.W)
+                        else:
+                            raise ValueError(f"Case not implemented with self.W.ndim={self.W.ndim} "
+                                             f"and self.W.dtype={self.W.dtype}")
+                    else:
+                        if scipy.sparse.isspmatrix_dia(self.W):
+                            L = self.W.sqrt()
+                        else:
+                            L = np.linalg.cholesky(self.W.toarray())
+                res_jac = J @ L.T
+        return res_jac
+
 
     def prepare_weight_matrices(self):
         r"""Compute weight matrix :math:`\mathbf{W}` `self.W` as the inverse of data covariance matrix `self.data_cov`.
@@ -1041,7 +1111,12 @@ class FitWorkspace:
                [0.  , 0.  , 0.  ]])
 
         """
-        if np.any(model_err > 0):
+        # model_err may be a flat ndarray (1D/2D cases) or an object array of blocks
+        # of unequal lengths (multi-spectra case). Evaluate the "has model errors"
+        # boolean in a way that works for both.
+        has_model_err = (model_err.dtype == object and bool(np.any([np.any(me > 0) for me in model_err]))
+                         or model_err.dtype != object and bool(np.any(model_err > 0)))
+        if has_model_err:
             if not scipy.sparse.issparse(self.W):
                 zeros = self.W == 0
                 if self.W.ndim == 1 and self.W.dtype != object:
@@ -1185,50 +1260,55 @@ class FitWorkspace:
                     J[ip].append((tmp_model[k] - model[k]) / self.epsilon[ip])
             else:
                 J[ip] = (tmp_model.flatten() - model) / self.epsilon[ip]
+        if self.W.dtype == object and self.W[0].ndim == 2:
+            # multi-block case: list of Jacobians, J[ip][k] is the derivative vector
+            # of block k with respect to parameter ip (length m_k). The dtype=object
+            # cast is mandatory to keep blocks of unequal lengths as separate arrays.
+            return np.asarray(J, dtype=object)
         return np.asarray(J)
 
     def hessian(self, params):  # pragma: nocover
-        """Experimental function to compute the hessian of a model.
+        """Compute the Hessian of the model residuals by centred finite differences
+        on the numerical Jacobian.
 
-        Parameters
-        ----------
-        params: array_like
-            The array of model parameters.
+        ``H[ip, jp]`` is the derivative of the ``jp``-th row of the Jacobian
+        (i.e. of ``d model / d p_jp``) with respect to the ``ip``-th parameter:
+
+            H[ip, jp, :] ≈ ( J(p + h_ip . e_ip)[jp, :] - J(p - h_ip . e_ip)[jp, :] ) / (2 . h_ip)
+
+        It reuses :meth:`jacobian` so the per-parameter finite-difference step
+        (``self.epsilon``, with the same bound "flip" convention as :meth:`jacobian`)
+        is handled consistently across the 1D / 2D cases. Fixed parameters are left at
+        zero rows/columns (like in :meth:`jacobian`).
+
+        .. note::
+            This is an experimental helper currently only used by
+            :func:`simple_newton_minimisation`, which expects a 3D array of shape
+            ``(n_params, n_params, m_residuals)`` (it accesses ``H[:, :, 0]``).
+            It is coded for the regular (non multi-block) Jacobians; the multi-block
+            object-array case is not supported here.
 
         Returns
         -------
-
+        H: np.array
+            Array of shape (n_params, n_params, m_residuals).
         """
-        x, model, model_err = self.simulate(*params)
-        model = model.flatten()
         J = self.jacobian(params)
-        H = np.zeros((params.size, params.size, model.size))
-        tmp_p = np.copy(params)
-        for ip, p1 in enumerate(params):
-            print(ip, p1, params[ip], tmp_p[ip], self.params.bounds[ip], self.epsilon[ip], tmp_p[ip] + self.epsilon[ip])
-            if self.params.fixed[ip]:
-                continue
-            if tmp_p[ip] + self.epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + self.epsilon[ip] > self.params.bounds[ip][1]:
-                self.epsilon[ip] = - self.epsilon[ip]
-            tmp_p[ip] += self.epsilon[ip]
-            print(tmp_p)
-            # tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            # J[ip] = (tmp_model.flatten() - model) / self.epsilon[ip]
-        tmp_J = self.jacobian(tmp_p)
-        for ip, p1 in enumerate(params):
-            if self.params.fixed[ip]:
-                continue
-            for jp, p2 in enumerate(params):
-                if self.params.fixed[jp]:
-                    continue
-                x, modelplus, model_err = self.simulate(params + self.epsilon)
-                x, modelmoins, model_err = self.simulate(params - self.epsilon)
-                model = model.flatten()
-
-                print("hh", ip, jp, tmp_J[ip], J[jp], tmp_p[ip], params, (tmp_J[ip] - J[jp]) / self.epsilon)
-                print((modelplus + modelmoins - 2 * model) / (np.asarray(self.epsilon) ** 2))
-                H[ip, jp] = (tmp_J[ip] - J[jp]) / self.epsilon
-                H[ip, jp] = (modelplus + modelmoins - 2 * model) / (np.asarray(self.epsilon) ** 2)
+        H = np.zeros((params.size, params.size, J.shape[1]))
+        ipar = self.params.get_free_parameters()
+        for ip in ipar:
+            h = self.epsilon[ip]
+            # mirror the bound "flip" convention used in jacobian()
+            if params[ip] + h < self.params.bounds[ip][0] or params[ip] + h > self.params.bounds[ip][1]:
+                h = -h
+            tmp_p_plus = np.copy(params)
+            tmp_p_minus = np.copy(params)
+            tmp_p_plus[ip] += h
+            tmp_p_minus[ip] -= h
+            J_plus = self.jacobian(tmp_p_plus)
+            J_minus = self.jacobian(tmp_p_minus)
+            # H[ip, jp, :] is the derivative of the jp-th Jacobian row w.r.t. p_ip
+            H[ip, :, :] = (J_plus - J_minus) / (2 * h)
         return H
 
     def __post_fit__(self):
@@ -1261,10 +1341,10 @@ class FitWorkspace:
             plt.show()
         if parameters.PdfPages:  # args from the above? MFL
             parameters.PdfPages.savefig()
-
-        self.simulate(*self.params.values)
-        self.live_fit = False
-        self.plot_fit()
+        if parameters.DISPLAY:
+            self.simulate(*self.params.values)
+            self.live_fit = False
+            self.plot_fit()
 
     def save_gradient_descent(self):
         iterations = np.arange(self.params_table.shape[0]).astype(int)
@@ -1407,7 +1487,20 @@ def gradient_descent(fit_workspace, niter=10, xtol=1e-3, ftol=1e-3, with_line_se
         # Jacobian
         J = fit_workspace.jacobian(tmp_params, model_input=[tmp_lambdas, tmp_model, tmp_model_err])
         # remove parameters with unexpected null Jacobian vectors or that are degenerated
-        J_vectors = [np.array(J[ip]).ravel() for ip in range(J.shape[0])]
+        # In the multi-block case (W object array), each J[ip] holds one block vector per
+        # data block (possibly of unequal lengths), so we must concatenate the blocks into
+        # a single contiguous 1D vector before measuring norms / dot products.
+        J_vectors = []
+        for ip in range(J.shape[0]):
+            J_part = J[ip]
+            # multi-block: J_part is a list or object-array of per-block vectors (ragged when a
+            # parameter is fixed, since fixed params contribute an empty sub-list, numpy returns
+            # a flat object-array of lists); concatenate the blocks into a contiguous 1D vector.
+            if isinstance(J_part, (list, tuple)) or (isinstance(J_part, np.ndarray) and J_part.dtype == object):
+                blocks = [b for b in J_part if getattr(b, 'size', 1) > 0]
+                J_vectors.append(np.concatenate(blocks).ravel() if blocks else np.array([]))
+            else:
+                J_vectors.append(np.ravel(J_part))
         J_norms = [np.linalg.norm(J_vectors[ip]) for ip in range(J.shape[0])]
         for ip in range(J.shape[0]):
             if ip not in ipar:
@@ -1433,7 +1526,12 @@ def gradient_descent(fit_workspace, niter=10, xtol=1e-3, ftol=1e-3, with_line_se
                         f"parameter {fit_workspace.params.labels[jp]} is fixed at its last known current value ({tmp_params[jp]}).")
                     continue
         # remove fixed and degenerated parameters; then transpose
-        J = J[ipar].T
+        if W.dtype == object:
+            # multi-block case: J is an object array (n_params, n_blocks) and the branches
+            # below index it as J[param][block], so keep it free-parameter indexed, not transposed.
+            J = J[ipar]
+        else:
+            J = J[ipar].T
 
         # compute J.T @ W @ J matrix and invert it
         if W.ndim == 1 and W.dtype != object:
@@ -1651,14 +1749,35 @@ def simple_newton_minimisation(fit_workspace, niter=10, xtol=1e-3, ftol=1e-3):  
     return tmp_params, inv_H[:, :, 0], np.array(funcs), np.array(params_table)
 
 
+def _append_params_table(fit_workspace, values):
+    """Append parameter rows to ``fit_workspace.params_table``.
+
+    ``params_table`` is initialised to ``None`` in :meth:`FitWorkspace.__init__` and must
+    remain an (n_rows, n_params) 2D ndarray so that :meth:`FitWorkspace.plot_gradient_descent`
+    (which accesses ``params_table.shape`` and ``params_table[:, ip]``) keeps working whatever
+    the minimisation method (gradient descent, least_squares, lm, ...) that filled it.
+
+    ``values`` may be a single 1D parameter vector ``(n_params,)`` (least_squares / lm) or a
+    full 2D block ``(n_rows, n_params)`` (gradient descent). It is stacked along ``axis=0``.
+    """
+    values = np.atleast_2d(np.asarray(values, dtype=float))
+    if fit_workspace.params_table is None:
+        fit_workspace.params_table = values.copy()
+    else:
+        fit_workspace.params_table = np.append(fit_workspace.params_table, values, axis=0)
+
+
 def run_gradient_descent(fit_workspace, xtol, ftol, niter, verbose=False, with_line_search=True):
     if fit_workspace.costs.size == 0:
         fit_workspace.costs = np.array([fit_workspace.chisq(fit_workspace.params.values)])
-        fit_workspace.params_table = np.array([fit_workspace.params.values])
+        # keep costs and params_table aligned: the initial cost corresponds to the
+        # initial parameter vector (save_gradient_descent builds one CSV row per
+        # cost / parameter-vector pair, so both must have the same length).
+        _append_params_table(fit_workspace, fit_workspace.params.values)
     p, cov, tmp_costs, tmp_params_table = gradient_descent(fit_workspace, niter=niter, xtol=xtol, ftol=ftol,
                                                            with_line_search=with_line_search)
     fit_workspace.params.values, fit_workspace.params.cov = p, cov
-    fit_workspace.params_table = np.concatenate([fit_workspace.params_table, tmp_params_table])
+    _append_params_table(fit_workspace, tmp_params_table)
     fit_workspace.costs = np.concatenate([fit_workspace.costs, tmp_costs])
     if verbose or fit_workspace.verbose:
         fit_workspace.my_logger.info(f"\n{fit_workspace.params.print_parameters_summary()}")
@@ -1685,11 +1804,22 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
                      verbose=False, with_line_search=True, minimizer_method="L-BFGS-B"):
     my_logger = set_logger(__name__)
 
+    guess = fit_workspace.params.values.astype('float64')
     bounds = fit_workspace.params.bounds
+    ipar = fit_workspace.params.get_free_parameters()
+
+    def weighted_residuals_free(free_params):
+        params = np.copy(fit_workspace.params.values).astype(float)
+        params[ipar] = free_params
+        return fit_workspace.weighted_residuals(params)
+
+    def weighted_residuals_jac_free(free_params):
+        params = np.copy(fit_workspace.params.values).astype(float)
+        params[ipar] = free_params
+        return fit_workspace.weighted_residuals_jac(params)[ipar].T
 
     nll = lambda params: -fit_workspace.lnlike(params)
 
-    guess = fit_workspace.params.values.astype('float64')
     if verbose:
         my_logger.debug(f"\n\tStart guess: {guess}")
 
@@ -1712,46 +1842,31 @@ def run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4, niter
             my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
 
     elif method == "least_squares":  # pragma: no cover
-        fit_workspace.my_logger.warning("least_squares might not work, use with caution... "
-                                        "or repair carefully the function weighted_residuals()")
         start = time.time()
         x_scale = np.abs(guess)
         x_scale[x_scale == 0] = 0.1
-        p = optimize.least_squares(fit_workspace.weighted_residuals, guess, verbose=2, ftol=1e-6, #x_scale=x_scale,
-                                   diff_step=fit_workspace.epsilon, bounds=list(np.array(bounds).T))
-        fit_workspace.params.values = p.x
+        
+        res = optimize.least_squares(weighted_residuals_free, guess[ipar], verbose=verbose, ftol=1e-8, #x_scale=x_scale,
+                                     jac=weighted_residuals_jac_free,
+                                     diff_step=fit_workspace.epsilon[ipar] / x_scale[ipar], bounds=list(np.array(bounds)[ipar].T))
+        fit_workspace.params.values[ipar] = res.x
+        Jfree = res.jac
+        fit_workspace.params.cov = np.linalg.inv(Jfree.T @ Jfree)
+        fit_workspace.costs = np.append(fit_workspace.costs, [res.fun @ res.fun])
+        _append_params_table(fit_workspace, fit_workspace.params.values)
         if verbose:
-            my_logger.debug(f"\n\t{p}")
+            fit_workspace.plot_fit()
+            my_logger.debug(f"\n\t{res}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
-
-    elif method == 'curve_fit':
-
-        def model(x, *params):
-            x, mod, mod_err = fit_workspace.simulate(*params)
-            return mod
-
-        def Dfun(x, *params):
-            return fit_workspace.jacobian(params, model_input=None).T
-
-        start = time.time()
-        result = optimize.curve_fit(model, fit_workspace.x, fit_workspace.data, jac=Dfun, x_scale='jac',
-                                    p0=fit_workspace.params.values, sigma=fit_workspace.err,
-                                    verbose=0, xtol=xtol, ftol=ftol,
-                                    bounds=list(np.array(bounds).T), absolute_sigma=True)
-        fit_workspace.params.values = result[0]
-        fit_workspace.params.cov = result[1]
-        if verbose:
-            my_logger.debug(f"\n\t{result}")
-            my_logger.debug(f"\n\tCurve_fit: total computation time: {time.time() - start}s")
-            if parameters.DEBUG:
-                fit_workspace.plot_fit()
 
     elif method == "lm":  # pragma: no cover
         start = time.time()
-        x, cov, infodict, mesg, ier = optimize.leastsq(fit_workspace.weighted_residuals, guess,
+        x, cov, infodict, mesg, ier = optimize.leastsq(weighted_residuals_free, guess[ipar],
                                                        ftol=ftol, xtol=xtol, full_output=True)
-        fit_workspace.params.values = x
+        fit_workspace.params.values[ipar] = x
         fit_workspace.params.cov = cov
+        fit_workspace.costs = np.append(fit_workspace.costs, [infodict['fvec'] @ infodict['fvec']])
+        _append_params_table(fit_workspace, fit_workspace.params.values)
         if verbose:
             my_logger.debug(f"\n\t{x}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
