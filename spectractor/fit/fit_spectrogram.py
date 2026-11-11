@@ -583,6 +583,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
     guess = np.asarray(fit_workspace.params.values)
     fit_workspace.simulate(*guess)
     # fit_workspace.plot_fit()
+    start = time.time()
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
@@ -590,7 +591,6 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         # if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
         #     fit_workspace.plot_fit()
         # params_table = np.array([guess])
-        start = time.time()
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
         fixed_default = np.copy(fit_workspace.params.fixed)
 
@@ -632,17 +632,17 @@ def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
         run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-10,
                                         ftol=1e-3 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=verbose,
                                         with_line_search=True)
-        extra = {"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
-                 "date-obs": fit_workspace.spectrum.date_obs,
-                 "outliers": len(fit_workspace.outliers)}
-        fit_workspace.params.extra = extra
-        my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
-        if fit_workspace.filename != "":
-            fit_workspace.params.plot_correlation_matrix()
-            write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params,
-                                    extra=extra)
-            # save_gradient_descent(fit_workspace, costs, params_table)
-            fit_workspace.plot_fit()
+    extra = {"chi2": fit_workspace.costs[-1] / (fit_workspace.data.size - len(fit_workspace.outliers) - len(fit_workspace.mask) - np.sum(fit_workspace.params.fixed)),
+             "date-obs": fit_workspace.spectrum.date_obs,
+             "outliers": len(fit_workspace.outliers)}
+    fit_workspace.params.extra = extra
+    my_logger.info(f"\n\t{method} total computation time: {time.time() - start}s")
+    if fit_workspace.filename != "":
+        fit_workspace.params.plot_correlation_matrix()
+        write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params,
+                                extra=extra)
+        # save_gradient_descent(fit_workspace, costs, params_table)
+        fit_workspace.plot_fit()
 
 
 if __name__ == "__main__":
