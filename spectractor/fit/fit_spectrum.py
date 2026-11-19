@@ -22,7 +22,7 @@ except ModuleNotFoundError:
 class SpectrumFitWorkspace(FitWorkspace):
 
     def __init__(self, spectrum, atmgrid_file_name="", fit_angstrom_exponent=False,
-                 verbose=False, plot=False, live_fit=False, truth=None, fixed_a1=True):
+                 verbose=False, plot=False, live_fit=False, truth=None, fixed_a1=True, fixed_dispersion=False):
         """Class to fit a spectrum extracted with Spectractor.
 
         The spectrum is supposed to be the product of the star SED, the instrument throughput and the atmospheric
@@ -49,6 +49,8 @@ class SpectrumFitWorkspace(FitWorkspace):
             Array of truth parameters to compare with the best fit result (default: None).
         fixed_a1: bool, optionnal
             Bool to fixe A1 or not (default: True)
+        fixed_dispersion: bool, optionnal
+            Bool to fixe dispersion relation
 
         Examples
         --------
@@ -83,6 +85,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         # fixed[6:8] = [True, True]
         fixed[8] = False  # alpha_pix
         fixed[9] = True
+        self.fixed_dispersion = fixed_dispersion
         # fixed[-1] = True
         if not fit_angstrom_exponent:
             fixed[3] = True  # angstrom_exponent
