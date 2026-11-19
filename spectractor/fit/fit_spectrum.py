@@ -22,7 +22,7 @@ except ModuleNotFoundError:
 class SpectrumFitWorkspace(FitWorkspace):
 
     def __init__(self, spectrum, atmgrid_file_name="", fit_angstrom_exponent=False,
-                 verbose=False, plot=False, live_fit=False, truth=None):
+                 verbose=False, plot=False, live_fit=False, truth=None, fixed_a1=True, fixed_dispersion=False):
         """Class to fit a spectrum extracted with Spectractor.
 
         The spectrum is supposed to be the product of the star SED, the instrument throughput and the atmospheric
@@ -47,6 +47,10 @@ class SpectrumFitWorkspace(FitWorkspace):
             If True, many plots along the fitting procedure are produced to see convergence in live (default: False).
         truth: array_like, optional
             Array of truth parameters to compare with the best fit result (default: None).
+        fixed_a1: bool, optionnal
+            Bool to fixe A1 or not (default: True)
+        fixed_dispersion: bool, optionnal
+            Bool to fixe dispersion relation
 
         Examples
         --------
@@ -75,12 +79,13 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.spectrum = spectrum
         p = np.array([1, 0, 0.05, 1.2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size
-        fixed[0] = True  # A1
+        fixed[0] = fixed_a1  # A1
         fixed[1] = True  #"A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
         fixed[5] = False
         # fixed[6:8] = [True, True]
         fixed[8] = False  # alpha_pix
         fixed[9] = True
+        self.fixed_dispersion = fixed_dispersion
         # fixed[-1] = True
         if not fit_angstrom_exponent:
             fixed[3] = True  # angstrom_exponent
@@ -258,6 +263,8 @@ class SpectrumFitWorkspace(FitWorkspace):
         """
         if not self.fit_angstrom_exponent:
             angstrom_exponent = None
+        if self.params.fixed[7] and self.params.fixed[8]: # DCCD and shift
+            self.simulation.fixed_dispersion = True
         lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x)
         if B != 0:
             model += B / (lambdas * np.gradient(lambdas))
@@ -359,7 +366,7 @@ def lnprob_spectrum(p):  # pragma: no cover
     return lp + w.lnlike(p)
 
 
-def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
+def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20, verbose=False, with_line_search=True):
     """Interface function to fit spectrum simulation parameters to data.
 
     Parameters
@@ -368,6 +375,10 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
         An instance of the SpectrogramFitWorkspace class.
     method: str, optional
         Fitting method (default: 'newton').
+    verbose: bool, optionnal
+        To verbose
+    with_line_search: bool, optionnal
+        Line search for newton method
 
     Examples
     --------
@@ -383,7 +394,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
     my_logger = set_logger(__name__)
     guess = np.asarray(fit_workspace.params.values)
     if method != "newton":
-        run_minimisation(fit_workspace, method=method)
+        run_minimisation(fit_workspace, method=method, verbose=verbose)
     else:
         # fit_workspace.simulation.fast_sim = True
         fit_workspace.chisq(guess)
@@ -403,8 +414,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
         fixed = copy.copy(fit_workspace.params.fixed)
         fit_workspace.params.fixed = [True] * len(fit_workspace.params)
         fit_workspace.params.fixed[fit_workspace.params.get_index(r"VAOD")] = False
-        run_minimisation(fit_workspace, method="newton", xtol=1e-3, ftol=100 / fit_workspace.data.size,
-                         verbose=False, with_line_search=False)
+        run_minimisation(fit_workspace, method="newton", xtol=1e-3, ftol=100 / fit_workspace.data.size, verbose=False, with_line_search=False)
         fit_workspace.params.fixed = fixed
         run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
                                         ftol=1e-3 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False)
@@ -417,10 +427,10 @@ def run_spectrum_minimisation(fit_workspace, method="newton", sigma_clip=20):
             fit_workspace.params.fixed[7] = False  # dccd
             fit_workspace.params.fixed[8] = False  # pixshift
             run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
-                                        ftol=1e-3 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False, with_line_search=True)
+                                        ftol=1e-3 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False, with_line_search=with_line_search)
             fit_workspace.params.fixed = fixed
             run_minimisation_sigma_clipping(fit_workspace, method="newton", xtol=1e-6,
-                                        ftol=1e-3 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False, with_line_search=True)
+                                        ftol=1e-3 / fit_workspace.data.size, sigma_clip=sigma_clip, niter_clip=3, verbose=False, with_line_search=with_line_search)
             
          
 
