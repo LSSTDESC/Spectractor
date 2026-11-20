@@ -932,7 +932,10 @@ class FitWorkspace:
                 L = 1. / np.sqrt(model_err * model_err + err * err)
             else:
                 L = 1. / np.sqrt(model_err * model_err + self.err * self.err).flatten()
-            res_jac = L * J
+            # Multiply each column of J by the corresponding element of L
+            # Reshape L to (1, m) so it broadcasts correctly to (n, m) instead of relying on
+            # NumPy broadcasting convention which can be error-prone
+            res_jac = L[np.newaxis, :] * J
         else:
             if self.data_cov.ndim > 2 or (self.data_cov.dtype == object and self.data_cov[0].ndim == 2):
                 K = self.data_cov.shape[0]
@@ -982,7 +985,9 @@ class FitWorkspace:
                             L = np.linalg.cholesky(self.W.toarray())
                 if np.ndim(L) == 1:
                     # 1D (diagonal) weight factor: multiply each residual-column of J by L.
-                    res_jac = L * J
+                    # Reshape L to (1, m) so it broadcasts correctly to (n, m) instead of relying on
+                    # NumPy broadcasting convention which can be error-prone
+                    res_jac = L[np.newaxis, :] * J
                 else:
                     res_jac = J @ L.T
         if self.keep is not None:
