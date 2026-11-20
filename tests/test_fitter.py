@@ -1,7 +1,10 @@
 import matplotlib as mpl
-mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
+#mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
 import numpy as np  # noqa: E402
+import pytest  # noqa: E402
+from spectractor.extractor.spectrum import Spectrum  # noqa: E402
+from spectractor.fit.fit_spectrum import SpectrumFitWorkspace  # noqa: E402
 from spectractor.fit.fitter import (FitParameters, FitWorkspace, run_minimisation,  # noqa: E402
                                     run_minimisation_sigma_clipping)  # noqa: E402
 from spectractor.config import set_logger  # noqa: E402
@@ -279,3 +282,58 @@ def test_weighted_residuals_jac_multiblock(seed=42, sigma_test=5):
     run_minimisation(w3, method="newton", niter=50)
     assert np.abs(w3.params.values[0] - a) < sigma_test * sigma, f"newton fixed-b a={w3.params.values[0]} != {a}"
     assert w3.params.values[1] == b, "newton fixed parameter b should be unchanged"
+
+
+def build_perfect_spectrum(file_name, atmgrid_file_name, truth, rel_err=0.01):
+    """Load a Spectrum and replace its data by the noiseless simulation computed at the truth parameters.
+
+    The simulation propagates the SED of the target (target.wavelengths and target.spectra) through the
+    instrument and atmosphere models, so the model of SpectrumFitWorkspace reproduces the data exactly
+    at the truth parameters.
+    """
+    spectrum = Spectrum(file_name)
+    w = SpectrumFitWorkspace(spectrum, atmgrid_file_name=atmgrid_file_name)
+    lambdas, model, _ = w.simulate(*truth)
+    spectrum.lambdas = lambdas.copy()
+    spectrum.data = model.copy()
+    spectrum.err = rel_err * model
+    spectrum.cov_matrix = np.diag(spectrum.err ** 2)
+    return spectrum
+
+
+@pytest.mark.parametrize("fixed_a1", [True, False])
+@pytest.mark.parametrize("fixed_dispersion", [True, False])
+def test_spectrum_fit_least_squares_perfect_spectrum(fixed_a1, fixed_dispersion):
+    # Fit a noiseless spectrum with least_squares (analytic jacobian): truth must be recovered.
+    file_name = "./tests/data/reduc_20170530_134_spectrum.fits"
+    atmgrid_file_name = file_name.replace("spectrum", "atmsim")
+    ref = SpectrumFitWorkspace(Spectrum(file_name), atmgrid_file_name=atmgrid_file_name)
+    idx = {label: ref.params.get_index(label) for label in
+           ["A1", "VAOD", "ozone [db]", "PWV [mm]", "reso [nm]", "D_CCD [mm]", "alpha_pix [pix]"]}
+
+    # truth parameters differ from the start values, except those that are fixed in the fit
+    start = np.array(ref.params.values, dtype=float)
+    truth = start.copy()
+    truth[idx["VAOD"]], truth[idx["ozone [db]"]], truth[idx["PWV [mm]"]], truth[idx["reso [nm]"]] = 0.08, 320, 4, 2
+    start[idx["VAOD"]], start[idx["ozone [db]"]], start[idx["PWV [mm]"]], start[idx["reso [nm]"]] = 0.03, 380, 6, 1.2
+    if not fixed_a1:
+        truth[idx["A1"]] = 0.9
+    if not fixed_dispersion:
+        truth[idx["D_CCD [mm]"]] += 0.3
+        truth[idx["alpha_pix [pix]"]] += 0.4
+
+    spectrum = build_perfect_spectrum(file_name, atmgrid_file_name, truth)
+    w = SpectrumFitWorkspace(spectrum, atmgrid_file_name=atmgrid_file_name, fixed_a1=fixed_a1,
+                             fixed_dispersion=fixed_dispersion)
+    assert w.params.fixed[idx["A1"]] == fixed_a1
+    assert w.params.fixed[idx["D_CCD [mm]"]] == fixed_dispersion
+    assert w.params.fixed[idx["alpha_pix [pix]"]] == fixed_dispersion
+    w.params.values = start.copy()
+    run_minimisation(w, method="least_squares")
+    w.plot_fit()
+
+    free = w.params.get_free_parameters()
+    np.testing.assert_allclose(w.params.values[free], truth[free], rtol=1e-3, atol=1e-3)
+    fixed = np.array([i for i in range(w.params.ndim) if i not in free])
+    assert np.all(w.params.values[fixed] == start[fixed]), "fixed parameters must not be modified"
+    assert w.costs[-1] / w.data.size < 1e-6
